@@ -1,0 +1,490 @@
+const express    = require('express');
+const fs         = require('fs');
+const path       = require('path');
+const https      = require('https');
+const crypto     = require('crypto');
+const os         = require('os');
+const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
+const db         = require('./db');
+
+const app  = express();
+const PORT = process.env.PORT || 3000;
+
+app.set('trust proxy', true);
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function getLocalIPs() {
+  const nets = os.networkInterfaces(); const ips = [];
+  for (const n of Object.keys(nets))
+    for (const net of nets[n])
+      if (net.family === 'IPv4' && !net.internal) ips.push(net.address);
+  return ips;
+}
+
+function httpsGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (SheetMusicCatalog/2.0)', 'Accept': 'application/json,text/html', ...headers } }, res => {
+      if (res.statusCode >= 301 && res.statusCode <= 308 && res.headers.location) {
+        const next = new URL(res.headers.location, url).href;
+        res.resume();
+        return httpsGet(next, headers).then(resolve, reject);
+      }
+      let body = ''; res.on('data', c => body += c); res.on('end', () => resolve({ status: res.statusCode, body }));
+    }).on('error', reject);
+  });
+}
+
+function baseUrl(req) {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+  return `${req.protocol}://${req.get('host')}`;
+}
+
+// Effective config = stored config, with environment variables taking precedence
+// (so secrets never need to live in the database/repo for hosted deployments).
+async function effectiveConfig() {
+  const cfg = await db.getConfig();
+  return {
+    ...cfg,
+    clientId:      process.env.GOOGLE_CLIENT_ID     || cfg.clientId,
+    clientSecret:  process.env.GOOGLE_CLIENT_SECRET || cfg.clientSecret,
+    adminPassword: process.env.ADMIN_PASSWORD       || cfg.adminPassword,
+    notifyEmail:   process.env.NOTIFY_EMAIL         || cfg.notifyEmail,
+    smtpUser:      process.env.SMTP_USER            || cfg.smtpUser,
+    smtpPass:      process.env.SMTP_PASS            || cfg.smtpPass,
+    smtpHost:      process.env.SMTP_HOST            || cfg.smtpHost,
+    smtpPort:      parseInt(process.env.SMTP_PORT)  || cfg.smtpPort,
+  };
+}
+
+// ── Admin auth ────────────────────────────────────────────────────────────────
+
+let _secretCache = null;
+async function getServerSecret() {
+  if (process.env.SECRET) return process.env.SECRET;
+  if (_secretCache) return _secretCache;
+  const cfg = await db.getConfig();
+  if (!cfg._secret) { cfg._secret = crypto.randomBytes(32).toString('hex'); await db.saveConfig(cfg); }
+  _secretCache = cfg._secret;
+  return _secretCache;
+}
+async function makeAdminToken(password) {
+  return crypto.createHmac('sha256', await getServerSecret()).update(password).digest('hex');
+}
+async function isAdminRequest(req) {
+  const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
+  if (!token) return false;
+  const cfg = await effectiveConfig();
+  if (!cfg.adminPassword) return true;
+  const expected = await makeAdminToken(cfg.adminPassword);
+  return token.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+}
+function adminRequired(req, res, next) {
+  isAdminRequest(req).then(ok => ok ? next() : res.status(403).json({ error: 'Admin access required.' }))
+    .catch(e => res.status(500).json({ error: e.message }));
+}
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+
+app.get('/api/data', async (req, res) => {
+  try { res.json(await db.getData()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Legacy whole-document replace (kept for compatibility)
+app.post('/api/data', adminRequired, async (req, res) => {
+  try { await db.replaceData(req.body); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Granular entry endpoints
+app.post('/api/entries/:tab', adminRequired, async (req, res) => {
+  try {
+    const tab = req.params.tab;
+    if (!['work', 'personal'].includes(tab)) return res.status(400).json({ error: 'Invalid tab' });
+    const entry = { ...req.body, _id: req.body._id || Date.now() };
+    if (!entry.title || !String(entry.title).trim()) return res.status(400).json({ error: 'Title is required' });
+    await db.addEntry(tab, entry);
+    res.json({ success: true, entry });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/entries/:tab/:id', adminRequired, async (req, res) => {
+  try {
+    const updated = await db.updateEntry(req.params.tab, parseInt(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ error: 'Entry not found' });
+    res.json({ success: true, entry: updated });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/entries/:tab/bulk', adminRequired, async (req, res) => {
+  try {
+    const { action, ids, patch } = req.body;
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids required' });
+    let n = 0;
+    if (action === 'delete')     n = await db.deleteEntries(req.params.tab, ids);
+    else if (action === 'patch') n = await db.patchEntries(req.params.tab, ids, patch || {});
+    else return res.status(400).json({ error: 'Unknown action' });
+    res.json({ success: true, count: n });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/entries/:tab/:id', adminRequired, async (req, res) => {
+  try {
+    const n = await db.deleteEntries(req.params.tab, [parseInt(req.params.id)]);
+    res.json({ success: true, count: n });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+app.get('/api/admin-status', async (req, res) => {
+  try {
+    const cfg = await effectiveConfig();
+    res.json({ hasPassword: !!cfg.adminPassword, isAdmin: await isAdminRequest(req) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin-login', async (req, res) => {
+  try {
+    const { password } = req.body; const cfg = await effectiveConfig();
+    if (!cfg.adminPassword) return res.json({ token: 'open', open: true });
+    if (password !== cfg.adminPassword) return res.status(401).json({ error: 'Incorrect password.' });
+    res.json({ token: await makeAdminToken(password) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin-set-password', adminRequired, async (req, res) => {
+  try {
+    if (process.env.ADMIN_PASSWORD)
+      return res.status(400).json({ error: 'Password is managed by the ADMIN_PASSWORD environment variable on the server.' });
+    const cfg = await db.getConfig();
+    if (req.body.password) cfg.adminPassword = req.body.password;
+    else delete cfg.adminPassword;
+    await db.saveConfig(cfg);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── ISBN Lookup (Google Books primary, Open Library fallback) ─────────────────
+
+app.get('/api/isbn-lookup', async (req, res) => {
+  const isbn = (req.query.isbn || '').replace(/[-\s]/g, '');
+  if (!isbn) return res.status(400).json({ error: 'ISBN required' });
+  try {
+    // 1) Google Books
+    try {
+      const { body } = await httpsGet(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+      const j = JSON.parse(body);
+      if (j.totalItems > 0 && j.items?.length) {
+        const v = j.items[0].volumeInfo || {};
+        return res.json({
+          source: 'Google Books',
+          title: [v.title, v.subtitle].filter(Boolean).join(': '),
+          author: (v.authors || []).join(', '),
+          description: v.description || '',
+          publisher: v.publisher || '',
+          year: (v.publishedDate || '').slice(0, 4),
+          pageCount: v.pageCount || '',
+          link: v.infoLink || v.canonicalVolumeLink || '',
+          thumbnail: (v.imageLinks?.thumbnail || '').replace(/^http:/, 'https:'),
+        });
+      }
+    } catch (e) { console.error('Google Books lookup failed:', e.message); }
+
+    // 2) Open Library fallback
+    const { body: olBody } = await httpsGet(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+    const olJson = JSON.parse(olBody); const key = `ISBN:${isbn}`;
+    if (olJson[key]) {
+      const b = olJson[key];
+      return res.json({
+        source: 'Open Library',
+        title: b.title || '', author: (b.authors || []).map(a => a.name).join(', '),
+        description: typeof b.notes === 'string' ? b.notes : (b.notes?.value || ''),
+        publisher: (b.publishers || []).map(p => p.name).join(', '),
+        year: (b.publish_date || '').slice(-4),
+        link: b.url || '', thumbnail: b.cover?.medium || '',
+      });
+    }
+    const { body: srchBody } = await httpsGet(`https://openlibrary.org/search.json?isbn=${isbn}&limit=1`);
+    const srchJson = JSON.parse(srchBody);
+    if (srchJson.docs?.length) {
+      const d = srchJson.docs[0];
+      return res.json({
+        source: 'Open Library',
+        title: d.title || '', author: (d.author_name || []).join(', '),
+        description: '', publisher: (d.publisher || []).slice(0, 2).join(', '),
+        year: String(d.first_publish_year || ''), link: '', thumbnail: '',
+      });
+    }
+    res.status(404).json({ error: 'No book found for that ISBN.' });
+  } catch (e) { res.status(500).json({ error: 'Lookup failed: ' + e.message }); }
+});
+
+// ── JW Pepper Lookup (title + composer) ───────────────────────────────────────
+
+const VOICING_RE = /\b(SSAATTBB|SSATB|SATTBB|SSAA|SATB|SSAB|SSA|SAB|SA|TTBB|TTB|TBB|TB|Unison|2-Part|3-Part Mixed|3-Part|Two-Part)\b/i;
+
+function parsePepperProducts(arr) {
+  return (arr || []).slice(0, 8).map(p => {
+    const props = {};
+    (p.properties || []).forEach(x => { props[x.name] = (x.values || []).join(', '); });
+    const itemNames = (p.items || []).map(i => i.name || i.nameComplete || '').filter(Boolean);
+    const voicings = [...new Set(itemNames.map(n => (n.match(VOICING_RE) || [])[1]).filter(Boolean)
+      .map(v => v.toUpperCase().replace('TWO-PART', '2-Part')))];
+    const img = p.items?.[0]?.images?.[0]?.imageUrl || '';
+    return {
+      title: p.productName || '',
+      composer: props.Composer || props.Arranger || props['Composer/Arranger'] || p[`Composer`]?.[0] || '',
+      publisher: p.brand || '',
+      voicings,
+      description: (p.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400),
+      url: p.linkText ? `https://www.jwpepper.com/${p.linkText}/p` : (p.link || ''),
+      image: img,
+    };
+  }).filter(r => r.title && r.url);
+}
+
+app.get('/api/pepper-lookup', async (req, res) => {
+  const title = (req.query.title || '').trim();
+  const composer = (req.query.composer || '').trim();
+  if (!title) return res.status(400).json({ error: 'Title required' });
+  const query = encodeURIComponent([title, composer].filter(Boolean).join(' '));
+  try {
+    // 1) VTEX intelligent search API
+    try {
+      const { status, body } = await httpsGet(`https://www.jwpepper.com/api/io/_v/api/intelligent-search/product_search/?query=${query}&count=8`);
+      if (status === 200) {
+        const j = JSON.parse(body);
+        const results = parsePepperProducts(j.products);
+        if (results.length) return res.json({ results });
+      }
+    } catch (e) { console.error('Pepper intelligent-search failed:', e.message); }
+
+    // 2) VTEX legacy catalog search API
+    try {
+      const { status, body } = await httpsGet(`https://www.jwpepper.com/api/catalog_system/pub/products/search/?ft=${query}&_from=0&_to=7`);
+      if (status === 200 || status === 206) {
+        const arr = JSON.parse(body);
+        const results = (arr || []).slice(0, 8).map(p => {
+          const voicings = [...new Set((p.items || []).map(i => (String(i.name || '').match(VOICING_RE) || [])[1])
+            .filter(Boolean).map(v => v.toUpperCase().replace('TWO-PART', '2-Part')))];
+          return {
+            title: p.productName || '',
+            composer: (p.Composer || p.Arranger || [])[0] || '',
+            publisher: p.brand || '',
+            voicings,
+            description: (p.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400),
+            url: p.linkText ? `https://www.jwpepper.com/${p.linkText}/p` : '',
+            image: p.items?.[0]?.images?.[0]?.imageUrl || '',
+          };
+        }).filter(r => r.title && r.url);
+        if (results.length) return res.json({ results });
+      }
+    } catch (e) { console.error('Pepper catalog search failed:', e.message); }
+
+    res.status(404).json({ error: 'No JW Pepper results found. Try fewer words or check spelling.' });
+  } catch (e) { res.status(500).json({ error: 'JW Pepper lookup failed: ' + e.message }); }
+});
+
+// ── Requests (Library system) ─────────────────────────────────────────────────
+
+app.post('/api/request', async (req, res) => {
+  try {
+    const { entryTitle, entryType, entryComposer, entryVoicing, tab,
+            name, email, school, district, copies, message } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required.' });
+
+    const request = {
+      id: Date.now(), timestamp: new Date().toISOString(),
+      tab, entryTitle, entryType, entryComposer: entryComposer || '', entryVoicing: entryVoicing || '',
+      name: name.trim(), email: (email || '').trim(), school: (school || '').trim(),
+      district: (district || '').trim(), copies: (copies || '').trim(), message: (message || '').trim(),
+      status: 'pending'
+    };
+    await db.addRequest(request);
+
+    const cfg = await effectiveConfig();
+    if (cfg.notifyEmail && cfg.smtpUser && cfg.smtpPass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: cfg.smtpHost || 'smtp.gmail.com',
+          port: cfg.smtpPort || 587,
+          secure: cfg.smtpPort === 465,
+          auth: { user: cfg.smtpUser, pass: cfg.smtpPass },
+        });
+        const typeLabel = entryType === 'octavo' ? 'Octavo' : 'Book';
+        const tabLabel  = tab === 'work' ? 'Work' : 'Personal';
+        const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        await transporter.sendMail({
+          from: `"Sheet Music Catalog" <${cfg.smtpUser}>`,
+          to: cfg.notifyEmail,
+          subject: `📚 New Request: "${entryTitle}" (${typeLabel})`,
+          html: `
+<div style="font-family:sans-serif;max-width:540px;margin:0 auto;color:#1a1917;">
+  <div style="background:#2d5a8e;padding:20px 24px;border-radius:8px 8px 0 0;">
+    <h2 style="margin:0;color:#fff;font-size:18px;">New Sheet Music Request</h2>
+    <p style="margin:4px 0 0;color:#c8d9ef;font-size:13px;">from your catalog</p>
+  </div>
+  <div style="border:1px solid #e2e0db;border-top:none;border-radius:0 0 8px 8px;padding:24px;">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0eeea;font-weight:600;color:#2d5a8e;width:36%;">Item</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f0eeea;">${esc(entryTitle) || '—'}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0eeea;color:#6b6860;">Type</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f0eeea;">${typeLabel} · ${tabLabel} collection</td></tr>
+      ${entryComposer ? `<tr><td style="padding:8px 0;border-bottom:1px solid #f0eeea;color:#6b6860;">Composer</td><td style="padding:8px 0;border-bottom:1px solid #f0eeea;">${esc(entryComposer)}</td></tr>` : ''}
+      ${entryVoicing ? `<tr><td style="padding:8px 0;border-bottom:1px solid #f0eeea;color:#6b6860;">Voicing</td><td style="padding:8px 0;border-bottom:1px solid #f0eeea;">${esc(entryVoicing)}</td></tr>` : ''}
+    </table>
+    <h3 style="font-size:14px;color:#6b6860;text-transform:uppercase;letter-spacing:.5px;margin:0 0 12px;">Requester</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <tr><td style="padding:6px 0;color:#6b6860;width:36%;">Name</td><td style="padding:6px 0;font-weight:500;">${esc(name)}</td></tr>
+      ${email ? `<tr><td style="padding:6px 0;color:#6b6860;">Email</td><td style="padding:6px 0;"><a href="mailto:${esc(email)}">${esc(email)}</a></td></tr>` : ''}
+      ${school ? `<tr><td style="padding:6px 0;color:#6b6860;">School</td><td style="padding:6px 0;">${esc(school)}</td></tr>` : ''}
+      ${district ? `<tr><td style="padding:6px 0;color:#6b6860;">District</td><td style="padding:6px 0;">${esc(district)}</td></tr>` : ''}
+      ${copies ? `<tr><td style="padding:6px 0;color:#6b6860;">Copies needed</td><td style="padding:6px 0;">${esc(copies)}</td></tr>` : ''}
+    </table>
+    ${message ? `<div style="background:#f8f7f4;border-radius:6px;padding:14px;font-size:13px;color:#1a1917;line-height:1.6;"><strong>Message:</strong><br>${esc(message)}</div>` : ''}
+    <p style="margin:20px 0 0;font-size:12px;color:#6b6860;">
+      Received ${new Date().toLocaleString()} · View all requests in your catalog under ⚙ Settings → Requests.
+    </p>
+  </div>
+</div>`,
+        });
+      } catch (e) { console.error('Email error:', e.message); }
+    }
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/requests', adminRequired, async (req, res) => {
+  try { res.json(await db.getRequests()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/requests/:id/status', adminRequired, async (req, res) => {
+  try { await db.setRequestStatus(parseInt(req.params.id), req.body.status); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/requests/:id', adminRequired, async (req, res) => {
+  try { await db.deleteRequest(parseInt(req.params.id)); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Share info / health ───────────────────────────────────────────────────────
+
+app.get('/api/share-info', (req, res) => res.json({ ips: getLocalIPs(), port: PORT, appUrl: process.env.APP_URL || null, hosted: db.mode === 'postgres' }));
+app.get('/healthz', (req, res) => res.json({ ok: true, storage: db.mode }));
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+app.get('/api/auth-status', async (req, res) => {
+  try {
+    const cfg = await effectiveConfig();
+    const tokens = await db.getTokens();
+    res.json({ configured: !!(cfg.clientId && cfg.clientSecret), authenticated: !!(cfg.clientId && cfg.clientSecret && tokens), spreadsheetId: cfg.spreadsheetId || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin-only: previously this leaked the Google client secret to all visitors.
+app.get('/api/config-read', adminRequired, async (req, res) => {
+  try {
+    const c = await effectiveConfig();
+    res.json({
+      clientId: c.clientId || '', clientSecretSet: !!c.clientSecret, hasAdminPassword: !!c.adminPassword,
+      notifyEmail: c.notifyEmail || '', smtpUser: c.smtpUser || '', smtpHost: c.smtpHost || '', smtpPort: c.smtpPort || '',
+      envManaged: { adminPassword: !!process.env.ADMIN_PASSWORD, google: !!process.env.GOOGLE_CLIENT_ID },
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/config', adminRequired, async (req, res) => {
+  try {
+    const allowed = ['clientId', 'clientSecret', 'notifyEmail', 'smtpUser', 'smtpPass', 'smtpHost', 'smtpPort'];
+    const cfg = await db.getConfig();
+    for (const k of allowed) if (k in req.body) cfg[k] = req.body[k];
+    await db.saveConfig(cfg);
+    if (req.body.clientId || req.body.clientSecret) await db.deleteTokens();
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Google OAuth ──────────────────────────────────────────────────────────────
+
+async function getOAuthClient(req) {
+  const cfg = await effectiveConfig();
+  if (!cfg.clientId || !cfg.clientSecret) return null;
+  return new google.auth.OAuth2(cfg.clientId, cfg.clientSecret, `${baseUrl(req)}/auth/callback`);
+}
+
+app.get('/auth/google', async (req, res) => {
+  const c = await getOAuthClient(req); if (!c) return res.redirect('/?error=no-config');
+  res.redirect(c.generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file'] }));
+});
+
+app.get('/auth/callback', async (req, res) => {
+  try {
+    const c = await getOAuthClient(req);
+    const { tokens } = await c.getToken(req.query.code);
+    await db.saveTokens(tokens);
+    res.redirect('/?auth=success');
+  } catch (e) { res.redirect(`/?error=${encodeURIComponent(e.message)}`); }
+});
+
+app.post('/auth/revoke', adminRequired, async (req, res) => {
+  await db.deleteTokens();
+  const cfg = await db.getConfig(); delete cfg.spreadsheetId; await db.saveConfig(cfg);
+  res.json({ success: true });
+});
+
+// ── Google Sheets Sync ────────────────────────────────────────────────────────
+
+app.post('/api/sync-sheets', adminRequired, async (req, res) => {
+  const { tab, rows, headers } = req.body;
+  try {
+    const c = await getOAuthClient(req); if (!c) return res.status(400).json({ error: 'Google credentials not configured.' });
+    const tokens = await db.getTokens();
+    if (!tokens) return res.status(401).json({ error: 'Not authenticated with Google.' });
+    c.setCredentials(tokens);
+    c.on('tokens', t => db.saveTokens({ ...tokens, ...t }).catch(() => {}));
+    const sheets = google.sheets({ version: 'v4', auth: c });
+    const cfg = await db.getConfig();
+    let spreadsheetId = cfg.spreadsheetId;
+    if (!spreadsheetId) {
+      const created = await sheets.spreadsheets.create({ requestBody: { properties: { title: 'Sheet Music Library' }, sheets: [{ properties: { title: 'Work', index: 0 } }, { properties: { title: 'Personal', index: 1 } }] } });
+      spreadsheetId = created.data.spreadsheetId; cfg.spreadsheetId = spreadsheetId; await db.saveConfig(cfg);
+    }
+    const sheetTitle = tab === 'work' ? 'Work' : 'Personal';
+    const ss = await sheets.spreadsheets.get({ spreadsheetId });
+    if (!ss.data.sheets.some(s => s.properties.title === sheetTitle))
+      await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [{ addSheet: { properties: { title: sheetTitle } } }] } });
+    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `${sheetTitle}!A:Z` });
+    await sheets.spreadsheets.values.update({ spreadsheetId, range: `${sheetTitle}!A1`, valueInputOption: 'RAW', requestBody: { values: [headers, ...rows] } });
+    const sheetId = (await sheets.spreadsheets.get({ spreadsheetId })).data.sheets.find(s => s.properties.title === sheetTitle).properties.sheetId;
+    await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [
+      { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: 'userEnteredFormat.textFormat.bold' } },
+      { autoResizeDimensions: { dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: headers.length } } }
+    ] } });
+    res.json({ success: true, spreadsheetId, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}` });
+  } catch (e) {
+    console.error('Sync error:', e.message);
+    const isAuth = e.code === 401 || (e.message && e.message.includes('invalid_grant'));
+    if (isAuth) await db.deleteTokens();
+    res.status(isAuth ? 401 : 500).json({ error: e.message, reauth: isAuth });
+  }
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+db.init().then(() => {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🎵  Sheet Music Catalog  (storage: ${db.mode})`);
+    console.log(`   Local:   http://localhost:${PORT}`);
+    if (db.mode === 'json') getLocalIPs().forEach(ip => console.log(`   Network: http://${ip}:${PORT}`));
+    console.log('');
+  });
+}).catch(e => { console.error('Failed to initialize storage:', e); process.exit(1); });

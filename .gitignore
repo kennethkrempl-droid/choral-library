@@ -1,0 +1,13 @@
+node_modules/
+.tokens.json
+config.json
+backups/
+.DS_Store
+.env
+.railway-cli/
+.admin-password.txt
+deploy.log
+deploy.command
+.tools/
+.neon-project.json
+.database-url.txt

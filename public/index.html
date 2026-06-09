@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Choral Library — Sheet Music Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root {
+  --bg:#f5f3ee; --surface:#fffefb; --line:#e5e1d8; --line-soft:#efece4;
+  --ink:#1f1d19; --muted:#6f6a5f; --faint:#9b958a;
+  --navy:#23344f; --navy-deep:#1a283d; --navy-soft:#eef2f8;
+  --accent:#33567f; --accent-hover:#284562; --accent-light:#e9eff7; --accent-line:#c9d7e8;
+  --gold:#a3742a; --gold-light:#faf3e3; --gold-line:#e7d4a8;
+  --danger:#b2392b; --danger-light:#fbeeec; --danger-line:#ecc6bf;
+  --success:#22784a; --success-light:#eaf6ef; --success-line:#bfe3cd;
+  --warning:#9a6314; --warning-light:#fdf5e6; --warning-line:#f0d9a8;
+  --r:10px; --r-sm:7px;
+  --shadow:0 1px 2px rgba(31,29,25,.05),0 2px 8px rgba(31,29,25,.05);
+  --shadow-md:0 6px 24px rgba(31,29,25,.14);
+  --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --display:'Fraunces',Georgia,serif;
+}
+html { scrollbar-gutter:stable; }
+body { font-family:var(--font); background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5; min-height:100vh; }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+.text-muted { color:var(--muted); }
+.divider { border:none; border-top:1px solid var(--line); margin:4px 0; }
+
+/* ── Header ── */
+header { background:linear-gradient(135deg,var(--navy-deep) 0%,var(--navy) 100%); color:#f3f0e9; padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; gap:14px; position:sticky; top:0; z-index:100; box-shadow:0 1px 0 rgba(0,0,0,.2); }
+.brand { display:flex; align-items:center; gap:12px; min-width:0; }
+.brand-mark { width:34px; height:34px; border-radius:9px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+.brand-text { line-height:1.15; white-space:nowrap; overflow:hidden; }
+.brand-title { font-family:var(--display); font-size:18px; font-weight:600; letter-spacing:.2px; }
+.brand-sub { font-size:11px; color:rgba(243,240,233,.55); letter-spacing:.6px; text-transform:uppercase; }
+.header-actions { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+
+/* ── Buttons ── */
+button { font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; border:none; border-radius:var(--r-sm); padding:7px 14px; display:inline-flex; align-items:center; gap:6px; transition:background .15s,border-color .15s,color .15s,opacity .15s; white-space:nowrap; line-height:1.4; }
+button:disabled { opacity:.45; cursor:not-allowed; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover:not(:disabled) { background:var(--accent-hover); }
+.btn-secondary { background:var(--surface); color:var(--ink); border:1px solid var(--line); box-shadow:0 1px 1px rgba(31,29,25,.04); }
+.btn-secondary:hover:not(:disabled) { background:var(--bg); border-color:#d6d1c5; }
+.btn-danger { background:var(--danger-light); color:var(--danger); border:1px solid var(--danger-line); }
+.btn-danger:hover:not(:disabled) { background:#f6ded9; }
+.btn-success { background:var(--success-light); color:var(--success); border:1px solid var(--success-line); }
+.btn-success:hover:not(:disabled) { background:#dbefe3; }
+.btn-gold { background:var(--gold-light); color:var(--gold); border:1px solid var(--gold-line); }
+.btn-gold:hover:not(:disabled) { background:#f4e8cb; }
+.btn-ghost { background:transparent; color:var(--muted); padding:5px 9px; }
+.btn-ghost:hover:not(:disabled) { background:rgba(31,29,25,.06); color:var(--ink); }
+.btn-sm { font-size:12px; padding:5px 10px; }
+.btn-icon { padding:5px; width:28px; height:28px; justify-content:center; border-radius:6px; }
+.btn-header { background:rgba(255,255,255,.1); color:#f3f0e9; border:1px solid rgba(255,255,255,.2); }
+.btn-header:hover:not(:disabled) { background:rgba(255,255,255,.18); }
+.btn-header.active { background:#f3f0e9; color:var(--navy-deep); border-color:#f3f0e9; }
+
+/* ── Viewer banner ── */
+.viewer-banner { background:var(--gold-light); border-bottom:1px solid var(--gold-line); padding:8px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; color:var(--gold); }
+.viewer-banner.hidden { display:none; }
+
+/* ── Tabs ── */
+.tabs-nav { display:flex; gap:4px; padding:10px 24px 0; background:var(--surface); border-bottom:1px solid var(--line); position:sticky; top:60px; z-index:90; overflow-x:auto; }
+.tab-btn { background:none; border:none; border-bottom:2px solid transparent; border-radius:0; padding:10px 16px 12px; color:var(--muted); font-weight:500; font-size:14px; cursor:pointer; transition:color .15s,border-color .15s; margin-bottom:-1px; white-space:nowrap; display:flex; align-items:center; gap:7px; }
+.tab-btn:hover { color:var(--ink); }
+.tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+.tab-count { font-size:11px; font-weight:600; background:var(--bg); border:1px solid var(--line); color:var(--muted); border-radius:20px; padding:0 7px; line-height:17px; }
+.tab-btn.active .tab-count { background:var(--accent-light); border-color:var(--accent-line); color:var(--accent); }
+.tab-panel { display:none; padding:22px 24px 60px; max-width:1480px; margin:0 auto; }
+.tab-panel.active { display:block; }
+
+/* ── Stats ── */
+.stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:18px; }
+.stat-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 16px; box-shadow:var(--shadow); }
+.stat-value { font-family:var(--display); font-size:24px; font-weight:600; line-height:1.1; }
+.stat-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--faint); margin-top:3px; }
+
+/* ── Cards ── */
+.card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); }
+.card + .card { margin-top:18px; }
+.card-header { padding:13px 18px; border-bottom:1px solid var(--line-soft); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.card-header h3 { font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px; }
+.card-body { padding:18px; }
+.action-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+.action-bar .spacer { flex:1; }
+
+/* ── Add entry card ── */
+.add-card { margin-bottom:18px; overflow:hidden; }
+.add-card-toggle { width:100%; background:var(--surface); border:none; padding:13px 18px; display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:var(--ink); border-radius:0; }
+.add-card-toggle:hover { background:var(--bg); }
+.add-card-toggle .chev { margin-left:auto; transition:transform .2s; color:var(--muted); }
+.add-card.open .add-card-toggle .chev { transform:rotate(180deg); }
+.add-card-inner { display:none; border-top:1px solid var(--line-soft); }
+.add-card.open .add-card-inner { display:block; }
+
+/* ── Forms ── */
+.form-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(195px,1fr)); gap:13px; }
+.form-group { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.form-group.full { grid-column:1/-1; }
+.form-group label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+.form-group input,.form-group select,.form-group textarea { font-family:inherit; font-size:14px; padding:8px 11px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--surface); color:var(--ink); outline:none; transition:border-color .15s,box-shadow .15s,background .3s; width:100%; }
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(51,86,127,.12); }
+.form-group textarea { resize:vertical; min-height:72px; }
+.form-group input.flash { background:var(--success-light); border-color:var(--success-line); }
+.input-row { display:flex; gap:6px; align-items:stretch; }
+.input-row input { flex:1; min-width:0; }
+.btn-scan { padding:0 10px; background:var(--bg); border:1px solid var(--line); border-radius:var(--r-sm); color:var(--muted); font-size:15px; flex-shrink:0; }
+.btn-scan:hover { background:var(--accent-light); color:var(--accent); }
+.form-footer { display:flex; gap:8px; align-items:center; margin-top:16px; padding-top:14px; border-top:1px solid var(--line-soft); flex-wrap:wrap; }
+.entry-type-toggle { display:flex; gap:3px; background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:3px; }
+.entry-type-toggle button { border-radius:6px; padding:5px 16px; font-size:13px; background:none; color:var(--muted); border:none; font-weight:500; }
+.entry-type-toggle button.active { background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:600; }
+.dup-warning { display:none; margin-top:12px; background:var(--warning-light); border:1px solid var(--warning-line); border-radius:var(--r-sm); padding:10px 13px; font-size:13px; color:var(--warning); }
+.dup-warning.visible { display:block; }
+.dup-warning strong { font-weight:600; }
+
+/* ── Table controls ── */
+.table-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:13px 15px; border-bottom:1px solid var(--line-soft); }
+.search-input { flex:1; min-width:170px; max-width:320px; padding:8px 11px 8px 32px; border:1px solid var(--line); border-radius:var(--r-sm); font-family:inherit; font-size:13px; outline:none; color:var(--ink); background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%236f6a5f' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center; transition:border-color .15s; }
+.search-input:focus { border-color:var(--accent); background-color:var(--surface); }
+.filter-select { padding:8px 28px 8px 10px; border:1px solid var(--line); border-radius:var(--r-sm); font-family:inherit; font-size:13px; background:var(--bg); color:var(--ink); outline:none; cursor:pointer; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236f6a5f' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 9px center; }
+.filter-select:focus { border-color:var(--accent); }
+.filter-select.active-filter { border-color:var(--accent-line); background-color:var(--accent-light); color:var(--accent); font-weight:500; }
+.clear-filters { display:none; }
+.clear-filters.visible { display:inline-flex; }
+
+/* ── Bulk bar ── */
+.bulk-bar { display:none; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 15px; background:var(--navy-soft); border-bottom:1px solid var(--accent-line); font-size:13px; }
+.bulk-bar.visible { display:flex; }
+.bulk-count { font-weight:600; color:var(--accent); margin-right:4px; }
+
+/* ── Table ── */
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+thead th { text-align:left; padding:10px 12px; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); border-bottom:1px solid var(--line); white-space:nowrap; cursor:pointer; user-select:none; background:var(--surface); position:sticky; top:0; }
+thead th:hover { color:var(--ink); }
+thead th.sorted { color:var(--accent); }
+thead th .sort-icon { opacity:.4; font-size:10px; margin-left:3px; }
+thead th.sorted .sort-icon { opacity:1; }
+thead th.col-check,tbody td.col-check { width:34px; padding:6px 6px 6px 14px; cursor:default; }
+tbody tr { border-bottom:1px solid var(--line-soft); transition:background .1s; }
+tbody tr:last-child { border-bottom:none; }
+tbody tr:hover { background:var(--navy-soft); }
+tbody tr.selected { background:var(--accent-light); }
+tbody td { padding:9px 12px; vertical-align:middle; }
+td.cell-title { font-weight:600; max-width:300px; }
+td.cell-title .title-link { color:inherit; }
+td.cell-title .title-link:hover { color:var(--accent); text-decoration:none; }
+td.cell-title .ext { font-size:11px; opacity:.55; margin-left:3px; }
+.tag-chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:3px; }
+.tag-chip { font-size:10px; font-weight:600; background:var(--gold-light); color:var(--gold); border:1px solid var(--gold-line); border-radius:20px; padding:0 7px; line-height:16px; }
+input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
+.badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:var(--bg); border:1px solid var(--line); color:var(--muted); }
+.badge.octavo { background:var(--accent-light); color:var(--accent); border-color:var(--accent-line); }
+.badge.book { background:#f2edfa; color:#5e3ea8; border-color:#dccfee; }
+.voicing-chip { display:inline-block; font-size:11px; font-weight:600; font-family:var(--font); background:var(--bg); border:1px solid var(--line); color:var(--muted); border-radius:5px; padding:1px 7px; letter-spacing:.3px; }
+.row-actions { display:flex; gap:3px; align-items:center; justify-content:flex-end; }
+.btn-request { background:var(--gold-light); color:var(--gold); border:1px solid var(--gold-line); font-size:12px; padding:3px 10px; border-radius:20px; }
+.btn-request:hover:not(:disabled) { background:#f4e8cb; }
+.desc-cell { cursor:pointer; max-width:280px; font-size:12.5px; color:var(--muted); }
+.desc-cell .desc-full { display:none; white-space:pre-wrap; }
+.desc-cell .show-less { display:none; }
+.desc-cell.expanded .desc-preview { display:none; }
+.desc-cell.expanded .desc-full { display:inline; }
+.desc-cell.expanded .show-more { display:none; }
+.desc-cell.expanded .show-less { display:inline; }
+.desc-toggle { font-size:11px; color:var(--accent); white-space:nowrap; }
+.empty-state { text-align:center; padding:56px 24px; color:var(--muted); }
+.empty-state .empty-icon { font-size:34px; opacity:.4; margin-bottom:10px; }
+.empty-state p { margin-top:6px; font-size:13px; }
+.table-footer { padding:10px 15px; border-top:1px solid var(--line-soft); font-size:12px; color:var(--muted); display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+
+/* ── Status badges ── */
+.status-badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.status-pending { background:var(--warning-light); color:var(--warning); border:1px solid var(--warning-line); }
+.status-fulfilled { background:var(--success-light); color:var(--success); border:1px solid var(--success-line); }
+.status-declined { background:var(--danger-light); color:var(--danger); border:1px solid var(--danger-line); }
+
+/* ── Modals ── */
+.modal-overlay { position:fixed; inset:0; background:rgba(26,30,38,.5); backdrop-filter:blur(2px); z-index:200; display:flex; align-items:center; justify-content:center; padding:16px; opacity:0; pointer-events:none; transition:opacity .18s; }
+.modal-overlay.open { opacity:1; pointer-events:auto; }
+.modal { background:var(--surface); border-radius:14px; box-shadow:var(--shadow-md); width:100%; max-width:580px; max-height:92vh; overflow-y:auto; transform:translateY(10px) scale(.99); transition:transform .18s; }
+.modal-overlay.open .modal { transform:translateY(0) scale(1); }
+.modal-header { padding:16px 20px 14px; border-bottom:1px solid var(--line-soft); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:var(--surface); z-index:1; }
+.modal-header h2 { font-family:var(--display); font-size:17px; font-weight:600; }
+.modal-body { padding:18px 20px; }
+.modal-footer { padding:13px 20px; border-top:1px solid var(--line-soft); display:flex; gap:8px; justify-content:flex-end; position:sticky; bottom:0; background:var(--surface); }
+
+/* ── Pepper results ── */
+.pepper-result { display:flex; gap:13px; padding:13px 0; border-bottom:1px solid var(--line-soft); align-items:flex-start; }
+.pepper-result:last-child { border-bottom:none; }
+.pepper-cover { width:52px; height:68px; object-fit:cover; border-radius:5px; border:1px solid var(--line); background:var(--bg); flex-shrink:0; }
+.pepper-cover.placeholder { display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:20px; }
+.pepper-main { flex:1; min-width:0; }
+.pepper-title { font-weight:600; font-size:14px; }
+.pepper-meta { font-size:12px; color:var(--muted); margin-top:1px; }
+.pepper-desc { font-size:12px; color:var(--faint); margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.pepper-voicings { display:flex; gap:5px; flex-wrap:wrap; margin-top:7px; }
+.pepper-voicings button { font-size:11px; padding:3px 10px; }
+
+/* ── Dup modal ── */
+.dup-match { background:var(--warning-light); border:1px solid var(--warning-line); border-radius:var(--r-sm); padding:10px 13px; margin-bottom:8px; font-size:13px; }
+.dup-match .dm-title { font-weight:600; }
+.dup-match .dm-meta { font-size:12px; color:var(--muted); margin-top:1px; }
+
+/* ── Request modal ── */
+.request-item-card { background:var(--accent-light); border:1px solid var(--accent-line); border-radius:var(--r-sm); padding:12px 14px; margin-bottom:16px; }
+.request-item-card .item-title { font-weight:600; font-size:14px; }
+.request-item-card .item-meta { font-size:12px; color:var(--muted); margin-top:2px; }
+.request-success { text-align:center; padding:20px 0; }
+.request-success .success-icon { font-size:40px; margin-bottom:12px; }
+.request-success h3 { font-family:var(--display); font-size:17px; font-weight:600; margin-bottom:6px; }
+.request-success p { font-size:13px; color:var(--muted); }
+
+/* ── Scanner ── */
+#scanner-modal .modal { max-width:420px; }
+#reader { width:100%; border-radius:8px; overflow:hidden; background:#000; min-height:260px; }
+.scanner-hint { text-align:center; font-size:13px; color:var(--muted); margin-top:10px; }
+
+/* ── Settings ── */
+.settings-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+.settings-section { border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--surface); box-shadow:var(--shadow); }
+.settings-section-header { padding:12px 16px; background:var(--bg); border-bottom:1px solid var(--line); font-weight:600; font-size:13px; display:flex; align-items:center; gap:8px; }
+.settings-section-body { padding:16px; display:flex; flex-direction:column; gap:12px; }
+.env-note { font-size:11px; color:var(--faint); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 10px; }
+
+/* ── Google wizard ── */
+.wizard-steps { display:flex; margin-bottom:16px; }
+.wizard-step { flex:1; text-align:center; padding:8px 4px; border-bottom:2px solid var(--line); font-size:12px; font-weight:500; color:var(--muted); cursor:pointer; }
+.wizard-step.active { color:var(--accent); border-bottom-color:var(--accent); }
+.wizard-step.done { color:var(--success); border-bottom-color:var(--success); }
+.wizard-step .step-num { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:11px; font-weight:700; background:var(--line); color:var(--muted); margin-bottom:3px; }
+.wizard-step.active .step-num { background:var(--accent); color:#fff; }
+.wizard-step.done .step-num { background:var(--success); color:#fff; }
+.wizard-page { display:none; }
+.wizard-page.active { display:block; }
+.wizard-instruction { background:var(--accent-light); border:1px solid var(--accent-line); border-radius:8px; padding:13px 15px; margin-bottom:12px; }
+.wizard-instruction ol { padding-left:18px; font-size:13px; line-height:2.1; }
+.wizard-instruction code { background:rgba(51,86,127,.12); padding:1px 6px; border-radius:4px; font-family:monospace; font-size:12px; color:var(--accent); }
+.connected-box { background:var(--success-light); border:1px solid var(--success-line); border-radius:8px; padding:14px; text-align:center; }
+
+/* ── Requests list ── */
+.request-row { border-bottom:1px solid var(--line-soft); padding:12px 0; display:flex; gap:12px; align-items:flex-start; }
+.request-row:last-child { border-bottom:none; }
+.request-row-main { flex:1; min-width:0; }
+.request-row-title { font-weight:600; font-size:13px; }
+.request-row-meta { font-size:12px; color:var(--muted); margin-top:2px; line-height:1.6; }
+.request-row-actions { display:flex; gap:4px; flex-shrink:0; }
+
+/* ── Share ── */
+.share-url-row { display:flex; gap:6px; align-items:center; background:var(--bg); border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 12px; }
+.share-url-row span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--accent); font-family:monospace; font-size:13px; }
+
+/* ── Auth pill ── */
+.auth-pill { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:500; }
+header .auth-pill.connected { background:rgba(82,196,128,.15); color:#8fe0ae; }
+header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(243,240,233,.5); }
+.settings-section .auth-pill.connected { background:var(--success-light); color:var(--success); }
+.settings-section .auth-pill.disconnected { background:var(--bg); color:var(--muted); border:1px solid var(--line); }
+.auth-pill .dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+/* ── Toasts ── */
+#toast-container { position:fixed; bottom:20px; right:20px; z-index:999; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+.toast { padding:11px 15px; border-radius:9px; font-size:13px; font-weight:500; box-shadow:var(--shadow-md); pointer-events:auto; display:flex; align-items:center; gap:8px; animation:slideIn .2s ease; max-width:320px; background:var(--surface); }
+@keyframes slideIn { from{transform:translateX(20px);opacity:0} to{transform:translateX(0);opacity:1} }
+.toast.success { background:var(--success-light); color:var(--success); border:1px solid var(--success-line); }
+.toast.error { background:var(--danger-light); color:var(--danger); border:1px solid var(--danger-line); }
+.toast.info { background:var(--accent-light); color:var(--accent); border:1px solid var(--accent-line); }
+.spinner { width:13px; height:13px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spin .6s linear infinite; display:inline-block; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+@media(max-width:640px){
+  header{padding:0 14px;height:54px}
+  .brand-sub{display:none}
+  .tabs-nav{padding:6px 14px 0;top:54px}
+  .tab-panel{padding:14px 12px 50px}
+  .form-grid{grid-template-columns:1fr}
+  .settings-grid{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">𝄞</div>
+    <div class="brand-text">
+      <div class="brand-title">Choral Library</div>
+      <div class="brand-sub">Sheet Music Catalog</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <span id="auth-pill" class="auth-pill disconnected admin-only"><span class="dot"></span>Google</span>
+    <button id="admin-btn" class="btn-header btn-sm" onclick="toggleAdmin()">🔓 Sign In</button>
+  </div>
+</header>
+
+<div class="viewer-banner hidden" id="viewer-banner">
+  <span>You're browsing the library in read-only mode — search and explore freely, or request an item.</span>
+  <button class="btn-sm btn-primary" onclick="toggleAdmin()">Librarian Login</button>
+</div>
+
+<nav class="tabs-nav">
+  <button class="tab-btn active" data-tab="work">Work <span class="tab-count" id="count-work">0</span></button>
+  <button class="tab-btn" data-tab="personal">Personal <span class="tab-count" id="count-personal">0</span></button>
+  <button class="tab-btn admin-only" data-tab="settings">⚙ Settings</button>
+</nav>
+
+<!-- ═══ LIBRARY TABS (work + personal share markup, generated) ═══ -->
+<div class="tab-panel active" id="tab-work"></div>
+<div class="tab-panel" id="tab-personal"></div>
+
+<!-- ═══ SETTINGS TAB ═══ -->
+<div class="tab-panel" id="tab-settings">
+  <div class="settings-grid">
+
+    <div class="settings-section admin-only" style="grid-column:1/-1;">
+      <div class="settings-section-header">
+        📬 Requests
+        <span id="request-count-badge" style="background:var(--warning-light);color:var(--warning);border:1px solid var(--warning-line);padding:1px 8px;border-radius:20px;font-size:11px;margin-left:4px;display:none;"></span>
+      </div>
+      <div class="settings-section-body" style="padding:0;">
+        <div id="requests-list" style="padding:0 16px;">
+          <p style="padding:20px 0;text-align:center;color:var(--muted);font-size:13px;">No requests yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section admin-only">
+      <div class="settings-section-header">📧 Email Notifications</div>
+      <div class="settings-section-body">
+        <p style="font-size:13px;color:var(--muted);">Get an email whenever someone submits a request. Uses Gmail by default — create an <a href="https://myaccount.google.com/apppasswords" target="_blank">App Password</a> for this.</p>
+        <div class="form-group"><label>Send notifications to</label><input type="email" id="cfg-notify-email" placeholder="you@example.com"></div>
+        <div class="form-group"><label>Gmail address (sends from)</label><input type="email" id="cfg-smtp-user" placeholder="you@gmail.com"></div>
+        <div class="form-group">
+          <label>Gmail App Password</label>
+          <input type="password" id="cfg-smtp-pass" placeholder="xxxx xxxx xxxx xxxx" autocomplete="new-password">
+          <span style="font-size:11px;color:var(--muted);">Generate at Google Account → Security → App Passwords</span>
+        </div>
+        <details style="font-size:12px;color:var(--muted);">
+          <summary style="cursor:pointer;">Using a non-Gmail SMTP server?</summary>
+          <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
+            <div class="form-group"><label>SMTP Host</label><input type="text" id="cfg-smtp-host" placeholder="smtp.gmail.com"></div>
+            <div class="form-group"><label>SMTP Port</label><input type="number" id="cfg-smtp-port" placeholder="587"></div>
+          </div>
+        </details>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-primary btn-sm" onclick="saveEmailConfig()">Save Email Settings</button>
+          <button class="btn-secondary btn-sm" onclick="testEmail()">Send Test Email</button>
+        </div>
+        <div id="email-config-status" style="font-size:12px;color:var(--muted);"></div>
+      </div>
+    </div>
+
+    <div class="settings-section admin-only">
+      <div class="settings-section-header">🔐 Librarian Access</div>
+      <div class="settings-section-body" id="admin-access-body">
+        <p style="font-size:13px;color:var(--muted);">Set a password so visitors get view-only access while you can add, edit, and delete.</p>
+        <div class="form-group">
+          <label>Admin Password</label>
+          <input type="password" id="set-admin-pw" placeholder="Leave blank for open access" autocomplete="new-password">
+        </div>
+        <button class="btn-primary btn-sm" onclick="saveAdminPassword()">Save Password</button>
+        <div id="admin-pw-status" style="font-size:12px;color:var(--muted);"></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-header">🔗 Share This Library</div>
+      <div class="settings-section-body" id="share-body">
+        <div id="share-urls" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+    </div>
+
+    <div class="settings-section admin-only">
+      <div class="settings-section-header">
+        📊 Google Sheets
+        <span id="settings-auth-pill" class="auth-pill disconnected" style="margin-left:auto;font-size:11px;"><span class="dot"></span></span>
+      </div>
+      <div class="settings-section-body">
+        <div class="wizard-steps">
+          <div class="wizard-step active" id="wstep-1" onclick="gotoWizardStep(1)"><div><div class="step-num">1</div></div>Create App</div>
+          <div class="wizard-step" id="wstep-2" onclick="gotoWizardStep(2)"><div><div class="step-num">2</div></div>Credentials</div>
+          <div class="wizard-step" id="wstep-3" onclick="gotoWizardStep(3)"><div><div class="step-num">3</div></div>Connect</div>
+        </div>
+        <div class="wizard-page active" id="wpage-1">
+          <div class="wizard-instruction">
+            <ol>
+              <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a></li>
+              <li>Click <strong>+ Create Credentials → OAuth client ID</strong></li>
+              <li>Choose <strong>Web application</strong></li>
+              <li>Add redirect URI: <code id="redirect-uri-code">http://localhost:3000/auth/callback</code></li>
+              <li>Click Create, copy your credentials</li>
+            </ol>
+          </div>
+          <p style="font-size:12px;color:var(--muted);">Also enable the <a href="https://console.cloud.google.com/apis/library/sheets.googleapis.com" target="_blank">Google Sheets API</a>.</p>
+          <div style="margin-top:10px;"><button class="btn-primary btn-sm" onclick="gotoWizardStep(2)">I have my credentials →</button></div>
+        </div>
+        <div class="wizard-page" id="wpage-2">
+          <div id="google-env-note" class="env-note" style="display:none;margin-bottom:10px;">Google credentials are managed by environment variables on the server.</div>
+          <div class="form-group" style="margin-bottom:10px;"><label>Client ID</label><input type="text" id="cfg-client-id" placeholder="…googleusercontent.com" autocomplete="off"></div>
+          <div class="form-group" style="margin-bottom:12px;"><label>Client Secret</label><input type="password" id="cfg-client-secret" placeholder="GOCSPX-…" autocomplete="off"></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-ghost btn-sm" onclick="gotoWizardStep(1)">← Back</button>
+            <button class="btn-primary btn-sm" onclick="saveConfigAndNext()">Save & Continue →</button>
+          </div>
+        </div>
+        <div class="wizard-page" id="wpage-3">
+          <div id="google-connected-view" style="display:none;">
+            <div class="connected-box">
+              <p style="font-weight:600;color:var(--success);">✅ Connected to Google!</p>
+              <p style="font-size:12px;color:var(--muted);margin-top:4px;" id="sheet-link-line"></p>
+            </div>
+            <div style="margin-top:10px;"><button class="btn-danger btn-sm" onclick="disconnectGoogle()">Disconnect</button></div>
+          </div>
+          <div id="google-connect-view">
+            <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Sign in with Google to authorize Sheets access.</p>
+            <button type="button" class="btn-primary" onclick="connectGoogle()" style="width:100%;justify-content:center;padding:10px;font-size:14px;gap:10px;">
+              <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Sign in with Google
+            </button>
+            <div style="margin-top:8px;"><button class="btn-ghost btn-sm" onclick="gotoWizardStep(2)">← Back</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ MODALS ═══ -->
+<div class="modal-overlay" id="request-modal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header"><h2>📬 Request This Item</h2><button class="btn-ghost btn-icon" onclick="closeRequestModal()">✕</button></div>
+    <div class="modal-body" id="request-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="csv-tip-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header"><h2>📊 Copy to Google Sheets</h2><button class="btn-ghost btn-icon" onclick="document.getElementById('csv-tip-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <ol style="padding-left:20px;font-size:13px;line-height:2.2;">
+        <li>Click <strong>Export CSV</strong> to download the file</li>
+        <li>Open <a href="https://sheets.google.com" target="_blank">sheets.google.com</a> and create a blank sheet</li>
+        <li>Go to <strong>File → Import</strong></li>
+        <li>Upload the CSV file you just downloaded</li>
+        <li>Choose <strong>"Replace spreadsheet"</strong> or <strong>"Insert new sheet"</strong></li>
+      </ol>
+      <p style="font-size:12px;color:var(--muted);margin-top:12px;">You'll have your own editable copy in your Google Drive.</p>
+    </div>
+    <div class="modal-footer"><button class="btn-ghost" onclick="document.getElementById('csv-tip-modal').classList.remove('open')">Close</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="scanner-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h2>📷 Scan Barcode</h2><button class="btn-ghost btn-icon" onclick="closeScanner()">✕</button></div>
+    <div class="modal-body">
+      <div id="reader"></div>
+      <p class="scanner-hint">Point at the barcode on the back of the book</p>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header"><h2 id="modal-title">Edit Entry</h2><button class="btn-ghost btn-icon" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <form id="form-edit" onsubmit="submitEdit(event)"><div class="form-grid" id="fields-edit"></div></form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="document.getElementById('form-edit').requestSubmit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="admin-modal">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-header"><h2>🔐 Librarian Login</h2><button class="btn-ghost btn-icon" onclick="closeAdminModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="admin-password-input" placeholder="Enter password…" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAdminLogin()">
+      </div>
+      <div id="admin-login-error" style="color:var(--danger);font-size:12px;margin-top:6px;display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeAdminModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitAdminLogin()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header"><h2 id="delete-modal-title">Delete Entry</h2><button class="btn-ghost btn-icon" onclick="closeDeleteModal()">✕</button></div>
+    <div class="modal-body"><p id="delete-modal-text">Are you sure?</p></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn-danger" onclick="confirmDelete()" id="delete-confirm-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="dup-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header"><h2>⚠️ Possible Duplicate</h2><button class="btn-ghost btn-icon" onclick="closeDupModal(false)">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">This looks like it may already be in your library:</p>
+      <div id="dup-matches"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeDupModal(false)">Cancel</button>
+      <button class="btn-gold" onclick="closeDupModal(true)">Add Anyway</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="pepper-modal">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header"><h2>🔎 JW Pepper Results</h2><button class="btn-ghost btn-icon" onclick="closePepperModal()">✕</button></div>
+    <div class="modal-body" id="pepper-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bulk-tag-modal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header"><h2 id="bulk-tag-title">Tag Selected</h2><button class="btn-ghost btn-icon" onclick="closeBulkTagModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group" id="bulk-tag-field"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeBulkTagModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmBulkTag()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+let data        = { work:[], personal:[] };
+let entryTypes  = { work:'octavo', personal:'octavo' };
+let filters     = { work:{search:'',type:'',genre:'',voicing:''}, personal:{search:'',type:'',genre:'',voicing:''} };
+let sortState   = { work:{col:null,dir:1}, personal:{col:null,dir:1} };
+let selected    = { work:new Set(), personal:new Set() };
+let editTarget  = null, deleteTarget = null, requestTarget = null, pendingAdd = null, pepperTarget = null, bulkTagTarget = null;
+let authStatus  = { configured:false, authenticated:false, spreadsheetId:null };
+let isAdmin     = false;
+let adminToken  = localStorage.getItem('adminToken') || null;
+let html5QrCode = null, scannerPrefix = null, lastAutoIsbn = {};
+let shareInfo   = null;
+let cfgInfo     = null;
+
+const VOICINGS = ['SATB','SAB','SSA','SSAA','SSATB','SATTBB','SSAATTBB','TTB','TTBB','TBB','SA','3-Part Mixed','3-Part','2-Part','Unison','Other'];
+const GENRES   = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater','Jazz','Sacred','Other'];
+
+// Hide admin-only elements unless body.is-admin
+document.head.insertAdjacentHTML('beforeend','<style>body:not(.is-admin) .admin-only{display:none !important}</style>');
+
+// ── Library panel template ────────────────────────────────────────────────
+function buildPanel(tab){
+  const T = cap(tab);
+  document.getElementById('tab-'+tab).innerHTML = `
+  <div class="stats-row" id="stats-${tab}"></div>
+
+  <div class="card add-card admin-only" id="add-card-${tab}">
+    <button type="button" class="add-card-toggle" onclick="toggleAddCard('${tab}')">
+      <span style="color:var(--accent);font-size:16px;">＋</span> Add to ${T} Library
+      <span class="chev">▾</span>
+    </button>
+    <div class="add-card-inner">
+      <div class="card-body">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:13px;">
+          <div class="entry-type-toggle">
+            <button type="button" class="active" onclick="setEntryType('${tab}','octavo',this)">Octavo</button>
+            <button type="button" onclick="setEntryType('${tab}','book',this)">Book</button>
+          </div>
+        </div>
+        <form id="form-${tab}" onsubmit="submitForm(event,'${tab}')">
+          <div class="form-grid" id="fields-${tab}"></div>
+          <div class="dup-warning" id="dup-inline-${tab}"></div>
+          <div class="form-footer">
+            <button type="submit" class="btn-primary">Add Entry</button>
+            <button type="button" class="btn-gold" id="pepper-btn-${tab}" onclick="pepperLookup('${tab}')">🔎 Search JW Pepper</button>
+            <button type="button" class="btn-ghost" onclick="resetForm('${tab}')">Clear</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-controls">
+      <input type="text" class="search-input" id="search-${tab}" placeholder="Search title, composer, voicing, anything…" oninput="filterTable('${tab}',this.value)">
+      <select class="filter-select" id="ftype-${tab}" onchange="setFilter('${tab}','type',this.value)">
+        <option value="">All Types</option><option value="octavo">Octavos</option><option value="book">Books</option>
+      </select>
+      <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"></select>
+      <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"></select>
+      <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">✕ Clear</button>
+      <span style="flex:1"></span>
+      <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}')" id="export-btn-${tab}">⬇ Export CSV</button>
+      <button class="btn-secondary btn-sm" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">📊</button>
+      <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncSheets('${tab}')">⟳ Sync to Google Sheet</button>
+    </div>
+    <div class="bulk-bar" id="bulk-bar-${tab}">
+      <span class="bulk-count" id="bulk-count-${tab}"></span>
+      <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}',true)">⬇ Export Selected</button>
+      <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','genre')">♪ Set Genre</button>
+      <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','tags')">🏷 Add Tag</button>
+      <button class="btn-danger btn-sm" onclick="openBulkDelete('${tab}')">🗑 Delete</button>
+      <span style="flex:1"></span>
+      <button class="btn-ghost btn-sm" onclick="clearSelection('${tab}')">Deselect All</button>
+    </div>
+    <div class="table-wrap"><table id="table-${tab}"><thead></thead><tbody></tbody></table></div>
+    <div class="table-footer" id="footer-${tab}"></div>
+  </div>`;
+}
+
+function toggleAddCard(tab){ document.getElementById('add-card-'+tab).classList.toggle('open'); }
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+async function init() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('auth')==='success') toast('Connected to Google!','success');
+  if (p.get('error')) toast('Error: '+decodeURIComponent(p.get('error')),'error');
+  history.replaceState(null,'',location.pathname);
+  buildPanel('work'); buildPanel('personal'); buildForms();
+  await Promise.all([loadData(), loadAuthStatus(), checkAdminStatus()]);
+  renderAll(); loadShareInfo();
+}
+
+async function loadData() { const r=await fetch('/api/data'); data=await r.json(); data.work=data.work||[]; data.personal=data.personal||[]; }
+async function loadAuthStatus() { const r=await fetch('/api/auth-status'); authStatus=await r.json(); updateGoogleUI(); }
+
+async function checkAdminStatus() {
+  const r=await fetch('/api/admin-status',{headers:adminToken?{Authorization:`Bearer ${adminToken}`}:{}});
+  const j=await r.json();
+  if (!j.hasPassword) { isAdmin=true; adminToken='open'; localStorage.setItem('adminToken','open'); }
+  else { isAdmin=j.isAdmin; if(!isAdmin) adminToken=null; }
+  applyAdminMode();
+}
+
+function adminHeaders() { return adminToken?{headers:{Authorization:`Bearer ${adminToken}`}}:{}; }
+function adminFetchOpts(body,method='POST') { return { method, headers:{'Content-Type':'application/json',...(adminToken?{Authorization:`Bearer ${adminToken}`}:{})}, body:JSON.stringify(body) }; }
+
+// ── Admin ─────────────────────────────────────────────────────────────────
+function applyAdminMode() {
+  document.body.classList.toggle('is-admin', isAdmin);
+  const btn=document.getElementById('admin-btn'), banner=document.getElementById('viewer-banner');
+  if (isAdmin) { btn.className='btn-header btn-sm active'; btn.textContent='🔒 Librarian'; banner.classList.add('hidden'); }
+  else {
+    btn.className='btn-header btn-sm'; btn.innerHTML='🔓 Sign In'; banner.classList.remove('hidden');
+    const active=document.querySelector('.tab-btn.active');
+    if(active&&active.dataset.tab==='settings') switchTab('work');
+    selected.work.clear(); selected.personal.clear();
+  }
+  renderAll();
+  if (isAdmin) { loadRequests(); prefillSettings(); }
+}
+
+async function toggleAdmin() {
+  if (isAdmin) { isAdmin=false; adminToken=null; localStorage.removeItem('adminToken'); applyAdminMode(); toast('Signed out','info'); return; }
+  const r=await fetch('/api/admin-status'); const j=await r.json();
+  if (!j.hasPassword) { const lr=await fetch('/api/admin-login',adminFetchOpts({})); const lj=await lr.json(); adminToken=lj.token; localStorage.setItem('adminToken',adminToken); isAdmin=true; applyAdminMode(); toast('Librarian mode on','success'); }
+  else { document.getElementById('admin-password-input').value=''; document.getElementById('admin-login-error').style.display='none'; document.getElementById('admin-modal').classList.add('open'); setTimeout(()=>document.getElementById('admin-password-input').focus(),100); }
+}
+
+async function submitAdminLogin() {
+  const password=document.getElementById('admin-password-input').value;
+  const errEl=document.getElementById('admin-login-error');
+  const r=await fetch('/api/admin-login',adminFetchOpts({password})); const j=await r.json();
+  if (!r.ok) { errEl.textContent=j.error||'Incorrect password'; errEl.style.display=''; return; }
+  adminToken=j.token; localStorage.setItem('adminToken',adminToken); isAdmin=true; closeAdminModal(); applyAdminMode(); toast('Welcome back!','success');
+}
+function closeAdminModal() { document.getElementById('admin-modal').classList.remove('open'); }
+
+async function saveAdminPassword() {
+  if (!isAdmin) { toast('Sign in first','error'); return; }
+  const pw=document.getElementById('set-admin-pw').value;
+  const r=await fetch('/api/admin-set-password',adminFetchOpts({password:pw}));
+  const j=await r.json();
+  if (r.ok) {
+    document.getElementById('admin-pw-status').textContent=pw?'Password saved. Visitors will be read-only.':'Password removed — open access.';
+    toast(pw?'Password set':'Password removed','success');
+    if (pw) { const lr=await fetch('/api/admin-login',adminFetchOpts({password:pw})); const lj=await lr.json(); adminToken=lj.token; localStorage.setItem('adminToken',adminToken); }
+  } else toast(j.error||'Could not save password','error');
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
+
+// ── Fields ────────────────────────────────────────────────────────────────
+function octavoFields(){return[
+  {key:'title',label:'Title',type:'text',required:true},
+  {key:'composer',label:'Composer / Arranger',type:'text'},
+  {key:'voicing',label:'Voicing',type:'select',options:VOICINGS},
+  {key:'genre',label:'Genre',type:'select',options:GENRES},
+  {key:'copies',label:'Copy Count',type:'number',min:0},
+  {key:'lastPerformed',label:'Last Performed',type:'date'},
+  {key:'link',label:'Song Link (URL)',type:'url'},
+  {key:'tags',label:'Tags (comma-separated)',type:'text'},
+];}
+function bookFields(){return[
+  {key:'isbn',label:'ISBN',type:'text',isbnField:true},
+  {key:'title',label:'Title',type:'text',required:true},
+  {key:'author',label:'Author / Editor',type:'text'},
+  {key:'genre',label:'Genre',type:'select',options:GENRES},
+  {key:'copies',label:'Copies',type:'number',min:0},
+  {key:'publisher',label:'Publisher',type:'text'},
+  {key:'year',label:'Year',type:'text'},
+  {key:'description',label:'Description',type:'textarea',full:true},
+  {key:'link',label:'Link (URL)',type:'url'},
+  {key:'tags',label:'Tags (comma-separated)',type:'text'},
+];}
+
+function buildForms(){['work','personal'].forEach(tab=>renderFormFields(tab,entryTypes[tab]));}
+
+function renderFormFields(tab,type,container,prefix){
+  const fields=type==='octavo'?octavoFields():bookFields();
+  const el=container||document.getElementById('fields-'+tab), p=prefix||tab;
+  el.innerHTML=fields.map(f=>buildFieldHTML(f,p,'')).join('');
+  attachDupListeners(p);
+  const pb=document.getElementById('pepper-btn-'+tab);
+  if(pb) pb.style.display=type==='octavo'?'':'none';
+}
+
+function buildFieldHTML(f,prefix,value){
+  const id=`${prefix}_${f.key}`, req=f.required?'required':'';
+  let val=value;
+  if(f.key==='tags'&&Array.isArray(value)) val=value.join(', ');
+  val=(val!==undefined&&val!==null)?escAttr(String(val)):'';
+  let inner;
+  if (f.type==='select'){
+    const opts=f.options.map(o=>`<option value="${escAttr(o)}"${value===o?' selected':''}>${esc(o)}</option>`).join('');
+    const extra=(value&&!f.options.includes(value))?`<option value="${escAttr(value)}" selected>${esc(value)}</option>`:'';
+    inner=`<select id="${id}" name="${f.key}" ${req}><option value="">Select…</option>${opts}${extra}</select>`;
+  }
+  else if(f.type==='textarea') inner=`<textarea id="${id}" name="${f.key}" ${req}>${esc(String(value??''))}</textarea>`;
+  else if(f.isbnField) inner=`<div class="input-row"><input type="text" id="${id}" name="${f.key}" value="${val}" placeholder="e.g. 9780739044148" onblur="autoIsbnLookup('${prefix}',this.value)"><button type="button" class="btn-scan" title="Scan barcode" onclick="openScanner('${prefix}')">📷</button><button type="button" class="btn-secondary btn-sm" onclick="isbnLookup('${prefix}')">Look up</button></div>`;
+  else inner=`<input type="${f.type}" id="${id}" name="${f.key}" value="${val}" ${req} ${f.min!==undefined?'min="'+f.min+'"':''}>`;
+  return `<div class="form-group${f.full?' full':''}"><label for="${id}">${f.label}</label>${inner}</div>`;
+}
+
+function setEntryType(tab,type,btn){entryTypes[tab]=type;btn.closest('.entry-type-toggle').querySelectorAll('button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderFormFields(tab,type);}
+
+// ── Duplicate detection ───────────────────────────────────────────────────
+function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim().replace(/^(the|a|an)\s+/,'');}
+function personKey(s){const n=norm(s);if(!n)return '';const parts=n.split(' ');return parts[parts.length-1];}
+
+function findDuplicates(title,person,excludeId){
+  const t=norm(title); if(!t) return [];
+  const p=personKey(person);
+  const out=[];
+  for(const tab of ['work','personal']){
+    for(const e of data[tab]){
+      if(excludeId&&e._id===excludeId) continue;
+      if(norm(e.title)!==t) continue;
+      const ep=personKey(e.composer||e.author);
+      if(!p||!ep||p===ep) out.push({tab,entry:e});
+    }
+  }
+  return out;
+}
+
+function attachDupListeners(prefix){
+  const t=document.getElementById(`${prefix}_title`);
+  if(!t||prefix==='edit') return;
+  const check=()=>{
+    const person=(document.getElementById(`${prefix}_composer`)||document.getElementById(`${prefix}_author`)||{}).value||'';
+    const matches=findDuplicates(t.value,person);
+    const w=document.getElementById('dup-inline-'+prefix);
+    if(!w) return;
+    if(t.value.trim()&&matches.length){
+      const m=matches[0];
+      w.innerHTML=`⚠️ <strong>${esc(m.entry.title)}</strong> by ${esc(m.entry.composer||m.entry.author||'unknown')} is already in your ${m.tab} library (${m.entry.copies||'?'} copies)${matches.length>1?` — and ${matches.length-1} more match${matches.length>2?'es':''}`:''}.`;
+      w.classList.add('visible');
+    } else w.classList.remove('visible');
+  };
+  t.addEventListener('blur',check);
+  t.addEventListener('input',debounce(check,400));
+}
+
+function showDupModal(matches,onConfirm){
+  pendingAdd=onConfirm;
+  document.getElementById('dup-matches').innerHTML=matches.slice(0,5).map(m=>`
+    <div class="dup-match">
+      <div class="dm-title">${esc(m.entry.title)}</div>
+      <div class="dm-meta">${esc(m.entry.composer||m.entry.author||'—')} · ${m.entry.voicing?esc(m.entry.voicing)+' · ':''}${cap(m.tab)} library · ${m.entry.copies||'?'} ${m.entry.copies==='1'?'copy':'copies'}</div>
+    </div>`).join('');
+  document.getElementById('dup-modal').classList.add('open');
+}
+function closeDupModal(confirmed){
+  document.getElementById('dup-modal').classList.remove('open');
+  const fn=pendingAdd; pendingAdd=null;
+  if(confirmed&&fn) fn();
+}
+
+// ── ISBN lookup ───────────────────────────────────────────────────────────
+async function autoIsbnLookup(prefix,val){const isbn=(val||'').replace(/[-\s]/g,'');if(!isbn||isbn===lastAutoIsbn[prefix])return;const t=document.getElementById(`${prefix}_title`);if(t&&t.value.trim())return;lastAutoIsbn[prefix]=isbn;await isbnLookup(prefix,true);}
+async function isbnLookup(prefix,silent=false){
+  const isbnEl=document.getElementById(`${prefix}_isbn`);if(!isbnEl)return;
+  const isbn=isbnEl.value.replace(/[-\s]/g,'');if(!isbn){if(!silent)toast('Enter an ISBN first','error');return;}
+  const lb=isbnEl.closest('.input-row')?.querySelector('.btn-secondary');
+  if(lb){lb.innerHTML='<span class="spinner"></span>';lb.disabled=true;}
+  try{
+    const r=await fetch(`/api/isbn-lookup?isbn=${encodeURIComponent(isbn)}`);const j=await r.json();
+    if(!r.ok){if(!silent)toast(j.error||'Book not found','error');return;}
+    const set=(k,v)=>{const el=document.getElementById(`${prefix}_${k}`);if(el&&v){el.value=v;flash(el);}};
+    set('title',j.title);set('author',j.author);set('description',j.description);
+    set('publisher',j.publisher);set('year',j.year);
+    const linkEl=document.getElementById(`${prefix}_link`);
+    if(linkEl&&!linkEl.value&&j.link){linkEl.value=j.link;flash(linkEl);}
+    toast(`Filled in from ${j.source||'book database'}!`,'success');
+  }catch(e){if(!silent)toast('Lookup failed: '+e.message,'error');}
+  finally{if(lb){lb.innerHTML='Look up';lb.disabled=false;}}
+}
+
+// ── JW Pepper lookup ──────────────────────────────────────────────────────
+async function pepperLookup(prefix){
+  const title=(document.getElementById(`${prefix}_title`)||{}).value||'';
+  const composer=(document.getElementById(`${prefix}_composer`)||{}).value||'';
+  if(!title.trim()){toast('Enter a title first','error');return;}
+  pepperTarget=prefix;
+  const body=document.getElementById('pepper-modal-body');
+  body.innerHTML='<p style="text-align:center;padding:24px;color:var(--muted);"><span class="spinner" style="width:18px;height:18px;"></span><br><br>Searching JW Pepper…</p>';
+  document.getElementById('pepper-modal').classList.add('open');
+  try{
+    const r=await fetch(`/api/pepper-lookup?title=${encodeURIComponent(title)}&composer=${encodeURIComponent(composer)}`);
+    const j=await r.json();
+    if(!r.ok){body.innerHTML=`<div class="empty-state" style="padding:24px;"><div class="empty-icon">🔎</div><strong>No results</strong><p>${esc(j.error||'Nothing found — try fewer words.')}</p></div>`;return;}
+    window._pepperResults=j.results;
+    body.innerHTML=j.results.map((p,i)=>`
+      <div class="pepper-result">
+        ${p.image?`<img class="pepper-cover" src="${escAttr(p.image)}" alt="" loading="lazy" onerror="this.outerHTML='&lt;div class=&quot;pepper-cover placeholder&quot;&gt;♪&lt;/div&gt;'">`:`<div class="pepper-cover placeholder">♪</div>`}
+        <div class="pepper-main">
+          <div class="pepper-title">${esc(p.title)}</div>
+          <div class="pepper-meta">${esc([p.composer,p.publisher].filter(Boolean).join(' · '))||'&nbsp;'}</div>
+          ${p.description?`<div class="pepper-desc">${esc(p.description)}</div>`:''}
+          <div class="pepper-voicings">
+            ${p.voicings.length?p.voicings.map(v=>`<button type="button" class="btn-primary btn-sm" onclick="applyPepper(${i},'${escAttr(v)}')">Use ${esc(v)}</button>`).join(''):`<button type="button" class="btn-primary btn-sm" onclick="applyPepper(${i},'')">Use This</button>`}
+            <a class="btn-ghost btn-sm" href="${escAttr(p.url)}" target="_blank" style="display:inline-flex;align-items:center;">View ↗</a>
+          </div>
+        </div>
+      </div>`).join('');
+  }catch(e){body.innerHTML=`<div class="empty-state" style="padding:24px;"><strong>Lookup failed</strong><p>${esc(e.message)}</p></div>`;}
+}
+
+function applyPepper(i,voicing){
+  const p=window._pepperResults[i], prefix=pepperTarget;
+  const set=(k,v)=>{const el=document.getElementById(`${prefix}_${k}`);if(el&&v){el.value=v;flash(el);}};
+  set('title',p.title);
+  if(p.composer)set('composer',p.composer);
+  if(voicing){const el=document.getElementById(`${prefix}_voicing`);if(el){const normV=VOICINGS.find(x=>x.toUpperCase()===voicing.toUpperCase())||voicing;if(![...el.options].some(o=>o.value===normV))el.insertAdjacentHTML('beforeend',`<option value="${escAttr(normV)}">${esc(normV)}</option>`);el.value=normV;flash(el);}}
+  const linkEl=document.getElementById(`${prefix}_link`);
+  if(linkEl){linkEl.value=p.url;flash(linkEl);}
+  closePepperModal();
+  toast('Filled in from JW Pepper!','success');
+}
+function closePepperModal(){document.getElementById('pepper-modal').classList.remove('open');}
+
+// ── Scanner ───────────────────────────────────────────────────────────────
+function openScanner(prefix){
+  scannerPrefix=prefix; document.getElementById('scanner-modal').classList.add('open');
+  if(html5QrCode){html5QrCode.stop().catch(()=>{});html5QrCode=null;}
+  html5QrCode=new Html5Qrcode('reader');
+  Html5Qrcode.getCameras().then(cameras=>{
+    if(!cameras.length){toast('No camera found','error');closeScanner();return;}
+    const cam=cameras.find(c=>/back|rear|environment/i.test(c.label))||cameras[cameras.length-1];
+    html5QrCode.start(cam.id,{fps:10,qrbox:{width:280,height:120},aspectRatio:1.5},
+      decoded=>{const isbn=decoded.replace(/[-\s]/g,'');const el=document.getElementById(`${scannerPrefix}_isbn`);if(el){el.value=isbn;closeScanner();isbnLookup(scannerPrefix);}},
+      ()=>{}
+    ).catch(err=>{toast('Camera error: '+err,'error');closeScanner();});
+  }).catch(err=>{toast('Cannot access camera: '+err,'error');closeScanner();});
+}
+function closeScanner(){document.getElementById('scanner-modal').classList.remove('open');if(html5QrCode){html5QrCode.stop().catch(()=>{}).finally(()=>{html5QrCode=null;});}}
+
+// ── CRUD ──────────────────────────────────────────────────────────────────
+function readFormEntry(formEl,type){
+  const fields=type==='octavo'?octavoFields():bookFields();
+  const entry={_type:type};
+  fields.forEach(f=>{const el=formEl.querySelector(`[name="${f.key}"]`);let v=el?el.value.trim():'';
+    if(f.key==='tags')v=v?v.split(',').map(s=>s.trim()).filter(Boolean):[];
+    entry[f.key]=v;});
+  return entry;
+}
+
+function submitForm(e,tab){
+  e.preventDefault();
+  const entry=readFormEntry(e.target,entryTypes[tab]);
+  const doAdd=async()=>{
+    entry._id=Date.now();
+    const r=await fetch(`/api/entries/${tab}`,adminFetchOpts(entry));
+    const j=await r.json();
+    if(!r.ok){toast(j.error||'Could not save','error');return;}
+    data[tab].unshift(j.entry);
+    renderTable(tab);resetForm(tab);
+    toast('Added to '+cap(tab)+' library','success');
+  };
+  const matches=findDuplicates(entry.title,entry.composer||entry.author);
+  if(matches.length)showDupModal(matches,doAdd);
+  else doAdd();
+}
+function resetForm(tab){document.getElementById('form-'+tab).reset();lastAutoIsbn[tab]=null;const w=document.getElementById('dup-inline-'+tab);if(w)w.classList.remove('visible');}
+
+function openEdit(tab,id){
+  const entry=data[tab].find(e=>e._id===id);
+  if(!entry)return;
+  editTarget={tab,id,type:entry._type};
+  const fields=entry._type==='octavo'?octavoFields():bookFields();
+  document.getElementById('fields-edit').innerHTML=fields.map(f=>buildFieldHTML(f,'edit',entry[f.key]??'')).join('');
+  document.getElementById('modal-title').textContent=`Edit ${entry._type==='octavo'?'Octavo':'Book'} — ${entry.title||'(untitled)'}`;
+  document.getElementById('edit-modal').classList.add('open');
+}
+async function submitEdit(e){
+  e.preventDefault();
+  const{tab,id,type}=editTarget;
+  const entry={...readFormEntry(document.getElementById('form-edit'),type),_type:type,_id:id};
+  const r=await fetch(`/api/entries/${tab}/${id}`,adminFetchOpts(entry,'PUT'));
+  const j=await r.json();
+  if(!r.ok){toast(j.error||'Could not save','error');return;}
+  const i=data[tab].findIndex(x=>x._id===id);
+  if(i>-1)data[tab][i]=j.entry;
+  renderTable(tab);closeModal();toast('Entry updated','success');
+}
+function closeModal(){document.getElementById('edit-modal').classList.remove('open');editTarget=null;}
+
+function openDelete(tab,id){
+  const entry=data[tab].find(e=>e._id===id);
+  deleteTarget={tab,ids:[id]};
+  document.getElementById('delete-modal-title').textContent='Delete Entry';
+  document.getElementById('delete-modal-text').innerHTML=`Are you sure you want to delete <strong>${esc(entry?.title||'(untitled)')}</strong>? This cannot be undone.`;
+  document.getElementById('delete-modal').classList.add('open');
+}
+function openBulkDelete(tab){
+  const ids=[...selected[tab]];
+  if(!ids.length)return;
+  deleteTarget={tab,ids};
+  document.getElementById('delete-modal-title').textContent='Delete '+ids.length+' Entries';
+  document.getElementById('delete-modal-text').innerHTML=`Are you sure you want to delete <strong>${ids.length} entries</strong> from the ${cap(tab)} library? This cannot be undone.`;
+  document.getElementById('delete-modal').classList.add('open');
+}
+async function confirmDelete(){
+  const{tab,ids}=deleteTarget;
+  const r=await fetch(`/api/entries/${tab}/bulk`,adminFetchOpts({action:'delete',ids}));
+  const j=await r.json();
+  if(!r.ok){toast(j.error||'Delete failed','error');return;}
+  const set=new Set(ids);
+  data[tab]=data[tab].filter(e=>!set.has(e._id));
+  ids.forEach(id=>selected[tab].delete(id));
+  renderTable(tab);closeDeleteModal();
+  toast(ids.length>1?ids.length+' entries deleted':'Entry deleted','info');
+}
+function closeDeleteModal(){document.getElementById('delete-modal').classList.remove('open');deleteTarget=null;}
+
+// ── Bulk tag / genre ──────────────────────────────────────────────────────
+function openBulkTag(tab,kind){
+  bulkTagTarget={tab,kind};
+  document.getElementById('bulk-tag-title').textContent=(kind==='genre'?'Set Genre for ':'Add Tag to ')+selected[tab].size+' Entries';
+  document.getElementById('bulk-tag-field').innerHTML=kind==='genre'
+    ?`<label>Genre</label><select id="bulk-tag-value">${GENRES.map(g=>`<option>${g}</option>`).join('')}</select>`
+    :`<label>Tag</label><input type="text" id="bulk-tag-value" placeholder="e.g. Spring Concert 2026">`;
+  document.getElementById('bulk-tag-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('bulk-tag-value').focus(),100);
+}
+async function confirmBulkTag(){
+  const{tab,kind}=bulkTagTarget;
+  const val=document.getElementById('bulk-tag-value').value.trim();
+  if(!val){toast('Enter a value','error');return;}
+  const ids=[...selected[tab]];
+  if(kind==='genre'){
+    const r=await fetch(`/api/entries/${tab}/bulk`,adminFetchOpts({action:'patch',ids,patch:{genre:val}}));
+    if(!r.ok){toast('Update failed','error');return;}
+    data[tab].forEach(e=>{if(selected[tab].has(e._id))e.genre=val;});
+  } else {
+    // tags merge client-side per entry (avoid clobbering existing tags)
+    for(const e of data[tab]){
+      if(!selected[tab].has(e._id))continue;
+      const tags=[...new Set([...(Array.isArray(e.tags)?e.tags:[]),val])];
+      e.tags=tags;
+      await fetch(`/api/entries/${tab}/bulk`,adminFetchOpts({action:'patch',ids:[e._id],patch:{tags}}));
+    }
+  }
+  renderTable(tab);closeBulkTagModal();
+  toast('Updated '+ids.length+' entries','success');
+}
+function closeBulkTagModal(){document.getElementById('bulk-tag-modal').classList.remove('open');bulkTagTarget=null;}
+
+// ── Selection ─────────────────────────────────────────────────────────────
+function toggleSelect(tab,id,checked){
+  if(checked)selected[tab].add(id);else selected[tab].delete(id);
+  updateBulkBar(tab);
+  const row=document.querySelector(`#table-${tab} tr[data-id="${id}"]`);
+  if(row)row.classList.toggle('selected',checked);
+}
+function toggleSelectAll(tab,checked){
+  const visible=getSorted(tab,getFiltered(tab));
+  visible.forEach(e=>{if(checked)selected[tab].add(e._id);else selected[tab].delete(e._id);});
+  renderTable(tab);
+}
+function clearSelection(tab){selected[tab].clear();renderTable(tab);}
+function updateBulkBar(tab){
+  const n=selected[tab].size;
+  document.getElementById('bulk-bar-'+tab).classList.toggle('visible',n>0&&isAdmin);
+  document.getElementById('bulk-count-'+tab).textContent=n+' selected';
+}
+
+// ── Request system ────────────────────────────────────────────────────────
+function openRequestModal(tab, id) {
+  const entry = data[tab].find(e => e._id === id);
+  requestTarget = { tab, entry };
+  const typeLabel = entry._type === 'octavo' ? 'Octavo' : 'Book';
+  const meta = entry._type === 'octavo'
+    ? [entry.composer, entry.voicing, entry.genre].filter(Boolean).join(' · ')
+    : [entry.author, entry.genre].filter(Boolean).join(' · ');
+  document.getElementById('request-modal-body').innerHTML = `
+    <div class="request-item-card">
+      <div class="item-title">${esc(entry.title||'Untitled')}</div>
+      <div class="item-meta">${typeLabel}${meta?' · '+esc(meta):''}</div>
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group"><label>Your Name <span style="color:var(--danger)">*</span></label><input type="text" id="req-name" placeholder="Jane Smith" required></div>
+      <div class="form-group"><label>Email</label><input type="email" id="req-email" placeholder="jane@school.edu"></div>
+      <div class="form-group"><label>School / Organization</label><input type="text" id="req-school" placeholder="Lincoln Elementary"></div>
+      <div class="form-group"><label>School District</label><input type="text" id="req-district" placeholder="Springfield USD"></div>
+      ${entry._type==='octavo'?`<div class="form-group"><label>Copies Needed</label><input type="number" id="req-copies" min="1" placeholder="e.g. 30"></div>`:''}
+      <div class="form-group full"><label>Message (optional)</label><textarea id="req-message" placeholder="Tell us about your ensemble, performance date, etc."></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft);">
+      <button class="btn-ghost" onclick="closeRequestModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitRequest()">Send Request</button>
+    </div>`;
+  document.getElementById('request-modal').classList.add('open');
+}
+
+async function submitRequest() {
+  const name = (document.getElementById('req-name')?.value||'').trim();
+  if (!name) { toast('Please enter your name','error'); return; }
+  const { tab, entry } = requestTarget;
+  const btn = document.querySelector('#request-modal-body .btn-primary');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending…';
+  const payload = {
+    tab, entryTitle: entry.title, entryType: entry._type,
+    entryComposer: entry.composer||entry.author||'', entryVoicing: entry.voicing||'',
+    name, email: document.getElementById('req-email')?.value||'',
+    school: document.getElementById('req-school')?.value||'',
+    district: document.getElementById('req-district')?.value||'',
+    copies: document.getElementById('req-copies')?.value||'',
+    message: document.getElementById('req-message')?.value||'',
+  };
+  try {
+    const r = await fetch('/api/request', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const j = await r.json();
+    if (!r.ok) { toast(j.error||'Failed to send request','error'); btn.disabled=false; btn.innerHTML='Send Request'; return; }
+    document.getElementById('request-modal-body').innerHTML = `
+      <div class="request-success">
+        <div class="success-icon">📬</div>
+        <h3>Request sent!</h3>
+        <p>The librarian has been notified and will be in touch.<br>Thank you, ${esc(name)}!</p>
+        <button class="btn-primary" style="margin-top:16px;" onclick="closeRequestModal()">Done</button>
+      </div>`;
+  } catch(e) {
+    toast('Error: '+e.message,'error');
+    btn.disabled = false; btn.innerHTML = 'Send Request';
+  }
+}
+function closeRequestModal() { document.getElementById('request-modal').classList.remove('open'); requestTarget=null; }
+
+// ── Requests admin view ───────────────────────────────────────────────────
+async function loadRequests() {
+  if (!isAdmin) return;
+  try {
+    const r = await fetch('/api/requests', adminHeaders());
+    if (!r.ok) return;
+    const requests = await r.json();
+    const badge = document.getElementById('request-count-badge');
+    const pending = requests.filter(r=>r.status==='pending').length;
+    if (pending > 0) { badge.textContent=`${pending} new`; badge.style.display=''; }
+    else badge.style.display = 'none';
+    const container = document.getElementById('requests-list');
+    if (!requests.length) { container.innerHTML='<p style="padding:20px 0;text-align:center;color:var(--muted);font-size:13px;">No requests yet. Requests will appear here when someone uses the Request button.</p>'; return; }
+    container.innerHTML = requests.map(req => {
+      const date = new Date(req.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      const who  = [req.name, req.school, req.district].filter(Boolean).join(' · ');
+      return `<div class="request-row">
+        <div class="request-row-main">
+          <div class="request-row-title">${esc(req.entryTitle||'Untitled')} <span class="status-badge status-${esc(req.status)}">${esc(req.status)}</span></div>
+          <div class="request-row-meta">
+            ${esc(req.entryType==='octavo'?'Octavo':'Book')} · ${esc(req.tab==='work'?'Work':'Personal')} · ${date}<br>
+            <strong>${esc(req.name)}</strong>${req.email?' · <a href="mailto:'+escAttr(req.email)+'">'+esc(req.email)+'</a>':''}<br>
+            ${who !== req.name ? esc(who) : ''}
+            ${req.copies?` ${esc(req.copies)} copies requested · `:''}
+            ${req.message?`<em style="color:var(--muted)">"${esc(req.message.slice(0,120))}${req.message.length>120?'…':''}"</em>`:''}
+          </div>
+        </div>
+        <div class="request-row-actions">
+          ${req.status==='pending'?`<button class="btn-success btn-sm" onclick="updateRequestStatus(${req.id},'fulfilled')">✓ Fulfill</button>`:''}
+          ${req.status!=='declined'?`<button class="btn-danger btn-sm" onclick="updateRequestStatus(${req.id},'declined')">✕</button>`:''}
+          <button class="btn-ghost btn-icon btn-sm" onclick="deleteRequest(${req.id})" title="Remove">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+async function updateRequestStatus(id, status) {
+  await fetch(`/api/requests/${id}/status`, adminFetchOpts({status}));
+  loadRequests();
+  toast(status==='fulfilled'?'Marked as fulfilled':'Marked as declined','success');
+}
+async function deleteRequest(id) {
+  await fetch(`/api/requests/${id}`, { method:'DELETE', ...adminHeaders() });
+  loadRequests();
+  toast('Request removed','info');
+}
+
+// ── Filtering / sorting ───────────────────────────────────────────────────
+function getFiltered(tab){
+  const f=filters[tab];
+  return data[tab].filter(e=>{
+    if(f.type&&e._type!==f.type)return false;
+    if(f.genre&&e.genre!==f.genre)return false;
+    if(f.voicing&&e.voicing!==f.voicing)return false;
+    if(f.search){
+      const q=f.search.toLowerCase();
+      return Object.entries(e).some(([k,v])=>k!=='_id'&&String(Array.isArray(v)?v.join(' '):(v||'')).toLowerCase().includes(q));
+    }
+    return true;
+  });
+}
+function getSorted(tab,rows){
+  const{col,dir}=sortState[tab];
+  if(!col)return rows;
+  return[...rows].sort((a,b)=>{
+    let av=a[col],bv=b[col];
+    if(col==='copies'){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return (av-bv)*dir;}
+    av=String(Array.isArray(av)?av.join(', '):(av||'')).toLowerCase();bv=String(Array.isArray(bv)?bv.join(', '):(bv||'')).toLowerCase();
+    if(av===''&&bv!=='')return 1; if(bv===''&&av!=='')return -1;
+    if(av<bv)return -dir;if(av>bv)return dir;
+    const at=(a.title||'').toLowerCase(),bt=(b.title||'').toLowerCase();
+    return at<bt?-1:at>bt?1:0;
+  });
+}
+
+function setFilter(tab,key,val){filters[tab][key]=val;renderTable(tab);}
+function filterTable(tab,v){filters[tab].search=v;renderTable(tab);}
+function clearFilters(tab){
+  filters[tab]={search:'',type:'',genre:'',voicing:''};
+  document.getElementById('search-'+tab).value='';
+  renderTable(tab);
+}
+
+function refreshFilterOptions(tab){
+  const f=filters[tab];
+  const vSel=document.getElementById('fvoicing-'+tab),gSel=document.getElementById('fgenre-'+tab);
+  const dataV=[...new Set(data[tab].map(e=>e.voicing).filter(Boolean))];
+  const vOpts=[...new Set([...VOICINGS.filter(v=>dataV.includes(v)),...dataV])];
+  const dataG=[...new Set(data[tab].map(e=>e.genre).filter(Boolean))];
+  const gOpts=[...new Set([...GENRES.filter(g=>dataG.includes(g)),...dataG])];
+  vSel.innerHTML='<option value="">All Voicings</option>'+vOpts.map(v=>`<option value="${escAttr(v)}"${f.voicing===v?' selected':''}>${esc(v)}</option>`).join('');
+  gSel.innerHTML='<option value="">All Genres</option>'+gOpts.map(g=>`<option value="${escAttr(g)}"${f.genre===g?' selected':''}>${esc(g)}</option>`).join('');
+  document.getElementById('ftype-'+tab).value=f.type;
+  ['ftype','fvoicing','fgenre'].forEach((p,i)=>{
+    const el=document.getElementById(`${p}-${tab}`);
+    el.classList.toggle('active-filter',!!f[['type','voicing','genre'][i]]);
+  });
+  document.getElementById('clearf-'+tab).classList.toggle('visible',!!(f.search||f.type||f.genre||f.voicing));
+}
+
+// ── Tables ────────────────────────────────────────────────────────────────
+const OCTAVO_COLS=[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Arranger'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'lastPerformed',label:'Last Performed'}];
+const BOOK_COLS  =[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'author',label:'Author / Editor'},{key:'isbn',label:'ISBN'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'description',label:'Description'}];
+const MIXED_COLS =[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Author'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'lastPerformed',label:'Last Performed'}];
+function getColumns(tab){const t=filters[tab].type;return t==='octavo'?OCTAVO_COLS:t==='book'?BOOK_COLS:MIXED_COLS;}
+
+function renderAll(){renderTable('work');renderTable('personal');}
+
+function renderStats(tab){
+  const rows=data[tab];
+  const octavos=rows.filter(e=>e._type==='octavo').length;
+  const books=rows.filter(e=>e._type==='book').length;
+  const copies=rows.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
+  const composers=new Set(rows.map(e=>norm(e.composer||e.author)).filter(Boolean)).size;
+  document.getElementById('stats-'+tab).innerHTML=`
+    <div class="stat-card"><div class="stat-value">${rows.length}</div><div class="stat-label">Titles</div></div>
+    <div class="stat-card"><div class="stat-value">${octavos}</div><div class="stat-label">Octavos</div></div>
+    <div class="stat-card"><div class="stat-value">${books}</div><div class="stat-label">Books</div></div>
+    <div class="stat-card"><div class="stat-value">${copies.toLocaleString()}</div><div class="stat-label">Total Copies</div></div>
+    <div class="stat-card"><div class="stat-value">${composers}</div><div class="stat-label">Composers</div></div>`;
+  document.getElementById('count-'+tab).textContent=rows.length;
+}
+
+function renderTable(tab){
+  renderStats(tab);refreshFilterOptions(tab);
+  // prune selection of deleted entries
+  const idSet=new Set(data[tab].map(e=>e._id));
+  [...selected[tab]].forEach(id=>{if(!idSet.has(id))selected[tab].delete(id);});
+
+  const filtered=getFiltered(tab),sorted=getSorted(tab,filtered),cols=getColumns(tab),table=document.getElementById('table-'+tab);
+  const{col:sc,dir}=sortState[tab];
+  const allVisibleSelected=sorted.length>0&&sorted.every(e=>selected[tab].has(e._id));
+  const checkTh=isAdmin?`<th class="col-check" onclick="event.stopPropagation()"><input type="checkbox" class="row-check" ${allVisibleSelected?'checked':''} onchange="toggleSelectAll('${tab}',this.checked)" title="Select all shown"></th>`:'';
+  table.querySelector('thead').innerHTML=`<tr>${checkTh}${cols.map(c=>`<th class="${c.key===sc?'sorted':''}" onclick="sortBy('${tab}','${c.key}')">${c.label}<span class="sort-icon">${c.key===sc?(dir===1?'↑':'↓'):'↕'}</span></th>`).join('')}<th style="cursor:default;text-align:right;">Actions</th></tr>`;
+
+  if(!sorted.length){
+    const anyFilter=filters[tab].search||filters[tab].type||filters[tab].genre||filters[tab].voicing;
+    table.querySelector('tbody').innerHTML=`<tr><td colspan="${cols.length+2}"><div class="empty-state"><div class="empty-icon">𝄞</div><strong>${anyFilter?'No matches':'No entries yet'}</strong><p>${anyFilter?'Try adjusting your search or filters.':(isAdmin?'Use “Add to Library” above to add your first piece.':'Nothing here yet.')}</p></div></td></tr>`;
+  } else {
+    table.querySelector('tbody').innerHTML=sorted.map(e=>{
+      const checkTd=isAdmin?`<td class="col-check"><input type="checkbox" class="row-check" ${selected[tab].has(e._id)?'checked':''} onchange="toggleSelect('${tab}',${e._id},this.checked)"></td>`:'';
+      const cells=cols.map(c=>{
+        if(c.key==='_type') return `<td><span class="badge ${e._type}">${e._type==='octavo'?'Octavo':'Book'}</span></td>`;
+        if(c.key==='title'){
+          const tags=(Array.isArray(e.tags)&&e.tags.length)?`<div class="tag-chips">${e.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('')}</div>`:'';
+          const inner=e.link?`<a class="title-link" href="${escAttr(e.link)}" target="_blank" title="Open link">${esc(e.title||'(untitled)')}<span class="ext">↗</span></a>`:esc(e.title||'(untitled)');
+          return `<td class="cell-title">${inner}${tags}</td>`;
+        }
+        if(c.key==='voicing') return `<td>${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:'<span class="text-muted">—</span>'}</td>`;
+        if(c.key==='composer'){const v=esc(e.composer||e.author||'');return `<td>${v||'<span class="text-muted">—</span>'}</td>`;}
+        if(c.key==='description'){
+          if(!e.description) return `<td><span class="text-muted">—</span></td>`;
+          const needsExpand=e.description.length>80;
+          const preview=needsExpand?e.description.slice(0,80)+'…':e.description;
+          return needsExpand
+            ? `<td class="desc-cell" onclick="this.classList.toggle('expanded')" title="Click to expand/collapse"><span class="desc-preview">${esc(preview)}</span><span class="desc-full">${esc(e.description)}</span><span class="desc-toggle"> <span class="show-more">▾ more</span><span class="show-less">▴ less</span></span></td>`
+            : `<td class="desc-cell" style="cursor:default;">${esc(e.description)}</td>`;
+        }
+        return `<td>${esc(e[c.key]||'')||'<span class="text-muted">—</span>'}</td>`;
+      }).join('');
+      const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${tab}',${e._id})">✏️</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${tab}',${e._id})" style="color:var(--danger)">🗑</button>`:'';
+      return `<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request" onclick="openRequestModal('${tab}',${e._id})">📬 Request</button>${adminActions}</div></td></tr>`;
+    }).join('');
+  }
+  const visCopies=sorted.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
+  document.getElementById('footer-'+tab).innerHTML=`<span>Showing ${sorted.length} of ${data[tab].length} titles · ${visCopies.toLocaleString()} copies</span><span>${sc?`Sorted by ${sc==='_type'?'type':sc}`:''}</span>`;
+  updateBulkBar(tab);
+}
+
+function sortBy(tab,col){const s=sortState[tab];s.dir=s.col===col?s.dir*-1:1;s.col=col;renderTable(tab);}
+
+// ── CSV ───────────────────────────────────────────────────────────────────
+function exportCSV(tab,selectedOnly=false){
+  let rows=selectedOnly?data[tab].filter(e=>selected[tab].has(e._id)):getSorted(tab,getFiltered(tab));
+  if(!rows.length){toast('Nothing to export','info');return;}
+  const keys=['_type','title','composer','author','voicing','genre','copies','lastPerformed','isbn','publisher','year','description','tags','link'];
+  const labels={_type:'Type',title:'Title',composer:'Composer/Arranger',author:'Author/Editor',voicing:'Voicing',genre:'Genre',copies:'Copies',lastPerformed:'Last Performed',isbn:'ISBN',publisher:'Publisher',year:'Year',description:'Description',tags:'Tags',link:'Link'};
+  const usedKeys=keys.filter(k=>rows.some(r=>{const v=r[k];return Array.isArray(v)?v.length:v;}));
+  const header=usedKeys.map(k=>labels[k]).join(',');
+  const lines=rows.map(r=>usedKeys.map(k=>{
+    let v=k==='_type'?(r._type==='octavo'?'Octavo':'Book'):r[k];
+    if(Array.isArray(v))v=v.join('; ');
+    return `"${String(v??'').replace(/"/g,'""')}"`;
+  }).join(','));
+  const blob=new Blob([[header,...lines].join('\n')],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  Object.assign(document.createElement('a'),{href:url,download:`${tab}-sheet-music-${new Date().toISOString().slice(0,10)}.csv`}).click();
+  URL.revokeObjectURL(url);
+  toast(`Exported ${rows.length} ${selectedOnly?'selected ':''}entries`,'success');
+}
+function showCSVImportTip(){document.getElementById('csv-tip-modal').classList.add('open');}
+
+// ── Google Sync ───────────────────────────────────────────────────────────
+async function syncSheets(tab){
+  if(!authStatus.authenticated){toast('Connect Google in ⚙ Settings first','error');return;}
+  const btn=document.getElementById(`sync-${tab}-btn`);btn.disabled=true;const orig=btn.innerHTML;btn.innerHTML='<span class="spinner"></span> Syncing…';
+  try{
+    const rows=data[tab];if(!rows.length){toast('Nothing to sync','info');return;}
+    const headers=['Type','Title','Composer / Author','Voicing','Genre','Copies','Last Performed','ISBN','Publisher','Year','Description','Tags','Link'];
+    const csvRows=rows.map(e=>[e._type==='octavo'?'Octavo':'Book',e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||'']);
+    const r=await fetch('/api/sync-sheets',adminFetchOpts({tab,rows:csvRows,headers}));const j=await r.json();
+    if(!r.ok){if(j.reauth){authStatus.authenticated=false;updateGoogleUI();toast('Google session expired — reconnect in Settings','error');}else toast('Sync failed: '+j.error,'error');return;}
+    authStatus.spreadsheetId=j.spreadsheetId;
+    toast(`Synced! <a href="https://docs.google.com/spreadsheets/d/${j.spreadsheetId}" target="_blank">Open Sheet ↗</a>`,'success',6000);
+  }finally{btn.disabled=false;btn.innerHTML=orig;}
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────
+function updateGoogleUI(){
+  ['auth-pill','settings-auth-pill'].forEach(id=>{const p=document.getElementById(id);if(!p)return;p.className=p.className.replace(/connected|disconnected/g,'').trim()+(authStatus.authenticated?' connected':' disconnected');p.innerHTML=`<span class="dot"></span>${authStatus.authenticated?'Google ✓':'Google'}`;});
+}
+
+async function prefillSettings(){
+  try{
+    const r=await fetch('/api/config-read',adminHeaders());if(!r.ok)return;const c=await r.json();
+    cfgInfo=c;
+    if(c.clientId)    document.getElementById('cfg-client-id').value=c.clientId;
+    if(c.clientSecretSet)document.getElementById('cfg-client-secret').placeholder='••••••••  (saved)';
+    if(c.notifyEmail) document.getElementById('cfg-notify-email').value=c.notifyEmail;
+    if(c.smtpUser)    document.getElementById('cfg-smtp-user').value=c.smtpUser;
+    if(c.smtpHost)    document.getElementById('cfg-smtp-host').value=c.smtpHost;
+    if(c.smtpPort)    document.getElementById('cfg-smtp-port').value=c.smtpPort;
+    if(c.hasAdminPassword)document.getElementById('admin-pw-status').textContent='A password is currently set.';
+    if(c.envManaged?.adminPassword){
+      document.getElementById('admin-access-body').innerHTML='<p style="font-size:13px;color:var(--muted);">The password is managed securely on the server (ADMIN_PASSWORD environment variable). To change it, update the variable in your hosting dashboard.</p>';
+    }
+    if(c.envManaged?.google){
+      document.getElementById('google-env-note').style.display='';
+      document.getElementById('cfg-client-id').disabled=true;
+      document.getElementById('cfg-client-secret').disabled=true;
+    }
+    document.getElementById('redirect-uri-code').textContent=location.origin+'/auth/callback';
+    if(authStatus.authenticated)gotoWizardStep(3);
+    else if(c.clientId)gotoWizardStep(3);
+  }catch{}
+}
+
+async function saveEmailConfig(){
+  if(!isAdmin){toast('Sign in first','error');return;}
+  const body={
+    notifyEmail:document.getElementById('cfg-notify-email').value.trim(),
+    smtpUser:document.getElementById('cfg-smtp-user').value.trim(),
+    smtpHost:document.getElementById('cfg-smtp-host').value.trim()||'smtp.gmail.com',
+    smtpPort:parseInt(document.getElementById('cfg-smtp-port').value)||587,
+  };
+  const pass=document.getElementById('cfg-smtp-pass').value.trim();
+  if(pass)body.smtpPass=pass;
+  const r=await fetch('/api/config',adminFetchOpts(body));
+  if(r.ok){document.getElementById('email-config-status').textContent='Email settings saved.';toast('Email settings saved','success');}
+}
+
+async function testEmail(){
+  if(!isAdmin){toast('Sign in first','error');return;}
+  const notifyEmail=document.getElementById('cfg-notify-email').value.trim();
+  if(!notifyEmail){toast('Enter a notification email first','error');return;}
+  await saveEmailConfig();
+  const r=await fetch('/api/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    tab:'work',entryTitle:'Test Entry',entryType:'octavo',entryComposer:'Test Composer',entryVoicing:'SATB',
+    name:'Test User',email:'test@example.com',school:'Test School',district:'Test District',copies:'5',
+    message:'This is a test notification from your Sheet Music Catalog.',
+  })});
+  if(r.ok)toast('Test email sent to '+notifyEmail,'success');
+  else toast('Email test failed — check your credentials','error');
+}
+
+function gotoWizardStep(n){
+  [1,2,3].forEach(i=>{document.getElementById(`wstep-${i}`).className='wizard-step'+(i<n?' done':i===n?' active':'');const p=document.getElementById(`wpage-${i}`);if(p)p.className='wizard-page'+(i===n?' active':'');});
+  if(n===3){const cv=document.getElementById('google-connected-view'),dv=document.getElementById('google-connect-view');
+    if(authStatus.authenticated){cv.style.display='';dv.style.display='none';document.getElementById('sheet-link-line').innerHTML=authStatus.spreadsheetId?`<a href="https://docs.google.com/spreadsheets/d/${authStatus.spreadsheetId}" target="_blank">View Sheet Music Library →</a>`:'Ready to sync.';}
+    else{cv.style.display='none';dv.style.display='';}
+  }
+}
+async function saveConfigAndNext(){
+  const clientId=document.getElementById('cfg-client-id').value.trim(),clientSecret=document.getElementById('cfg-client-secret').value.trim();
+  if(!clientId||!clientSecret){toast('Enter both Client ID and Secret','error');return;}
+  const r=await fetch('/api/config',adminFetchOpts({clientId,clientSecret}));
+  if(r.ok){authStatus.configured=true;authStatus.authenticated=false;toast('Credentials saved','success');gotoWizardStep(3);}
+}
+function connectGoogle(){window.location.href='/auth/google';}
+async function disconnectGoogle(){await fetch('/auth/revoke',adminFetchOpts({}));authStatus.authenticated=false;authStatus.spreadsheetId=null;updateGoogleUI();gotoWizardStep(3);toast('Disconnected','info');}
+
+async function loadShareInfo(){
+  try{
+    const r=await fetch('/api/share-info');shareInfo=await r.json();
+    const c=document.getElementById('share-urls');
+    const rows=[];
+    if(shareInfo.hosted||shareInfo.appUrl){
+      const url=shareInfo.appUrl||location.origin;
+      rows.push(`<p style="font-size:13px;color:var(--muted);">This library is live on the web — share this link with anyone:</p>`);
+      rows.push(shareRow(url));
+    } else {
+      rows.push(`<p style="font-size:13px;color:var(--muted);"><strong>Same Wi-Fi</strong> — share these links with anyone on your network:</p>`);
+      (shareInfo.ips||[]).forEach(ip=>rows.push(shareRow(`http://${ip}:${shareInfo.port}`)));
+      if(!(shareInfo.ips||[]).length)rows.push('<p style="font-size:13px;color:var(--muted);">No network addresses found.</p>');
+    }
+    c.innerHTML=rows.join('');
+  }catch{}
+}
+function shareRow(url){return `<div class="share-url-row"><span>${esc(url)}</span><button class="btn-ghost btn-icon btn-sm" onclick="copyText('${escAttr(url)}')" title="Copy">⎘</button></div>`;}
+function copyText(t){navigator.clipboard.writeText(t).then(()=>toast('Copied!','success')).catch(()=>toast('Copy failed','error'));}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escAttr(s){return esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#039;');}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function flash(el){el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1200);}
+function debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
+function toast(msg,type='info',duration=3200){const el=Object.assign(document.createElement('div'),{className:`toast ${type}`,innerHTML:msg});el.onclick=()=>el.remove();document.getElementById('toast-container').appendChild(el);setTimeout(()=>el.remove(),duration);}
+
+['edit-modal','delete-modal','scanner-modal','admin-modal','request-modal','csv-tip-modal','dup-modal','pepper-modal','bulk-tag-modal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){
+    if(e.target!==this)return;
+    if(id==='edit-modal')closeModal();
+    else if(id==='delete-modal')closeDeleteModal();
+    else if(id==='scanner-modal')closeScanner();
+    else if(id==='admin-modal')closeAdminModal();
+    else if(id==='request-modal')closeRequestModal();
+    else if(id==='dup-modal')closeDupModal(false);
+    else this.classList.remove('open');
+  });
+});
+
+init();
+</script>
+</body>
+</html>

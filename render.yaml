@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: choral-library
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SECRET
+        generateValue: true
