@@ -444,32 +444,65 @@ app.post('/auth/revoke', adminRequired, async (req, res) => {
 // ── Google Sheets Sync ────────────────────────────────────────────────────────
 
 app.post('/api/sync-sheets', adminRequired, async (req, res) => {
-  const { tab, rows, headers } = req.body;
+  const { tab } = req.body;
   try {
     const c = await getOAuthClient(req); if (!c) return res.status(400).json({ error: 'Google credentials not configured.' });
     const tokens = await db.getTokens();
     if (!tokens) return res.status(401).json({ error: 'Not authenticated with Google.' });
     c.setCredentials(tokens);
     c.on('tokens', t => db.saveTokens({ ...tokens, ...t }).catch(() => {}));
-    const sheets = google.sheets({ version: 'v4', auth: c });
+    const sheetsApi = google.sheets({ version: 'v4', auth: c });
     const cfg = await db.getConfig();
     let spreadsheetId = cfg.spreadsheetId;
     if (!spreadsheetId) {
-      const created = await sheets.spreadsheets.create({ requestBody: { properties: { title: 'Sheet Music Library' }, sheets: [{ properties: { title: 'Work', index: 0 } }, { properties: { title: 'Personal', index: 1 } }] } });
+      const created = await sheetsApi.spreadsheets.create({ requestBody: { properties: { title: 'Sheet Music Library' }, sheets: [{ properties: { title: 'Work', index: 0 } }, { properties: { title: 'Personal', index: 1 } }] } });
       spreadsheetId = created.data.spreadsheetId; cfg.spreadsheetId = spreadsheetId; await db.saveConfig(cfg);
     }
-    const sheetTitle = tab === 'work' ? 'Work' : 'Personal';
-    const ss = await sheets.spreadsheets.get({ spreadsheetId });
-    if (!ss.data.sheets.some(s => s.properties.title === sheetTitle))
-      await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [{ addSheet: { properties: { title: sheetTitle } } }] } });
-    await sheets.spreadsheets.values.clear({ spreadsheetId, range: `${sheetTitle}!A:Z` });
-    await sheets.spreadsheets.values.update({ spreadsheetId, range: `${sheetTitle}!A1`, valueInputOption: 'RAW', requestBody: { values: [headers, ...rows] } });
-    const sheetId = (await sheets.spreadsheets.get({ spreadsheetId })).data.sheets.find(s => s.properties.title === sheetTitle).properties.sheetId;
-    await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [
-      { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: 'userEnteredFormat.textFormat.bold' } },
-      { autoResizeDimensions: { dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: headers.length } } }
-    ] } });
-    res.json({ success: true, spreadsheetId, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}` });
+
+    const tabTitle = tab === 'work' ? 'Work' : 'Personal';
+    // Payloads: either the new multi-sheet format, or legacy single-sheet {rows, headers}
+    let payloads = Array.isArray(req.body.sheets) && req.body.sheets.length
+      ? req.body.sheets
+      : [{ title: tabTitle, headers: req.body.headers, rows: req.body.rows }];
+    payloads = payloads.filter(p => p.title && Array.isArray(p.headers) && Array.isArray(p.rows));
+
+    // Group sheets we manage (and may delete when empty/stale)
+    const managedPrefixes = [`${tabTitle} – Voicing – `, `${tabTitle} – Genre – `, `${tabTitle} – Octavos – `, `${tabTitle} – Books – `];
+
+    // 1. Add missing sheets, delete stale managed ones — single batch
+    const ss = await sheetsApi.spreadsheets.get({ spreadsheetId });
+    const existing = ss.data.sheets.map(s => s.properties);
+    const wantTitles = new Set(payloads.map(p => p.title));
+    const structure = [];
+    for (const p of payloads)
+      if (!existing.some(e => e.title === p.title)) structure.push({ addSheet: { properties: { title: p.title } } });
+    for (const e of existing)
+      if (!wantTitles.has(e.title) && managedPrefixes.some(pre => e.title.startsWith(pre)))
+        structure.push({ deleteSheet: { sheetId: e.sheetId } });
+    if (structure.length) await sheetsApi.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: structure } });
+
+    // 2. Clear + write all sheets in two batched calls
+    const idByTitle = {};
+    (await sheetsApi.spreadsheets.get({ spreadsheetId })).data.sheets
+      .forEach(s => { idByTitle[s.properties.title] = s.properties.sheetId; });
+    const quote = t => `'${String(t).replace(/'/g, "''")}'`;
+    await sheetsApi.spreadsheets.values.batchClear({ spreadsheetId, requestBody: { ranges: payloads.map(p => `${quote(p.title)}!A:Z`) } });
+    await sheetsApi.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: {
+      valueInputOption: 'RAW',
+      data: payloads.map(p => ({ range: `${quote(p.title)}!A1`, values: [p.headers, ...p.rows] })),
+    } });
+
+    // 3. Bold headers + autosize columns — single batch
+    const fmt = [];
+    for (const p of payloads) {
+      const sheetId = idByTitle[p.title];
+      if (sheetId === undefined) continue;
+      fmt.push({ repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: 'userEnteredFormat.textFormat.bold' } });
+      fmt.push({ autoResizeDimensions: { dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: p.headers.length } } });
+    }
+    if (fmt.length) await sheetsApi.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: fmt } });
+
+    res.json({ success: true, spreadsheetId, sheetCount: payloads.length, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}` });
   } catch (e) {
     console.error('Sync error:', e.message);
     const isAuth = e.code === 401 || (e.message && e.message.includes('invalid_grant'));

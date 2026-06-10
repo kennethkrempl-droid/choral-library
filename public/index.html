@@ -1281,11 +1281,23 @@ async function syncSheets(tab){
   try{
     const rows=data[tab];if(!rows.length){toast('Nothing to sync','info');return;}
     const headers=['Type','Title','Composer / Author','Voicing','Genre','Copies','Last Performed','ISBN','Publisher','Year','Description','Tags','Link'];
-    const csvRows=rows.map(e=>[e._type==='octavo'?'Octavo':'Book',e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||'']);
-    const r=await fetch('/api/sync-sheets',adminFetchOpts({tab,rows:csvRows,headers}));const j=await r.json();
+    const toRow=e=>[e._type==='octavo'?'Octavo':'Book',e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||''];
+    const T=cap(tab);
+    const san=s=>String(s||'').replace(/[\\\/\?\*\[\]:]/g,' ').replace(/\s+/g,' ').trim().slice(0,60);
+    const groupBy=(arr,fn)=>{const m={};arr.forEach(e=>{const k=fn(e);(m[k]=m[k]||[]).push(e);});return m;};
+    // Main sheet + per-voicing sheets (octavos only) + per-genre sheets (octavos and books kept separate)
+    const sheets=[{title:T,headers,rows:rows.map(toRow)}];
+    const octavos=rows.filter(e=>e._type==='octavo'), books=rows.filter(e=>e._type==='book');
+    const vGroups=groupBy(octavos,e=>san(e.voicing)||'(none)');
+    Object.keys(vGroups).sort().forEach(v=>sheets.push({title:`${T} – Voicing – ${v}`,headers,rows:vGroups[v].map(toRow)}));
+    const ogGroups=groupBy(octavos,e=>san(e.genre)||'(none)');
+    Object.keys(ogGroups).sort().forEach(g=>sheets.push({title:`${T} – Octavos – ${g}`,headers,rows:ogGroups[g].map(toRow)}));
+    const bgGroups=groupBy(books,e=>san(e.genre)||'(none)');
+    Object.keys(bgGroups).sort().forEach(g=>sheets.push({title:`${T} – Books – ${g}`,headers,rows:bgGroups[g].map(toRow)}));
+    const r=await fetch('/api/sync-sheets',adminFetchOpts({tab,sheets}));const j=await r.json();
     if(!r.ok){if(j.reauth){authStatus.authenticated=false;updateGoogleUI();toast('Google session expired — reconnect in Settings','error');}else toast('Sync failed: '+j.error,'error');return;}
     authStatus.spreadsheetId=j.spreadsheetId;
-    toast(`Synced! <a href="https://docs.google.com/spreadsheets/d/${j.spreadsheetId}" target="_blank">Open Sheet ↗</a>`,'success',6000);
+    toast(`Synced ${j.sheetCount||sheets.length} sheets! <a href="https://docs.google.com/spreadsheets/d/${j.spreadsheetId}" target="_blank">Open ↗</a>`,'success',6000);
   }finally{btn.disabled=false;btn.innerHTML=orig;}
 }
 

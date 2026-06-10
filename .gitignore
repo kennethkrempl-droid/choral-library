@@ -11,3 +11,5 @@ deploy.command
 .tools/
 .neon-project.json
 .database-url.txt
+update-site.command
+update.log
