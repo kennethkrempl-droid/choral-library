@@ -311,12 +311,93 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 <nav class="tabs-nav">
   <button class="tab-btn active" data-tab="work">Work <span class="tab-count" id="count-work">0</span></button>
   <button class="tab-btn" data-tab="personal">Personal <span class="tab-count" id="count-personal">0</span></button>
+  <button class="tab-btn admin-only" data-tab="import">📷 Import</button>
   <button class="tab-btn admin-only" data-tab="settings">⚙ Settings</button>
 </nav>
 
 <!-- ═══ LIBRARY TABS (work + personal share markup, generated) ═══ -->
 <div class="tab-panel active" id="tab-work"></div>
 <div class="tab-panel" id="tab-personal"></div>
+
+<!-- ═══ IMPORT TAB ═══ -->
+<div class="tab-panel" id="tab-import">
+
+  <div class="card" id="gemini-setup-card" style="margin-bottom:18px;display:none;">
+    <div class="card-header"><h3>🔑 One-time setup — free scanning key</h3></div>
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+        Photo scanning uses Google's free AI tier (no credit card, 1,500 scans/day free).
+        Takes about a minute to set up:</p>
+      <ol style="padding-left:20px;font-size:13px;line-height:2;margin-bottom:14px;">
+        <li>Open <a href="https://aistudio.google.com/apikey" target="_blank"><strong>aistudio.google.com/apikey</strong></a> and sign in with your Google account</li>
+        <li>Click <strong>Create API key</strong></li>
+        <li>Copy the key and paste it below</li>
+      </ol>
+      <div class="input-row" style="max-width:480px;">
+        <input type="password" id="gemini-key-input" placeholder="Paste your free API key (AIza…)" autocomplete="off">
+        <button class="btn-primary btn-sm" onclick="saveGeminiKey()">Save Key</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px;">
+    <div class="card-header">
+      <h3>📷 Scan Cover Photos</h3>
+      <span id="scan-status" class="text-muted" style="font-size:12px;"></span>
+    </div>
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+        Photograph your covers (a few per photo is fine — they'll be split apart automatically), then upload the batch.
+        Each piece appears below for review before anything is saved.</p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <label class="btn-primary" style="cursor:pointer;">
+          ＋ Choose Photos
+          <input type="file" id="scan-files" accept="image/*" multiple style="display:none;" onchange="queueScans(this.files)">
+        </label>
+        <span class="text-muted" style="font-size:12px;">JPG/PNG/HEIC from your phone or camera all work</span>
+      </div>
+      <div id="scan-queue" style="margin-top:12px;display:flex;flex-direction:column;gap:5px;"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px;">
+    <div class="card-header">
+      <h3>📋 Review &amp; Add</h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label style="font-size:12px;color:var(--muted);">Add to:</label>
+        <select class="filter-select" id="import-target">
+          <option value="work">Work library</option>
+          <option value="personal">Personal library</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="import-table">
+        <thead><tr><th>Title</th><th>Composer / Arranger</th><th>Voicing</th><th>Genre</th><th style="width:70px;">Copies</th><th></th></tr></thead>
+        <tbody id="import-rows"><tr><td colspan="6"><div class="empty-state" style="padding:28px;"><p>Scanned pieces will appear here for review.</p></div></td></tr></tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span id="import-count"></span>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost btn-sm" onclick="clearImportRows()">Clear All</button>
+        <button class="btn-primary btn-sm" id="import-add-btn" onclick="addImportRows()">Add All to Library</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>⌨️ Or paste a list</h3></div>
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">
+        One piece per line: <code style="background:var(--bg);padding:1px 6px;border-radius:4px;">Title, Composer, Voicing, Copies</code>
+        (voicing and copies optional)</p>
+      <textarea id="paste-box" style="width:100%;min-height:110px;font-family:monospace;font-size:13px;padding:10px;border:1px solid var(--line);border-radius:var(--r-sm);" placeholder="Sing We Now of Christmas, arr. Fred Prentice, SAB, 24&#10;The Road Home, Stephen Paulus, SATB, 30"></textarea>
+      <div style="margin-top:10px;"><button class="btn-secondary btn-sm" onclick="parsePasteBox()">Parse → Review List</button></div>
+    </div>
+  </div>
+
+</div>
 
 <!-- ═══ SETTINGS TAB ═══ -->
 <div class="tab-panel" id="tab-settings">
@@ -1310,6 +1391,7 @@ async function prefillSettings(){
   try{
     const r=await fetch('/api/config-read',adminHeaders());if(!r.ok)return;const c=await r.json();
     cfgInfo=c;
+    document.getElementById('gemini-setup-card').style.display=c.geminiKeySet?'none':'';
     if(c.clientId)    document.getElementById('cfg-client-id').value=c.clientId;
     if(c.clientSecretSet)document.getElementById('cfg-client-secret').placeholder='••••••••  (saved)';
     if(c.notifyEmail) document.getElementById('cfg-notify-email').value=c.notifyEmail;
@@ -1394,6 +1476,133 @@ async function loadShareInfo(){
 }
 function shareRow(url){return `<div class="share-url-row"><span>${esc(url)}</span><button class="btn-ghost btn-icon btn-sm" onclick="copyText('${escAttr(url)}')" title="Copy">⎘</button></div>`;}
 function copyText(t){navigator.clipboard.writeText(t).then(()=>toast('Copied!','success')).catch(()=>toast('Copy failed','error'));}
+
+// ── Photo import ──────────────────────────────────────────────────────────
+let importRows = [];
+
+async function saveGeminiKey(){
+  const key=document.getElementById('gemini-key-input').value.trim();
+  if(!key){toast('Paste your API key first','error');return;}
+  const r=await fetch('/api/config',adminFetchOpts({geminiApiKey:key}));
+  if(r.ok){document.getElementById('gemini-setup-card').style.display='none';toast('Key saved — scanning is ready!','success');}
+  else toast('Could not save key','error');
+}
+
+async function fileToScanPayload(file){
+  let bmp;
+  try{ bmp=await createImageBitmap(file); }
+  catch{
+    bmp=await new Promise((ok,err)=>{const img=new Image();img.onload=()=>ok(img);img.onerror=err;img.src=URL.createObjectURL(file);});
+  }
+  const w=bmp.width||bmp.naturalWidth, h=bmp.height||bmp.naturalHeight;
+  const scale=Math.min(1,1280/Math.max(w,h));
+  const c=document.createElement('canvas');c.width=Math.round(w*scale);c.height=Math.round(h*scale);
+  c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+  return {image:c.toDataURL('image/jpeg',0.85).split(',')[1],mimeType:'image/jpeg'};
+}
+
+async function queueScans(files){
+  if(!files||!files.length)return;
+  if(cfgInfo&&!cfgInfo.geminiKeySet){toast('Set up your free scanning key first (top of this page)','error');return;}
+  const queue=document.getElementById('scan-queue');
+  const items=[...files].map(f=>{
+    const el=document.createElement('div');
+    el.style.cssText='display:flex;gap:8px;align-items:center;font-size:13px;padding:6px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;';
+    el.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(f.name)}</span><span class="scan-item-status text-muted">waiting…</span>`;
+    queue.appendChild(el);
+    return {file:f,el};
+  });
+  document.getElementById('scan-files').value='';
+  let done=0;
+  for(const it of items){
+    const st=it.el.querySelector('.scan-item-status');
+    st.innerHTML='<span class="spinner"></span> scanning…';
+    try{
+      const payload=await fileToScanPayload(it.file);
+      let r=await fetch('/api/scan-cover',adminFetchOpts(payload));
+      if(r.status===429){st.textContent='rate limit — waiting 30s…';await new Promise(x=>setTimeout(x,30000));r=await fetch('/api/scan-cover',adminFetchOpts(payload));}
+      const j=await r.json();
+      if(!r.ok)throw new Error(j.error||'scan failed');
+      if(!j.pieces.length){st.textContent='⚠ nothing readable';st.style.color='var(--warning)';}
+      else{
+        j.pieces.forEach(p=>importRows.push({title:p.title,composer:p.composer,voicing:p.voicing,genre:'',copies:'1'}));
+        st.textContent=`✓ ${j.pieces.length} piece${j.pieces.length>1?'s':''}`;st.style.color='var(--success)';
+        renderImportRows();
+      }
+    }catch(e){st.textContent='✗ '+(e.message||'failed');st.style.color='var(--danger)';}
+    done++;
+    document.getElementById('scan-status').textContent=`${done}/${items.length} photos processed`;
+    await new Promise(x=>setTimeout(x,1200)); // stay friendly to the free tier
+  }
+}
+
+function renderImportRows(){
+  const tb=document.getElementById('import-rows');
+  if(!importRows.length){
+    tb.innerHTML='<tr><td colspan="6"><div class="empty-state" style="padding:28px;"><p>Scanned pieces will appear here for review.</p></div></td></tr>';
+    document.getElementById('import-count').textContent='';
+    return;
+  }
+  tb.innerHTML=importRows.map((r,i)=>{
+    const dups=findDuplicates(r.title,r.composer);
+    const vOpts=VOICINGS.map(v=>`<option${r.voicing===v?' selected':''}>${v}</option>`).join('');
+    const vExtra=(r.voicing&&!VOICINGS.includes(r.voicing))?`<option selected>${escAttr(r.voicing)}</option>`:'';
+    const gOpts=GENRES.map(g=>`<option${r.genre===g?' selected':''}>${g}</option>`).join('');
+    return `<tr>
+      <td style="min-width:200px;">${dups.length?'<span title="Looks like a duplicate of an existing entry" style="cursor:help;">⚠️ </span>':''}<input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.title)}" oninput="importRows[${i}].title=this.value"></td>
+      <td style="min-width:160px;"><input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.composer)}" oninput="importRows[${i}].composer=this.value"></td>
+      <td><select class="filter-select" onchange="importRows[${i}].voicing=this.value"><option value="">—</option>${vOpts}${vExtra}</select></td>
+      <td><select class="filter-select" onchange="importRows[${i}].genre=this.value"><option value="">—</option>${gOpts}</select></td>
+      <td><input type="number" min="0" style="width:64px;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.copies)}" oninput="importRows[${i}].copies=this.value"></td>
+      <td><button class="btn-ghost btn-icon btn-sm" title="Remove" onclick="importRows.splice(${i},1);renderImportRows()">✕</button></td>
+    </tr>`;
+  }).join('');
+  const dupCount=importRows.filter(r=>findDuplicates(r.title,r.composer).length).length;
+  document.getElementById('import-count').textContent=`${importRows.length} piece${importRows.length>1?'s':''} ready`+(dupCount?` · ⚠️ ${dupCount} possible duplicate${dupCount>1?'s':''}`:'');
+}
+
+function clearImportRows(){importRows=[];renderImportRows();document.getElementById('scan-queue').innerHTML='';document.getElementById('scan-status').textContent='';}
+
+async function addImportRows(){
+  const rows=importRows.filter(r=>r.title&&r.title.trim());
+  if(!rows.length){toast('Nothing to add','info');return;}
+  const tab=document.getElementById('import-target').value;
+  const btn=document.getElementById('import-add-btn');btn.disabled=true;const orig=btn.innerHTML;
+  let added=0,failed=0;
+  for(const r of rows){
+    btn.innerHTML=`<span class="spinner"></span> Adding ${added+failed+1}/${rows.length}…`;
+    const entry={_type:'octavo',_id:Date.now()+added+failed,title:r.title.trim(),composer:(r.composer||'').trim(),voicing:r.voicing||'',genre:r.genre||'',copies:String(r.copies||'1'),lastPerformed:'',link:'',tags:[]};
+    try{
+      const resp=await fetch(`/api/entries/${tab}`,adminFetchOpts(entry));
+      const j=await resp.json();
+      if(resp.ok){data[tab].unshift(j.entry);added++;}else failed++;
+    }catch{failed++;}
+  }
+  btn.disabled=false;btn.innerHTML=orig;
+  renderAll();
+  if(failed)toast(`Added ${added}, ${failed} failed — try those again`,'error');
+  else{toast(`Added ${added} pieces to your ${cap(tab)} library! 🎉`,'success',5000);clearImportRows();}
+}
+
+function parsePasteBox(){
+  const lines=document.getElementById('paste-box').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){toast('Paste some lines first','error');return;}
+  let n=0;
+  for(const line of lines){
+    const parts=line.split(',').map(s=>s.trim());
+    if(!parts[0])continue;
+    let voicing='',copies='1',rest=parts.slice(1);
+    // pull a trailing number as copies, and a recognizable voicing from wherever it sits
+    if(rest.length&&/^\d+$/.test(rest[rest.length-1]))copies=rest.pop();
+    const vIdx=rest.findIndex(p=>VOICINGS.some(v=>v.toLowerCase()===p.toLowerCase()));
+    if(vIdx>-1)voicing=VOICINGS.find(v=>v.toLowerCase()===rest[vIdx].toLowerCase()),rest.splice(vIdx,1);
+    importRows.push({title:parts[0],composer:rest.join(', '),voicing,genre:'',copies});
+    n++;
+  }
+  document.getElementById('paste-box').value='';
+  renderImportRows();
+  toast(`Parsed ${n} lines — review below`,'success');
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}

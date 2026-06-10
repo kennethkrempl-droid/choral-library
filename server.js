@@ -38,6 +38,19 @@ function httpsGet(url, headers = {}) {
   });
 }
 
+function httpsPost(url, bodyObj, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(bodyObj);
+    const u = new URL(url);
+    const req = https.request({
+      hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data), ...headers },
+    }, res => { let b = ''; res.on('data', c => b += c); res.on('end', () => resolve({ status: res.statusCode, body: b })); });
+    req.on('error', reject);
+    req.write(data); req.end();
+  });
+}
+
 function baseUrl(req) {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
   return `${req.protocol}://${req.get('host')}`;
@@ -52,6 +65,7 @@ async function effectiveConfig() {
     clientId:      process.env.GOOGLE_CLIENT_ID     || cfg.clientId,
     clientSecret:  process.env.GOOGLE_CLIENT_SECRET || cfg.clientSecret,
     adminPassword: process.env.ADMIN_PASSWORD       || cfg.adminPassword,
+    geminiApiKey:  process.env.GEMINI_API_KEY       || cfg.geminiApiKey,
     notifyEmail:   process.env.NOTIFY_EMAIL         || cfg.notifyEmail,
     smtpUser:      process.env.SMTP_USER            || cfg.smtpUser,
     smtpPass:      process.env.SMTP_PASS            || cfg.smtpPass,
@@ -291,6 +305,52 @@ app.get('/api/pepper-lookup', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'JW Pepper lookup failed: ' + e.message }); }
 });
 
+// ── Cover photo scan (Google AI free tier) ────────────────────────────────────
+
+const SCAN_VOICINGS = ['SATB','SAB','SSA','SSAA','SSATB','SATTBB','SSAATTBB','TTB','TTBB','TBB','SA','2-Part','3-Part','3-Part Mixed','Unison'];
+
+app.post('/api/scan-cover', adminRequired, async (req, res) => {
+  try {
+    const cfg = await effectiveConfig();
+    const key = cfg.geminiApiKey;
+    if (!key) return res.status(400).json({ error: 'No Google AI key configured. Add your free key in the Import tab.' });
+    const { image, mimeType } = req.body;
+    if (!image) return res.status(400).json({ error: 'No image provided.' });
+
+    const prompt = `You are reading photo(s) of printed choral sheet music covers (octavos). One photo may show one or several distinct covers.
+For EACH distinct piece visible, extract:
+- "title": the piece title as printed (not the series/publisher name)
+- "composer": composer and/or arranger as printed, e.g. "Mac Huff" or "arr. Roger Emerson" or "Handel, arr. Hopson"
+- "voicing": the voicing if printed, normalized to exactly one of: ${SCAN_VOICINGS.join(', ')} — or "" if not visible
+Respond with ONLY a strict JSON array (no markdown, no commentary): [{"title":"...","composer":"...","voicing":"..."}]
+If you cannot read anything, return [].`;
+
+    const { status, body } = await httpsPost(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`,
+      {
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType || 'image/jpeg', data: image } }] }],
+        generationConfig: { temperature: 0 },
+      }
+    );
+    if (status === 429) return res.status(429).json({ error: 'Free-tier rate limit hit — wait a minute and continue.' });
+    const j = JSON.parse(body);
+    if (status !== 200) return res.status(status).json({ error: j.error?.message || `Scan failed (HTTP ${status})` });
+    let text = j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const start = text.indexOf('['), end = text.lastIndexOf(']');
+    if (start === -1 || end === -1) return res.json({ pieces: [] });
+    let pieces;
+    try { pieces = JSON.parse(text.slice(start, end + 1)); } catch { return res.json({ pieces: [] }); }
+    if (!Array.isArray(pieces)) pieces = [];
+    pieces = pieces.filter(p => p && p.title).map(p => ({
+      title: String(p.title).trim().slice(0, 200),
+      composer: String(p.composer || '').trim().slice(0, 200),
+      voicing: SCAN_VOICINGS.find(v => v.toLowerCase() === String(p.voicing || '').trim().toLowerCase()) || '',
+    }));
+    res.json({ pieces });
+  } catch (e) { res.status(500).json({ error: 'Scan failed: ' + e.message }); }
+});
+
 // ── Requests (Library system) ─────────────────────────────────────────────────
 
 app.post('/api/request', async (req, res) => {
@@ -396,6 +456,7 @@ app.get('/api/config-read', adminRequired, async (req, res) => {
     const c = await effectiveConfig();
     res.json({
       clientId: c.clientId || '', clientSecretSet: !!c.clientSecret, hasAdminPassword: !!c.adminPassword,
+      geminiKeySet: !!c.geminiApiKey,
       notifyEmail: c.notifyEmail || '', smtpUser: c.smtpUser || '', smtpHost: c.smtpHost || '', smtpPort: c.smtpPort || '',
       envManaged: { adminPassword: !!process.env.ADMIN_PASSWORD, google: !!process.env.GOOGLE_CLIENT_ID },
     });
@@ -404,7 +465,7 @@ app.get('/api/config-read', adminRequired, async (req, res) => {
 
 app.post('/api/config', adminRequired, async (req, res) => {
   try {
-    const allowed = ['clientId', 'clientSecret', 'notifyEmail', 'smtpUser', 'smtpPass', 'smtpHost', 'smtpPort'];
+    const allowed = ['clientId', 'clientSecret', 'notifyEmail', 'smtpUser', 'smtpPass', 'smtpHost', 'smtpPort', 'geminiApiKey'];
     const cfg = await db.getConfig();
     for (const k of allowed) if (k in req.body) cfg[k] = req.body[k];
     await db.saveConfig(cfg);
