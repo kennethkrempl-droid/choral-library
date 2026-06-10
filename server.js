@@ -325,13 +325,19 @@ For EACH distinct piece visible, extract:
 Respond with ONLY a strict JSON array (no markdown, no commentary): [{"title":"...","composer":"...","voicing":"..."}]
 If you cannot read anything, return [].`;
 
-    const { status, body } = await httpsPost(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`,
-      {
-        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType || 'image/jpeg', data: image } }] }],
-        generationConfig: { temperature: 0 },
-      }
-    );
+    const payload = {
+      contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType || 'image/jpeg', data: image } }] }],
+      generationConfig: { temperature: 0 },
+    };
+    const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+    let status, body;
+    for (const model of models) {
+      ({ status, body } = await httpsPost(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+        payload
+      ));
+      if (status !== 429 && status !== 404) break; // try the next model on quota/availability problems
+    }
     if (status === 429) return res.status(429).json({ error: 'Free-tier rate limit hit — wait a minute and continue.' });
     const j = JSON.parse(body);
     if (status !== 200) return res.status(status).json({ error: j.error?.message || `Scan failed (HTTP ${status})` });
