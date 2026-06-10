@@ -1525,7 +1525,12 @@ async function queueScans(files){
       if(!r.ok)throw new Error(j.error||'scan failed');
       if(!j.pieces.length){st.textContent='⚠ nothing readable';st.style.color='var(--warning)';}
       else{
-        j.pieces.forEach(p=>importRows.push({title:p.title,composer:p.composer,voicing:p.voicing,genre:'',copies:'1'}));
+        st.textContent='finding links…';
+        for(const p of j.pieces){
+          const row={title:p.title,composer:p.composer,voicing:p.voicing,genre:'',copies:'1',link:''};
+          await enrichFromPepper(row);
+          importRows.push(row);
+        }
         st.textContent=`✓ ${j.pieces.length} piece${j.pieces.length>1?'s':''}`;st.style.color='var(--success)';
         renderImportRows();
       }
@@ -1534,6 +1539,22 @@ async function queueScans(files){
     document.getElementById('scan-status').textContent=`${done}/${items.length} photos processed`;
     await new Promise(x=>setTimeout(x,1200)); // stay friendly to the free tier
   }
+}
+
+async function enrichFromPepper(row){
+  try{
+    const r=await fetch(`/api/pepper-lookup?title=${encodeURIComponent(row.title)}&composer=${encodeURIComponent(row.composer)}`);
+    if(!r.ok)return;
+    const j=await r.json();
+    const best=(j.results||[]).find(p=>{
+      const a=norm(p.title),b=norm(row.title);
+      return a===b||a.includes(b)||b.includes(a);
+    });
+    if(!best)return;
+    row.link=best.url;
+    if(!row.composer&&best.composer)row.composer=best.composer;
+    if(!row.voicing&&best.voicings.length===1)row.voicing=best.voicings[0];
+  }catch{}
 }
 
 function renderImportRows(){
@@ -1554,7 +1575,7 @@ function renderImportRows(){
       <td><select class="filter-select" onchange="importRows[${i}].voicing=this.value"><option value="">—</option>${vOpts}${vExtra}</select></td>
       <td><select class="filter-select" onchange="importRows[${i}].genre=this.value"><option value="">—</option>${gOpts}</select></td>
       <td><input type="number" min="0" style="width:64px;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.copies)}" oninput="importRows[${i}].copies=this.value"></td>
-      <td><button class="btn-ghost btn-icon btn-sm" title="Remove" onclick="importRows.splice(${i},1);renderImportRows()">✕</button></td>
+      <td style="white-space:nowrap;">${r.link?`<a href="${escAttr(r.link)}" target="_blank" title="JW Pepper link found" style="font-size:12px;">🔗↗</a>`:'<span class="text-muted" style="font-size:11px;" title="No confident JW Pepper match — you can add a link later by editing the entry">—</span>'}<button class="btn-ghost btn-icon btn-sm" title="Remove" onclick="importRows.splice(${i},1);renderImportRows()">✕</button></td>
     </tr>`;
   }).join('');
   const dupCount=importRows.filter(r=>findDuplicates(r.title,r.composer).length).length;
@@ -1571,7 +1592,7 @@ async function addImportRows(){
   let added=0,failed=0;
   for(const r of rows){
     btn.innerHTML=`<span class="spinner"></span> Adding ${added+failed+1}/${rows.length}…`;
-    const entry={_type:'octavo',_id:Date.now()+added+failed,title:r.title.trim(),composer:(r.composer||'').trim(),voicing:r.voicing||'',genre:r.genre||'',copies:String(r.copies||'1'),lastPerformed:'',link:'',tags:[]};
+    const entry={_type:'octavo',_id:Date.now()+added+failed,title:r.title.trim(),composer:(r.composer||'').trim(),voicing:r.voicing||'',genre:r.genre||'',copies:String(r.copies||'1'),lastPerformed:'',link:r.link||'',tags:[]};
     try{
       const resp=await fetch(`/api/entries/${tab}`,adminFetchOpts(entry));
       const j=await resp.json();
@@ -1584,10 +1605,10 @@ async function addImportRows(){
   else{toast(`Added ${added} pieces to your ${cap(tab)} library! 🎉`,'success',5000);clearImportRows();}
 }
 
-function parsePasteBox(){
+async function parsePasteBox(){
   const lines=document.getElementById('paste-box').value.split('\n').map(l=>l.trim()).filter(Boolean);
   if(!lines.length){toast('Paste some lines first','error');return;}
-  let n=0;
+  const newRows=[];
   for(const line of lines){
     const parts=line.split(',').map(s=>s.trim());
     if(!parts[0])continue;
@@ -1596,12 +1617,15 @@ function parsePasteBox(){
     if(rest.length&&/^\d+$/.test(rest[rest.length-1]))copies=rest.pop();
     const vIdx=rest.findIndex(p=>VOICINGS.some(v=>v.toLowerCase()===p.toLowerCase()));
     if(vIdx>-1)voicing=VOICINGS.find(v=>v.toLowerCase()===rest[vIdx].toLowerCase()),rest.splice(vIdx,1);
-    importRows.push({title:parts[0],composer:rest.join(', '),voicing,genre:'',copies});
-    n++;
+    newRows.push({title:parts[0],composer:rest.join(', '),voicing,genre:'',copies,link:''});
   }
   document.getElementById('paste-box').value='';
+  importRows.push(...newRows);
   renderImportRows();
-  toast(`Parsed ${n} lines — review below`,'success');
+  toast(`Parsed ${newRows.length} lines — finding JW Pepper links…`,'info');
+  for(const row of newRows){await enrichFromPepper(row);}
+  renderImportRows();
+  toast('Links added where found — review below','success');
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
