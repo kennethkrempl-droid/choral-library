@@ -309,13 +309,15 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 </div>
 
 <nav class="tabs-nav">
-  <button class="tab-btn active" data-tab="work">Work <span class="tab-count" id="count-work">0</span></button>
-  <button class="tab-btn" data-tab="personal">Personal <span class="tab-count" id="count-personal">0</span></button>
+  <button class="tab-btn viewer-only" data-tab="all">Library <span class="tab-count" id="count-all">0</span></button>
+  <button class="tab-btn active admin-only" data-tab="work">Work <span class="tab-count" id="count-work">0</span></button>
+  <button class="tab-btn admin-only" data-tab="personal">Personal <span class="tab-count" id="count-personal">0</span></button>
   <button class="tab-btn admin-only" data-tab="import">📷 Import</button>
   <button class="tab-btn admin-only" data-tab="settings">⚙ Settings</button>
 </nav>
 
 <!-- ═══ LIBRARY TABS (work + personal share markup, generated) ═══ -->
+<div class="tab-panel" id="tab-all"></div>
 <div class="tab-panel active" id="tab-work"></div>
 <div class="tab-panel" id="tab-personal"></div>
 
@@ -633,9 +635,15 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 // ── State ─────────────────────────────────────────────────────────────────
 let data        = { work:[], personal:[] };
 let entryTypes  = { work:'octavo', personal:'octavo' };
-let filters     = { work:{search:'',type:'',genre:'',voicing:''}, personal:{search:'',type:'',genre:'',voicing:''} };
-let sortState   = { work:{col:null,dir:1}, personal:{col:null,dir:1} };
-let selected    = { work:new Set(), personal:new Set() };
+let filters     = { work:{search:'',type:'',genre:'',voicing:''}, personal:{search:'',type:'',genre:'',voicing:''}, all:{search:'',type:'',genre:'',voicing:''} };
+let sortState   = { work:{col:null,dir:1}, personal:{col:null,dir:1}, all:{col:null,dir:1} };
+let selected    = { work:new Set(), personal:new Set(), all:new Set() };
+
+// Combined view for visitors: one running list across both libraries
+function rowsFor(tab){
+  if(tab!=='all') return data[tab];
+  return [...data.work.map(e=>({...e,__src:'work'})), ...data.personal.map(e=>({...e,__src:'personal'}))];
+}
 let editTarget  = null, deleteTarget = null, requestTarget = null, pendingAdd = null, pepperTarget = null, bulkTagTarget = null;
 let authStatus  = { configured:false, authenticated:false, spreadsheetId:null };
 let isAdmin     = false;
@@ -648,11 +656,11 @@ const VOICINGS = ['SATB','SAB','SSA','SSAA','SSATB','SATTBB','SSAATTBB','TTB','T
 const GENRES   = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater','Jazz','Sacred','Other'];
 
 // Hide admin-only elements unless body.is-admin
-document.head.insertAdjacentHTML('beforeend','<style>body:not(.is-admin) .admin-only{display:none !important}</style>');
+document.head.insertAdjacentHTML('beforeend','<style>body:not(.is-admin) .admin-only{display:none !important}body.is-admin .viewer-only{display:none !important}</style>');
 
 // ── Library panel template ────────────────────────────────────────────────
 function buildPanel(tab){
-  const T = cap(tab);
+  const T = tab==='all' ? 'Full Library' : cap(tab);
   document.getElementById('tab-'+tab).innerHTML = `
   <div class="stats-row" id="stats-${tab}"></div>
 
@@ -701,6 +709,8 @@ function buildPanel(tab){
       <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}',true)">⬇ Export Selected</button>
       <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','genre')">♪ Set Genre</button>
       <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','tags')">🏷 Add Tag</button>
+      <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',true)">🚫 Mark In Use</button>
+      <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',false)">✅ Mark Available</button>
       <button class="btn-danger btn-sm" onclick="openBulkDelete('${tab}')">🗑 Delete</button>
       <span style="flex:1"></span>
       <button class="btn-ghost btn-sm" onclick="clearSelection('${tab}')">Deselect All</button>
@@ -718,7 +728,7 @@ async function init() {
   if (p.get('auth')==='success') toast('Connected to Google!','success');
   if (p.get('error')) toast('Error: '+decodeURIComponent(p.get('error')),'error');
   history.replaceState(null,'',location.pathname);
-  buildPanel('work'); buildPanel('personal'); buildForms();
+  buildPanel('work'); buildPanel('personal'); buildPanel('all'); buildForms();
   await Promise.all([loadData(), loadAuthStatus(), checkAdminStatus()]);
   renderAll(); loadShareInfo();
 }
@@ -741,11 +751,14 @@ function adminFetchOpts(body,method='POST') { return { method, headers:{'Content
 function applyAdminMode() {
   document.body.classList.toggle('is-admin', isAdmin);
   const btn=document.getElementById('admin-btn'), banner=document.getElementById('viewer-banner');
-  if (isAdmin) { btn.className='btn-header btn-sm active'; btn.textContent='🔒 Librarian'; banner.classList.add('hidden'); }
+  const active=document.querySelector('.tab-btn.active');
+  if (isAdmin) {
+    btn.className='btn-header btn-sm active'; btn.textContent='🔒 Librarian'; banner.classList.add('hidden');
+    if(active&&active.dataset.tab==='all') switchTab('work');
+  }
   else {
     btn.className='btn-header btn-sm'; btn.innerHTML='🔓 Sign In'; banner.classList.remove('hidden');
-    const active=document.querySelector('.tab-btn.active');
-    if(active&&active.dataset.tab==='settings') switchTab('work');
+    if(!active||active.dataset.tab!=='all') switchTab('all');
     selected.work.clear(); selected.personal.clear();
   }
   renderAll();
@@ -1083,6 +1096,21 @@ async function confirmBulkTag(){
 }
 function closeBulkTagModal(){document.getElementById('bulk-tag-modal').classList.remove('open');bulkTagTarget=null;}
 
+// ── Availability ──────────────────────────────────────────────────────────
+async function toggleAvail(tab,id){
+  const e=data[tab].find(x=>x._id===id);if(!e)return;
+  const newVal=!e.unavailable;
+  const r=await fetch(`/api/entries/${tab}/bulk`,adminFetchOpts({action:'patch',ids:[id],patch:{unavailable:newVal}}));
+  if(r.ok){e.unavailable=newVal;renderAll();toast(newVal?`"${e.title}" marked in use`:`"${e.title}" marked available`,'info');}
+  else toast('Could not update','error');
+}
+async function bulkAvail(tab,unavailable){
+  const ids=[...selected[tab]];if(!ids.length)return;
+  const r=await fetch(`/api/entries/${tab}/bulk`,adminFetchOpts({action:'patch',ids,patch:{unavailable}}));
+  if(r.ok){data[tab].forEach(e=>{if(selected[tab].has(e._id))e.unavailable=unavailable;});renderAll();toast(`${ids.length} entries marked ${unavailable?'in use':'available'}`,'success');}
+  else toast('Could not update','error');
+}
+
 // ── Selection ─────────────────────────────────────────────────────────────
 function toggleSelect(tab,id,checked){
   if(checked)selected[tab].add(id);else selected[tab].delete(id);
@@ -1213,13 +1241,13 @@ async function deleteRequest(id) {
 // ── Filtering / sorting ───────────────────────────────────────────────────
 function getFiltered(tab){
   const f=filters[tab];
-  return data[tab].filter(e=>{
+  return rowsFor(tab).filter(e=>{
     if(f.type&&e._type!==f.type)return false;
     if(f.genre&&e.genre!==f.genre)return false;
     if(f.voicing&&e.voicing!==f.voicing)return false;
     if(f.search){
       const q=f.search.toLowerCase();
-      return Object.entries(e).some(([k,v])=>k!=='_id'&&String(Array.isArray(v)?v.join(' '):(v||'')).toLowerCase().includes(q));
+      return Object.entries(e).some(([k,v])=>k!=='_id'&&!k.startsWith('__')&&String(Array.isArray(v)?v.join(' '):(v||'')).toLowerCase().includes(q));
     }
     return true;
   });
@@ -1249,9 +1277,9 @@ function clearFilters(tab){
 function refreshFilterOptions(tab){
   const f=filters[tab];
   const vSel=document.getElementById('fvoicing-'+tab),gSel=document.getElementById('fgenre-'+tab);
-  const dataV=[...new Set(data[tab].map(e=>e.voicing).filter(Boolean))];
+  const dataV=[...new Set(rowsFor(tab).map(e=>e.voicing).filter(Boolean))];
   const vOpts=[...new Set([...VOICINGS.filter(v=>dataV.includes(v)),...dataV])];
-  const dataG=[...new Set(data[tab].map(e=>e.genre).filter(Boolean))];
+  const dataG=[...new Set(rowsFor(tab).map(e=>e.genre).filter(Boolean))];
   const gOpts=[...new Set([...GENRES.filter(g=>dataG.includes(g)),...dataG])];
   vSel.innerHTML='<option value="">All Voicings</option>'+vOpts.map(v=>`<option value="${escAttr(v)}"${f.voicing===v?' selected':''}>${esc(v)}</option>`).join('');
   gSel.innerHTML='<option value="">All Genres</option>'+gOpts.map(g=>`<option value="${escAttr(g)}"${f.genre===g?' selected':''}>${esc(g)}</option>`).join('');
@@ -1267,12 +1295,21 @@ function refreshFilterOptions(tab){
 const OCTAVO_COLS=[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Arranger'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'lastPerformed',label:'Last Performed'}];
 const BOOK_COLS  =[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'author',label:'Author / Editor'},{key:'isbn',label:'ISBN'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'description',label:'Description'}];
 const MIXED_COLS =[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Author'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'lastPerformed',label:'Last Performed'}];
-function getColumns(tab){const t=filters[tab].type;return t==='octavo'?OCTAVO_COLS:t==='book'?BOOK_COLS:MIXED_COLS;}
+function getColumns(tab){
+  const t=filters[tab].type;
+  let cols=t==='octavo'?OCTAVO_COLS:t==='book'?BOOK_COLS:MIXED_COLS;
+  if(tab==='all'){
+    // visitor view: hide private "Last Performed", show Availability instead
+    cols=cols.map(c=>c.key==='lastPerformed'?{key:'__avail',label:'Availability'}:c);
+    if(!cols.some(c=>c.key==='__avail'))cols=[...cols,{key:'__avail',label:'Availability'}];
+  }
+  return cols;
+}
 
-function renderAll(){renderTable('work');renderTable('personal');}
+function renderAll(){renderTable('work');renderTable('personal');renderTable('all');}
 
 function renderStats(tab){
-  const rows=data[tab];
+  const rows=rowsFor(tab);
   const octavos=rows.filter(e=>e._type==='octavo').length;
   const books=rows.filter(e=>e._type==='book').length;
   const copies=rows.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
@@ -1289,21 +1326,25 @@ function renderStats(tab){
 function renderTable(tab){
   renderStats(tab);refreshFilterOptions(tab);
   // prune selection of deleted entries
-  const idSet=new Set(data[tab].map(e=>e._id));
+  const idSet=new Set(rowsFor(tab).map(e=>e._id));
   [...selected[tab]].forEach(id=>{if(!idSet.has(id))selected[tab].delete(id);});
 
   const filtered=getFiltered(tab),sorted=getSorted(tab,filtered),cols=getColumns(tab),table=document.getElementById('table-'+tab);
   const{col:sc,dir}=sortState[tab];
+  const showChecks=isAdmin&&tab!=='all';
   const allVisibleSelected=sorted.length>0&&sorted.every(e=>selected[tab].has(e._id));
-  const checkTh=isAdmin?`<th class="col-check" onclick="event.stopPropagation()"><input type="checkbox" class="row-check" ${allVisibleSelected?'checked':''} onchange="toggleSelectAll('${tab}',this.checked)" title="Select all shown"></th>`:'';
-  table.querySelector('thead').innerHTML=`<tr>${checkTh}${cols.map(c=>`<th class="${c.key===sc?'sorted':''}" onclick="sortBy('${tab}','${c.key}')">${c.label}<span class="sort-icon">${c.key===sc?(dir===1?'↑':'↓'):'↕'}</span></th>`).join('')}<th style="cursor:default;text-align:right;">Actions</th></tr>`;
+  const checkTh=showChecks?`<th class="col-check" onclick="event.stopPropagation()"><input type="checkbox" class="row-check" ${allVisibleSelected?'checked':''} onchange="toggleSelectAll('${tab}',this.checked)" title="Select all shown"></th>`:'';
+  table.querySelector('thead').innerHTML=`<tr>${checkTh}${cols.map(c=>c.key.startsWith('__')
+    ?`<th style="cursor:default;">${c.label}</th>`
+    :`<th class="${c.key===sc?'sorted':''}" onclick="sortBy('${tab}','${c.key}')">${c.label}<span class="sort-icon">${c.key===sc?(dir===1?'↑':'↓'):'↕'}</span></th>`).join('')}<th style="cursor:default;text-align:right;">Actions</th></tr>`;
 
   if(!sorted.length){
     const anyFilter=filters[tab].search||filters[tab].type||filters[tab].genre||filters[tab].voicing;
     table.querySelector('tbody').innerHTML=`<tr><td colspan="${cols.length+2}"><div class="empty-state"><div class="empty-icon">𝄞</div><strong>${anyFilter?'No matches':'No entries yet'}</strong><p>${anyFilter?'Try adjusting your search or filters.':(isAdmin?'Use “Add to Library” above to add your first piece.':'Nothing here yet.')}</p></div></td></tr>`;
   } else {
     table.querySelector('tbody').innerHTML=sorted.map(e=>{
-      const checkTd=isAdmin?`<td class="col-check"><input type="checkbox" class="row-check" ${selected[tab].has(e._id)?'checked':''} onchange="toggleSelect('${tab}',${e._id},this.checked)"></td>`:'';
+      const srcTab=tab==='all'?(e.__src||'work'):tab;
+      const checkTd=showChecks?`<td class="col-check"><input type="checkbox" class="row-check" ${selected[tab].has(e._id)?'checked':''} onchange="toggleSelect('${tab}',${e._id},this.checked)"></td>`:'';
       const cells=cols.map(c=>{
         if(c.key==='_type') return `<td><span class="badge ${e._type}">${e._type==='octavo'?'Octavo':'Book'}</span></td>`;
         if(c.key==='title'){
@@ -1311,6 +1352,7 @@ function renderTable(tab){
           const inner=e.link?`<a class="title-link" href="${escAttr(e.link)}" target="_blank" title="Open link">${esc(e.title||'(untitled)')}<span class="ext">↗</span></a>`:esc(e.title||'(untitled)');
           return `<td class="cell-title">${inner}${tags}</td>`;
         }
+        if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-fulfilled'}">${e.unavailable?'In Use':'Available'}</span></td>`;
         if(c.key==='voicing') return `<td>${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='composer'){const v=esc(e.composer||e.author||'');return `<td>${v||'<span class="text-muted">—</span>'}</td>`;}
         if(c.key==='description'){
@@ -1323,12 +1365,12 @@ function renderTable(tab){
         }
         return `<td>${esc(e[c.key]||'')||'<span class="text-muted">—</span>'}</td>`;
       }).join('');
-      const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${tab}',${e._id})">✏️</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${tab}',${e._id})" style="color:var(--danger)">🗑</button>`:'';
-      return `<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request" onclick="openRequestModal('${tab}',${e._id})">📬 Request</button>${adminActions}</div></td></tr>`;
+      const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="${e.unavailable?'Marked IN USE — click to mark available':'Available — click to mark in use'}" onclick="toggleAvail('${srcTab}',${e._id})">${e.unavailable?'🚫':'✅'}</button><button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${srcTab}',${e._id})">✏️</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${srcTab}',${e._id})" style="color:var(--danger)">🗑</button>`:'';
+      return `<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request" onclick="openRequestModal('${srcTab}',${e._id})">📬 Request</button>${adminActions}</div></td></tr>`;
     }).join('');
   }
   const visCopies=sorted.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
-  document.getElementById('footer-'+tab).innerHTML=`<span>Showing ${sorted.length} of ${data[tab].length} titles · ${visCopies.toLocaleString()} copies</span><span>${sc?`Sorted by ${sc==='_type'?'type':sc}`:''}</span>`;
+  document.getElementById('footer-'+tab).innerHTML=`<span>Showing ${sorted.length} of ${rowsFor(tab).length} titles · ${visCopies.toLocaleString()} copies</span><span>${sc?`Sorted by ${sc==='_type'?'type':sc}`:''}</span>`;
   updateBulkBar(tab);
 }
 
@@ -1336,14 +1378,15 @@ function sortBy(tab,col){const s=sortState[tab];s.dir=s.col===col?s.dir*-1:1;s.c
 
 // ── CSV ───────────────────────────────────────────────────────────────────
 function exportCSV(tab,selectedOnly=false){
-  let rows=selectedOnly?data[tab].filter(e=>selected[tab].has(e._id)):getSorted(tab,getFiltered(tab));
+  let rows=selectedOnly?rowsFor(tab).filter(e=>selected[tab].has(e._id)):getSorted(tab,getFiltered(tab));
   if(!rows.length){toast('Nothing to export','info');return;}
-  const keys=['_type','title','composer','author','voicing','genre','copies','lastPerformed','isbn','publisher','year','description','tags','link'];
-  const labels={_type:'Type',title:'Title',composer:'Composer/Arranger',author:'Author/Editor',voicing:'Voicing',genre:'Genre',copies:'Copies',lastPerformed:'Last Performed',isbn:'ISBN',publisher:'Publisher',year:'Year',description:'Description',tags:'Tags',link:'Link'};
-  const usedKeys=keys.filter(k=>rows.some(r=>{const v=r[k];return Array.isArray(v)?v.length:v;}));
+  const keys=['_type','title','composer','author','voicing','genre','copies','lastPerformed','unavailable','isbn','publisher','year','description','tags','link'];
+  const labels={_type:'Type',title:'Title',composer:'Composer/Arranger',author:'Author/Editor',voicing:'Voicing',genre:'Genre',copies:'Copies',lastPerformed:'Last Performed',unavailable:'Availability',isbn:'ISBN',publisher:'Publisher',year:'Year',description:'Description',tags:'Tags',link:'Link'};
+  let usedKeys=keys.filter(k=>rows.some(r=>{const v=r[k];return Array.isArray(v)?v.length:v;}));
+  if(tab==='all')usedKeys=usedKeys.filter(k=>k!=='lastPerformed'); // private field stays out of the public view's export
   const header=usedKeys.map(k=>labels[k]).join(',');
   const lines=rows.map(r=>usedKeys.map(k=>{
-    let v=k==='_type'?(r._type==='octavo'?'Octavo':'Book'):r[k];
+    let v=k==='_type'?(r._type==='octavo'?'Octavo':'Book'):k==='unavailable'?(r.unavailable?'In Use':'Available'):r[k];
     if(Array.isArray(v))v=v.join('; ');
     return `"${String(v??'').replace(/"/g,'""')}"`;
   }).join(','));
