@@ -381,7 +381,9 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
     </div>
     <div class="table-footer">
       <span id="import-count"></span>
-      <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-secondary btn-sm" onclick="removeImportDuplicates()" title="Drop rows that are already in your library, and doubled rows within this list">🧹 Remove Duplicates</button>
+        <button class="btn-gold btn-sm" id="suggest-genre-btn" onclick="suggestGenres()" title="AI-suggest a genre for rows that don't have one — review before adding">✨ Suggest Genres</button>
         <button class="btn-ghost btn-sm" onclick="clearImportRows()">Clear All</button>
         <button class="btn-primary btn-sm" id="import-add-btn" onclick="addImportRows()">Add All to Library</button>
       </div>
@@ -1626,6 +1628,43 @@ function renderImportRows(){
 }
 
 function clearImportRows(){importRows=[];renderImportRows();document.getElementById('scan-queue').innerHTML='';document.getElementById('scan-status').textContent='';}
+
+function removeImportDuplicates(){
+  const before=importRows.length;
+  const seen=new Set();
+  importRows=importRows.filter(r=>{
+    if(findDuplicates(r.title,r.composer).length)return false;        // already in the library
+    const k=norm(r.title)+'|'+personKey(r.composer);                   // doubled within this paste
+    if(seen.has(k))return false;
+    seen.add(k);
+    return true;
+  });
+  renderImportRows();
+  const n=before-importRows.length;
+  toast(n?`Removed ${n} duplicate${n>1?'s':''} — ${importRows.length} new piece${importRows.length===1?'':'s'} remain`:'No duplicates found','success',4500);
+}
+
+async function suggestGenres(){
+  const targets=importRows.map((r,i)=>({r,i})).filter(x=>!x.r.genre&&x.r.title);
+  if(!targets.length){toast('Every row already has a genre','info');return;}
+  if(cfgInfo&&!cfgInfo.geminiKeySet){toast('Set up your free scanning key first (top of this page)','error');return;}
+  const btn=document.getElementById('suggest-genre-btn');btn.disabled=true;const orig=btn.innerHTML;
+  let filled=0;
+  try{
+    for(let o=0;o<targets.length;o+=50){
+      const chunk=targets.slice(o,o+50);
+      btn.innerHTML=`<span class="spinner"></span> ${Math.min(o+50,targets.length)}/${targets.length}…`;
+      let r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:chunk.map(x=>({title:x.r.title,composer:x.r.composer}))}));
+      if(r.status===429){btn.innerHTML='rate limit — waiting 30s…';await new Promise(x=>setTimeout(x,30000));r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:chunk.map(x=>({title:x.r.title,composer:x.r.composer}))}));}
+      const j=await r.json();
+      if(!r.ok)throw new Error(j.error||'failed');
+      chunk.forEach((x,k)=>{if(j.genres[k]&&!importRows[x.i].genre){importRows[x.i].genre=j.genres[k];filled++;}});
+      renderImportRows();
+    }
+    toast(`Suggested genres for ${filled} pieces — they're guesses, glance over them before adding`,'success',5000);
+  }catch(e){toast('Genre suggestion stopped: '+e.message,'error');}
+  finally{btn.disabled=false;btn.innerHTML=orig;}
+}
 
 async function addImportRows(){
   const rows=importRows.filter(r=>r.title&&r.title.trim());

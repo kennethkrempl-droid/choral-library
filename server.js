@@ -357,6 +357,49 @@ If you cannot read anything, return [].`;
   } catch (e) { res.status(500).json({ error: 'Scan failed: ' + e.message }); }
 });
 
+// ── Genre suggestions (Google AI free tier) ───────────────────────────────────
+
+const SCAN_GENRES = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater','Jazz','Sacred','Other'];
+
+app.post('/api/suggest-genres', adminRequired, async (req, res) => {
+  try {
+    const cfg = await effectiveConfig();
+    const key = cfg.geminiApiKey;
+    if (!key) return res.status(400).json({ error: 'No Google AI key configured.' });
+    const pieces = req.body.pieces;
+    if (!Array.isArray(pieces) || !pieces.length || pieces.length > 60)
+      return res.status(400).json({ error: 'Send 1-60 pieces per request.' });
+
+    const list = pieces.map((p, i) => `${i + 1}. "${String(p.title || '').slice(0, 120)}" — ${String(p.composer || 'unknown').slice(0, 80)}`).join('\n');
+    const prompt = `These are choral sheet music pieces. Classify EACH into exactly one genre from this list: ${SCAN_GENRES.join(', ')}.
+Guidelines: arrangements of pop/rock/Motown songs = Pop. Christmas/Hanukkah/winter-holiday = Holiday. African-American spirituals = Spiritual. Sacred Latin/hymn/anthem texts = Sacred. Show tunes/movie musicals = Musical Theater. Art music/classical composers = Classical. Traditional folk songs = Folk. Jazz standards/vocal jazz = Jazz. Unsure = Other.
+Pieces:
+${list}
+Respond with ONLY a strict JSON array of ${pieces.length} strings in the same order, e.g. ["Pop","Holiday",...]. No markdown.`;
+
+    const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+    let status, body;
+    for (const model of models) {
+      ({ status, body } = await httpsPost(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+        { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } }
+      ));
+      if (status !== 429 && status !== 404) break;
+    }
+    if (status === 429) return res.status(429).json({ error: 'Free-tier rate limit hit — wait a minute and retry.' });
+    const j = JSON.parse(body);
+    if (status !== 200) return res.status(status).json({ error: j.error?.message || `Failed (HTTP ${status})` });
+    let text = (j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+    const start = text.indexOf('['), end = text.lastIndexOf(']');
+    if (start === -1 || end === -1) return res.json({ genres: pieces.map(() => '') });
+    let genres;
+    try { genres = JSON.parse(text.slice(start, end + 1)); } catch { genres = []; }
+    if (!Array.isArray(genres)) genres = [];
+    genres = pieces.map((_, i) => SCAN_GENRES.find(g => g.toLowerCase() === String(genres[i] || '').trim().toLowerCase()) || '');
+    res.json({ genres });
+  } catch (e) { res.status(500).json({ error: 'Genre suggestion failed: ' + e.message }); }
+});
+
 // ── Requests (Library system) ─────────────────────────────────────────────────
 
 app.post('/api/request', async (req, res) => {
