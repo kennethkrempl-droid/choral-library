@@ -392,8 +392,8 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
     <div class="card-header"><h3>⌨️ Or paste a list</h3></div>
     <div class="card-body">
       <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">
-        One piece per line: <code style="background:var(--bg);padding:1px 6px;border-radius:4px;">Title, Composer, Voicing, Copies</code>
-        (voicing and copies optional)</p>
+        Copy rows straight from Google Sheets or Excel and paste here — columns: <code style="background:var(--bg);padding:1px 6px;border-radius:4px;">Title · Composer · Voicing · Genre · Copies</code>
+        (only Title is required; voicing/genre/copies are recognized in any column order). Typed lines like <code style="background:var(--bg);padding:1px 6px;border-radius:4px;">Title, Composer, SATB, 24</code> work too.</p>
       <textarea id="paste-box" style="width:100%;min-height:110px;font-family:monospace;font-size:13px;padding:10px;border:1px solid var(--line);border-radius:var(--r-sm);" placeholder="Sing We Now of Christmas, arr. Fred Prentice, SAB, 24&#10;The Road Home, Stephen Paulus, SATB, 30"></textarea>
       <div style="margin-top:10px;"><button class="btn-secondary btn-sm" onclick="parsePasteBox()">Parse → Review List</button></div>
     </div>
@@ -1653,14 +1653,18 @@ async function parsePasteBox(){
   if(!lines.length){toast('Paste some lines first','error');return;}
   const newRows=[];
   for(const line of lines){
-    const parts=line.split(',').map(s=>s.trim());
+    // Tab-separated (straight copy-paste from Google Sheets / Excel) or comma-separated
+    const parts=(line.includes('\t')?line.split('\t'):line.split(',')).map(s=>s.trim());
     if(!parts[0])continue;
-    let voicing='',copies='1',rest=parts.slice(1);
-    // pull a trailing number as copies, and a recognizable voicing from wherever it sits
-    if(rest.length&&/^\d+$/.test(rest[rest.length-1]))copies=rest.pop();
+    let voicing='',genre='',copies='1',rest=parts.slice(1).filter(Boolean);
+    // recognize voicing, genre, and copy-count cells by their values, wherever they sit
     const vIdx=rest.findIndex(p=>VOICINGS.some(v=>v.toLowerCase()===p.toLowerCase()));
     if(vIdx>-1)voicing=VOICINGS.find(v=>v.toLowerCase()===rest[vIdx].toLowerCase()),rest.splice(vIdx,1);
-    newRows.push({title:parts[0],composer:rest.join(', '),voicing,genre:'',copies,link:''});
+    const gIdx=rest.findIndex(p=>GENRES.some(g=>g.toLowerCase()===p.toLowerCase()));
+    if(gIdx>-1)genre=GENRES.find(g=>g.toLowerCase()===rest[gIdx].toLowerCase()),rest.splice(gIdx,1);
+    const nIdx=rest.findIndex(p=>/^\d+$/.test(p));
+    if(nIdx>-1)copies=rest.splice(nIdx,1)[0];
+    newRows.push({title:parts[0],composer:rest.join(', '),voicing,genre,copies,link:''});
   }
   document.getElementById('paste-box').value='';
   importRows.push(...newRows);
