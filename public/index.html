@@ -382,8 +382,8 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
     <div class="table-footer">
       <span id="import-count"></span>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn-secondary btn-sm" onclick="removeImportDuplicates()" title="Drop rows that are already in your library, and doubled rows within this list">🧹 Remove Duplicates</button>
-        <button class="btn-secondary btn-sm" id="sync-counts-btn" onclick="syncImportCounts()" title="Update copy counts in your library wherever this list has a different number">🔢 Sync Counts</button>
+        <button class="btn-secondary btn-sm" id="merge-all-btn" onclick="mergeAllDuplicates()" title="For every duplicate: update the existing entry's title, count, and fields to match this list, then remove from import. Kept rows are left alone.">🔀 Merge All Duplicates</button>
+        <button class="btn-secondary btn-sm" onclick="removeImportDuplicates()" title="Just drop duplicate rows without changing anything in your library">🧹 Remove Without Merging</button>
         <button class="btn-gold btn-sm" id="suggest-genre-btn" onclick="suggestGenres()" title="AI-suggest a genre for rows that don't have one — review before adding">✨ Suggest Genres</button>
         <button class="btn-ghost btn-sm" onclick="clearImportRows()">Clear All</button>
         <button class="btn-primary btn-sm" id="import-add-btn" onclick="addImportRows()">Add All to Library</button>
@@ -1650,10 +1650,10 @@ function renderImportRows(){
       ${isFuzzy?'~':'='} <em>${esc(dups[0].entry.title)}</em>${dups[0].entry.composer||dups[0].entry.author?' · '+esc(dups[0].entry.composer||dups[0].entry.author):''}${dups[0].entry.voicing?' · '+esc(dups[0].entry.voicing):''} · ${dups[0].entry.copies||'?'} copies · ${cap(dups[0].tab)}${dups.length>1?` <span style="opacity:.7;">+${dups.length-1} more</span>`:''}
     </div>`:'';
     const icon=r._keep&&dups.length?'✓':countMismatch?'🔢':isFuzzy?'〜':'⚠️';
-    const keepBtn=dups.length
+    const rowBtns=dups.length
       ? r._keep
-        ? `<button class="btn-ghost btn-icon btn-sm" title="Undo — treat as duplicate again" onclick="importRows[${i}]._keep=false;renderImportRows()" style="color:var(--success,#27ae60);font-size:12px;">✓</button>`
-        : `<button class="btn-secondary btn-sm" title="Mark as a different piece — Remove Duplicates will leave it alone" onclick="importRows[${i}]._keep=true;renderImportRows()" style="font-size:11px;padding:2px 7px;">Keep</button>`
+        ? `<button class="btn-ghost btn-sm" title="Undo — treat as duplicate again" onclick="importRows[${i}]._keep=false;renderImportRows()" style="font-size:11px;padding:2px 7px;color:var(--success,#27ae60);">✓ Kept</button>`
+        : `<button class="btn-primary btn-sm" title="Update existing entry: fix title, count, and other fields — then remove this row" onclick="mergeImportRow(${i})" style="font-size:11px;padding:2px 7px;">Merge</button><button class="btn-secondary btn-sm" title="It's a different piece — add it separately without touching the existing entry" onclick="importRows[${i}]._keep=true;renderImportRows()" style="font-size:11px;padding:2px 7px;">Keep</button>`
       : '';
     return `<tr>
       <td style="min-width:200px;">${dups.length?`<span title="${r._keep?'Marked as separate piece':dupTitle}" style="cursor:help;">${icon} </span>`:''}<input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.title)}" oninput="importRows[${i}].title=this.value">${matchInfo}</td>
@@ -1661,7 +1661,7 @@ function renderImportRows(){
       <td><select class="filter-select" onchange="importRows[${i}].voicing=this.value"><option value="">—</option>${vOpts}${vExtra}</select></td>
       <td><select class="filter-select" onchange="importRows[${i}].genre=this.value"><option value="">—</option>${gOpts}</select></td>
       <td><input type="number" min="0" style="width:64px;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.copies)}" oninput="importRows[${i}].copies=this.value"></td>
-      <td style="white-space:nowrap;">${r.link?`<a href="${escAttr(r.link)}" target="_blank" title="JW Pepper link found" style="font-size:12px;">🔗↗</a>`:'<span class="text-muted" style="font-size:11px;" title="No confident JW Pepper match — you can add a link later by editing the entry">—</span>'}${keepBtn}<button class="btn-ghost btn-icon btn-sm" title="Remove this row" onclick="importRows.splice(${i},1);renderImportRows()" style="color:var(--danger,#c0392b);">🗑</button></td>
+      <td style="white-space:nowrap;display:flex;align-items:center;gap:3px;">${r.link?`<a href="${escAttr(r.link)}" target="_blank" title="JW Pepper link found" style="font-size:12px;">🔗↗</a>`:''}${rowBtns}<button class="btn-ghost btn-icon btn-sm" title="Remove this row without changing anything" onclick="importRows.splice(${i},1);renderImportRows()" style="color:var(--danger,#c0392b);">🗑</button></td>
     </tr>`;
   }).join('');
   const allDups=importRows.map(r=>r._keep?[]:findDuplicates(r.title,r.composer));
@@ -1717,6 +1717,58 @@ async function syncImportCounts(){
   renderAll();renderImportRows();
   if(failed)toast(`Updated ${updated} counts, ${failed} failed`,'error');
   else toast(`Updated copy counts for ${updated} piece${updated>1?'s':''}!`,'success',4000);
+}
+
+function buildMergedEntry(existing, importRow){
+  const merged={...existing};
+  if(importRow.title&&importRow.title.trim()) merged.title=importRow.title.trim();
+  if(importRow.copies) merged.copies=String(importRow.copies);
+  if(importRow.composer) merged.composer=importRow.composer.trim();
+  if(importRow.voicing) merged.voicing=importRow.voicing;
+  if(importRow.genre) merged.genre=importRow.genre;
+  return merged;
+}
+
+async function mergeImportRow(i){
+  const r=importRows[i];
+  const dups=findDuplicates(r.title,r.composer);
+  if(!dups.length)return;
+  const {tab,entry}=dups[0];
+  const merged=buildMergedEntry(entry,r);
+  try{
+    const resp=await fetch(`/api/entries/${tab}/${entry._id}`,adminFetchOpts(merged,'PUT'));
+    if(!resp.ok)throw new Error((await resp.json()).error||'failed');
+    const j=await resp.json();
+    const idx=data[tab].findIndex(e=>e._id===entry._id);
+    if(idx>-1)data[tab][idx]=j.entry;
+    importRows.splice(i,1);
+    renderAll();renderImportRows();
+    toast(`Merged "${merged.title}" into your ${cap(tab)} library`,'success',3000);
+  }catch(e){toast('Merge failed: '+e.message,'error');}
+}
+
+async function mergeAllDuplicates(){
+  const toMerge=importRows.map((r,i)=>({r,i})).filter(({r})=>!r._keep&&findDuplicates(r.title,r.composer).length);
+  if(!toMerge.length){toast('No duplicates to merge','info');return;}
+  const btn=document.getElementById('merge-all-btn');btn.disabled=true;const orig=btn.innerHTML;
+  let updated=0,failed=0;
+  for(let k=toMerge.length-1;k>=0;k--){
+    const {r,i}=toMerge[k];
+    btn.innerHTML=`<span class="spinner"></span> ${toMerge.length-k}/${toMerge.length}…`;
+    const dups=findDuplicates(r.title,r.composer);
+    if(!dups.length){importRows.splice(i,1);updated++;continue;}
+    const {tab,entry}=dups[0];
+    const merged=buildMergedEntry(entry,r);
+    try{
+      const resp=await fetch(`/api/entries/${tab}/${entry._id}`,adminFetchOpts(merged,'PUT'));
+      if(resp.ok){const j=await resp.json();const idx=data[tab].findIndex(e=>e._id===entry._id);if(idx>-1)data[tab][idx]=j.entry;importRows.splice(i,1);updated++;}
+      else failed++;
+    }catch{failed++;}
+  }
+  btn.disabled=false;btn.innerHTML=orig;
+  renderAll();renderImportRows();
+  if(failed)toast(`Merged ${updated}, ${failed} failed`,'error');
+  else toast(`Merged ${updated} ${updated===1?'entry':'entries'} — titles, counts & fields updated`,'success',4000);
 }
 
 async function suggestGenres(){
