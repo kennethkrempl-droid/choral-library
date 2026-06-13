@@ -77,8 +77,8 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 
 /* ── Stats ── */
 .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:18px; }
-.stat-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 16px; box-shadow:var(--shadow); }
-.stat-card.stat-primary { border-left:3px solid var(--accent); padding-left:13px; }
+.stat-card { background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--line); border-radius:var(--r); padding:12px 16px; box-shadow:var(--shadow); }
+.stat-card.stat-primary { border-left-color:var(--accent); }
 .stat-card.stat-primary .stat-value { font-size:30px; color:var(--accent); }
 .stat-value { font-family:var(--display); font-size:24px; font-weight:600; line-height:1.1; }
 .stat-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--faint); margin-top:3px; }
@@ -161,12 +161,12 @@ td.cell-title .ext { opacity:.5; margin-left:4px; display:inline-flex; align-ite
 .tag-chip { font-size:10px; font-weight:600; background:var(--gold-light); color:var(--gold); border:1px solid var(--gold-line); border-radius:20px; padding:0 7px; line-height:16px; }
 input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
 .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:var(--bg); border:1px solid var(--line); color:var(--muted); }
-.badge.octavo { background:var(--accent-light); color:var(--accent); border-color:var(--accent-line); }
+.badge.octavo { background:#edd8dc; color:#5e1928; border-color:#c4929f; }
 .badge.book { background:#eeecea; color:#5a5550; border-color:#d4d0c8; }
 .voicing-chip { display:inline-block; font-size:11px; font-weight:600; font-family:var(--font); background:var(--bg); border:1px solid var(--line); color:var(--muted); border-radius:5px; padding:1px 7px; letter-spacing:.3px; white-space:nowrap; }
 .row-actions { display:flex; gap:3px; align-items:center; justify-content:flex-end; }
-.btn-request { background:var(--gold-light); color:var(--gold); border:1px solid var(--gold-line); font-size:12px; padding:3px 10px; border-radius:20px; }
-.btn-request:hover:not(:disabled) { background:#f4e8cb; }
+.btn-request { background:transparent; color:var(--accent); border:1px solid var(--accent-line); font-size:12px; padding:3px 10px; border-radius:20px; }
+.btn-request:hover:not(:disabled) { background:var(--accent-light); }
 .desc-cell { cursor:pointer; max-width:280px; font-size:12.5px; color:var(--muted); }
 .desc-cell .desc-full { display:none; white-space:pre-wrap; }
 .desc-cell .show-less { display:none; }
@@ -310,7 +310,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 </div>
 
 <nav class="tabs-nav">
-  <button class="tab-btn viewer-only" data-tab="all">Library <span class="tab-count" id="count-all">0</span></button>
+  <button class="tab-btn viewer-only" data-tab="all">Library</button>
   <button class="tab-btn active admin-only" data-tab="work">Work <span class="tab-count" id="count-work">0</span></button>
   <button class="tab-btn admin-only" data-tab="personal">Personal <span class="tab-count" id="count-personal">0</span></button>
   <button class="tab-btn admin-only" data-tab="import"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Import</button>
@@ -707,6 +707,7 @@ document.head.insertAdjacentHTML('beforeend','<style>body:not(.is-admin) .admin-
 function buildPanel(tab){
   const T = tab==='all' ? 'Full Library' : cap(tab);
   document.getElementById('tab-'+tab).innerHTML = `
+  ${tab==='all'?`<p class="viewer-only" style="font-size:13px;color:var(--muted);margin:0 0 16px;line-height:1.5;">Browse and request sheet music from our choral catalog. Use the filters to narrow by voicing or genre, then click <strong>Request</strong> on any piece.</p>`:''}
   <div class="stats-row" id="stats-${tab}"></div>
 
   <div class="card add-card admin-only" id="add-card-${tab}">
@@ -1718,6 +1719,7 @@ function renderTable(tab){
         }
         if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-fulfilled'}">${e.unavailable?'In Use':'Available'}</span></td>`;
         if(c.key==='voicing') return `<td>${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:'<span class="text-muted">—</span>'}</td>`;
+        if(c.key==='genre') return `<td style="white-space:nowrap">${esc(e.genre||'')||'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='composer'){const v=esc(e.composer||e.author||'');return `<td>${v||'<span class="text-muted">—</span>'}</td>`;}
         if(c.key==='description'){
           if(!e.description) return `<td><span class="text-muted">—</span></td>`;
