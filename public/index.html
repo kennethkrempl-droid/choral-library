@@ -1646,18 +1646,22 @@ function renderImportRows(){
       :isFuzzy?'Possible duplicate (close spelling match)'
       :dups.length?'Duplicate already in your library':'';
     const flagged=dups.length&&!r._keep;
-    const matchInfo=flagged?`<div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4;display:flex;align-items:baseline;gap:6px;">
-      <span>${isFuzzy?'~':'='} <em>${esc(dups[0].entry.title)}</em>${dups[0].entry.composer||dups[0].entry.author?' · '+esc(dups[0].entry.composer||dups[0].entry.author):''}${dups[0].entry.voicing?' · '+esc(dups[0].entry.voicing):''} · ${dups[0].entry.copies||'?'} copies · ${cap(dups[0].tab)}${dups.length>1?` <span style="opacity:.7;">+${dups.length-1} more</span>`:''}</span>
-      <button class="btn-ghost btn-sm" style="font-size:11px;padding:1px 6px;white-space:nowrap;" title="Mark as a different piece — Remove Duplicates will leave it alone" onclick="importRows[${i}]._keep=true;renderImportRows()">✓ Keep</button>
-    </div>`:r._keep&&dups.length?`<div style="font-size:11px;color:var(--muted);margin-top:3px;">✓ Kept as separate piece</div>`:'';
+    const matchInfo=dups.length?`<div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4;">
+      ${isFuzzy?'~':'='} <em>${esc(dups[0].entry.title)}</em>${dups[0].entry.composer||dups[0].entry.author?' · '+esc(dups[0].entry.composer||dups[0].entry.author):''}${dups[0].entry.voicing?' · '+esc(dups[0].entry.voicing):''} · ${dups[0].entry.copies||'?'} copies · ${cap(dups[0].tab)}${dups.length>1?` <span style="opacity:.7;">+${dups.length-1} more</span>`:''}
+    </div>`:'';
     const icon=r._keep&&dups.length?'✓':countMismatch?'🔢':isFuzzy?'〜':'⚠️';
+    const keepBtn=dups.length
+      ? r._keep
+        ? `<button class="btn-ghost btn-icon btn-sm" title="Undo — treat as duplicate again" onclick="importRows[${i}]._keep=false;renderImportRows()" style="color:var(--success,#27ae60);font-size:12px;">✓</button>`
+        : `<button class="btn-secondary btn-sm" title="Mark as a different piece — Remove Duplicates will leave it alone" onclick="importRows[${i}]._keep=true;renderImportRows()" style="font-size:11px;padding:2px 7px;">Keep</button>`
+      : '';
     return `<tr>
       <td style="min-width:200px;">${dups.length?`<span title="${r._keep?'Marked as separate piece':dupTitle}" style="cursor:help;">${icon} </span>`:''}<input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.title)}" oninput="importRows[${i}].title=this.value">${matchInfo}</td>
       <td style="min-width:160px;"><input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.composer)}" oninput="importRows[${i}].composer=this.value"></td>
       <td><select class="filter-select" onchange="importRows[${i}].voicing=this.value"><option value="">—</option>${vOpts}${vExtra}</select></td>
       <td><select class="filter-select" onchange="importRows[${i}].genre=this.value"><option value="">—</option>${gOpts}</select></td>
       <td><input type="number" min="0" style="width:64px;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.copies)}" oninput="importRows[${i}].copies=this.value"></td>
-      <td style="white-space:nowrap;">${r.link?`<a href="${escAttr(r.link)}" target="_blank" title="JW Pepper link found" style="font-size:12px;">🔗↗</a>`:'<span class="text-muted" style="font-size:11px;" title="No confident JW Pepper match — you can add a link later by editing the entry">—</span>'}<button class="btn-ghost btn-icon btn-sm" title="Remove this row" onclick="importRows.splice(${i},1);renderImportRows()" style="color:var(--danger,#c0392b);">🗑</button></td>
+      <td style="white-space:nowrap;">${r.link?`<a href="${escAttr(r.link)}" target="_blank" title="JW Pepper link found" style="font-size:12px;">🔗↗</a>`:'<span class="text-muted" style="font-size:11px;" title="No confident JW Pepper match — you can add a link later by editing the entry">—</span>'}${keepBtn}<button class="btn-ghost btn-icon btn-sm" title="Remove this row" onclick="importRows.splice(${i},1);renderImportRows()" style="color:var(--danger,#c0392b);">🗑</button></td>
     </tr>`;
   }).join('');
   const allDups=importRows.map(r=>r._keep?[]:findDuplicates(r.title,r.composer));
