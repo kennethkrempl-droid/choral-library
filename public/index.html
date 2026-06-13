@@ -383,6 +383,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
       <span id="import-count"></span>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn-secondary btn-sm" onclick="removeImportDuplicates()" title="Drop rows that are already in your library, and doubled rows within this list">🧹 Remove Duplicates</button>
+        <button class="btn-secondary btn-sm" id="sync-counts-btn" onclick="syncImportCounts()" title="Update copy counts in your library wherever this list has a different number">🔢 Sync Counts</button>
         <button class="btn-gold btn-sm" id="suggest-genre-btn" onclick="suggestGenres()" title="AI-suggest a genre for rows that don't have one — review before adding">✨ Suggest Genres</button>
         <button class="btn-ghost btn-sm" onclick="clearImportRows()">Clear All</button>
         <button class="btn-primary btn-sm" id="import-add-btn" onclick="addImportRows()">Add All to Library</button>
@@ -1614,8 +1615,12 @@ function renderImportRows(){
     const vOpts=VOICINGS.map(v=>`<option${r.voicing===v?' selected':''}>${v}</option>`).join('');
     const vExtra=(r.voicing&&!VOICINGS.includes(r.voicing))?`<option selected>${escAttr(r.voicing)}</option>`:'';
     const gOpts=GENRES.map(g=>`<option${r.genre===g?' selected':''}>${g}</option>`).join('');
+    const countMismatch=dups.length&&String(dups[0].entry.copies||'')!==String(r.copies||'');
+    const dupTitle=countMismatch
+      ?`Duplicate — count differs: library has ${dups[0].entry.copies||'?'}, importing ${r.copies||'?'}`
+      :dups.length?'Looks like a duplicate of an existing entry':'';
     return `<tr>
-      <td style="min-width:200px;">${dups.length?'<span title="Looks like a duplicate of an existing entry" style="cursor:help;">⚠️ </span>':''}<input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.title)}" oninput="importRows[${i}].title=this.value"></td>
+      <td style="min-width:200px;">${dups.length?`<span title="${dupTitle}" style="cursor:help;">${countMismatch?'🔢':'⚠️'} </span>`:''}<input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.title)}" oninput="importRows[${i}].title=this.value"></td>
       <td style="min-width:160px;"><input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.composer)}" oninput="importRows[${i}].composer=this.value"></td>
       <td><select class="filter-select" onchange="importRows[${i}].voicing=this.value"><option value="">—</option>${vOpts}${vExtra}</select></td>
       <td><select class="filter-select" onchange="importRows[${i}].genre=this.value"><option value="">—</option>${gOpts}</select></td>
@@ -1624,7 +1629,8 @@ function renderImportRows(){
     </tr>`;
   }).join('');
   const dupCount=importRows.filter(r=>findDuplicates(r.title,r.composer).length).length;
-  document.getElementById('import-count').textContent=`${importRows.length} piece${importRows.length>1?'s':''} ready`+(dupCount?` · ⚠️ ${dupCount} possible duplicate${dupCount>1?'s':''}`:'');
+  const countMismatchTotal=importRows.filter(r=>{const d=findDuplicates(r.title,r.composer);return d.length&&String(d[0].entry.copies||'')!==String(r.copies||'');}).length;
+  document.getElementById('import-count').textContent=`${importRows.length} piece${importRows.length>1?'s':''} ready`+(dupCount?` · ⚠️ ${dupCount} duplicate${dupCount>1?'s':''}${countMismatchTotal?` (🔢 ${countMismatchTotal} with different counts)`:''}`:'');
 }
 
 function clearImportRows(){importRows=[];renderImportRows();document.getElementById('scan-queue').innerHTML='';document.getElementById('scan-status').textContent='';}
@@ -1642,6 +1648,35 @@ function removeImportDuplicates(){
   renderImportRows();
   const n=before-importRows.length;
   toast(n?`Removed ${n} duplicate${n>1?'s':''} — ${importRows.length} new piece${importRows.length===1?'':'s'} remain`:'No duplicates found','success',4500);
+}
+
+async function syncImportCounts(){
+  const mismatches=importRows.filter(r=>{
+    const d=findDuplicates(r.title,r.composer);
+    return d.length&&String(d[0].entry.copies||'')!==String(r.copies||'');
+  });
+  if(!mismatches.length){toast('No count differences found','info');return;}
+  const btn=document.getElementById('sync-counts-btn');btn.disabled=true;const orig=btn.innerHTML;
+  let updated=0,failed=0;
+  for(const r of mismatches){
+    const d=findDuplicates(r.title,r.composer);
+    if(!d.length)continue;
+    const {tab,entry}=d[0];
+    btn.innerHTML=`<span class="spinner"></span> ${updated+failed+1}/${mismatches.length}…`;
+    try{
+      const resp=await fetch(`/api/entries/${tab}/${entry._id}`,adminFetchOpts({...entry,copies:String(r.copies||'1')},'PUT'));
+      if(resp.ok){
+        const j=await resp.json();
+        const idx=data[tab].findIndex(e=>e._id===entry._id);
+        if(idx>-1)data[tab][idx]=j.entry;
+        updated++;
+      }else failed++;
+    }catch{failed++;}
+  }
+  btn.disabled=false;btn.innerHTML=orig;
+  renderAll();renderImportRows();
+  if(failed)toast(`Updated ${updated} counts, ${failed} failed`,'error');
+  else toast(`Updated copy counts for ${updated} piece${updated>1?'s':''}!`,'success',4000);
 }
 
 async function suggestGenres(){
