@@ -1487,7 +1487,12 @@ function renderTable(tab){
 
   if(!sorted.length){
     const anyFilter=filters[tab].search||filters[tab].type||filters[tab].genre||filters[tab].voicing;
-    table.querySelector('tbody').innerHTML=`<tr><td colspan="${cols.length+2}"><div class="empty-state"><div class="empty-icon">𝄞</div><strong>${anyFilter?'No matches':'No entries yet'}</strong><p>${anyFilter?'Try adjusting your search or filters.':(isAdmin?'Use “Add to Library” above to add your first piece.':'Nothing here yet.')}</p></div></td></tr>`;
+    const msg=showDupsOnly[tab]
+      ?{icon:'✅',title:'No duplicate titles found',body:'Every title in this tab is unique.'}
+      :anyFilter
+        ?{icon:'𝄞',title:'No matches',body:'Try adjusting your search or filters.'}
+        :{icon:'𝄞',title:'No entries yet',body:isAdmin?'Use “Add to Library” above to add your first piece.':'Nothing here yet.'};
+    table.querySelector('tbody').innerHTML=`<tr><td colspan=”${cols.length+2}”><div class=”empty-state”><div class=”empty-icon”>${msg.icon}</div><strong>${msg.title}</strong><p>${msg.body}</p></div></td></tr>`;
   } else {
     table.querySelector('tbody').innerHTML=sorted.map(e=>{
       const srcTab=tab==='all'?(e.__src||'work'):tab;
