@@ -1142,7 +1142,7 @@ let mergeState=null;
 function openMergeModal(tab){
   const ids=[...selected[tab]];
   if(ids.length!==2)return;
-  const [a,b]=[...data[tab]].find(e=>e._id===ids[0]),[...data[tab]].find(e=>e._id===ids[1]);
+  const a=data[tab].find(e=>e._id===ids[0]),b=data[tab].find(e=>e._id===ids[1]);
   if(!a||!b)return;
   mergeState={tab,a,b};
   const fields=[
