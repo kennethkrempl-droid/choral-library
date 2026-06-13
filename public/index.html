@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Choral Library — Sheet Music Catalog</title>
+<title>Music Library — Sheet Music Catalog</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,8 +13,8 @@
 :root {
   --bg:#f5f3ee; --surface:#fffefb; --line:#e5e1d8; --line-soft:#efece4;
   --ink:#1f1d19; --muted:#6f6a5f; --faint:#9b958a;
-  --navy:#23344f; --navy-deep:#1a283d; --navy-soft:#eef2f8;
-  --accent:#33567f; --accent-hover:#284562; --accent-light:#e9eff7; --accent-line:#c9d7e8;
+  --navy:#4a1420; --navy-deep:#2e0c13; --navy-soft:#fdf0f1;
+  --accent:#7c2d3e; --accent-hover:#621527; --accent-light:#f9eaec; --accent-line:#e8bdc2;
   --gold:#a3742a; --gold-light:#faf3e3; --gold-line:#e7d4a8;
   --danger:#b2392b; --danger-light:#fbeeec; --danger-line:#ecc6bf;
   --success:#22784a; --success-light:#eaf6ef; --success-line:#bfe3cd;
@@ -63,7 +63,7 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 .btn-header.active { background:#f3f0e9; color:var(--navy-deep); border-color:#f3f0e9; }
 
 /* ── Viewer banner ── */
-.viewer-banner { background:var(--gold-light); border-bottom:1px solid var(--gold-line); padding:8px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; color:var(--gold); }
+.viewer-banner { background:#eef4ff; border-bottom:1px solid #c3d9f8; padding:8px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; color:#2563a8; }
 .viewer-banner.hidden { display:none; }
 
 /* ── Tabs ── */
@@ -106,7 +106,7 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 .form-group.full { grid-column:1/-1; }
 .form-group label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
 .form-group input,.form-group select,.form-group textarea { font-family:inherit; font-size:14px; padding:8px 11px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--surface); color:var(--ink); outline:none; transition:border-color .15s,box-shadow .15s,background .3s; width:100%; }
-.form-group input:focus,.form-group select:focus,.form-group textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(51,86,127,.12); }
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(124,45,62,.12); }
 .form-group textarea { resize:vertical; min-height:72px; }
 .form-group input.flash { background:var(--success-light); border-color:var(--success-line); }
 .input-row { display:flex; gap:6px; align-items:stretch; }
@@ -117,8 +117,8 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 .entry-type-toggle { display:flex; gap:3px; background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:3px; }
 .entry-type-toggle button { border-radius:6px; padding:5px 16px; font-size:13px; background:none; color:var(--muted); border:none; font-weight:500; }
 .entry-type-toggle button.active { background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:600; }
-.dup-warning { display:none; margin-top:12px; background:var(--warning-light); border:1px solid var(--warning-line); border-radius:var(--r-sm); padding:10px 13px; font-size:13px; color:var(--warning); }
-.dup-warning.visible { display:block; }
+.dup-warning { display:none; margin-top:12px; background:var(--warning-light); border:1px solid var(--warning-line); border-radius:var(--r-sm); padding:10px 13px; font-size:13px; color:var(--warning); gap:6px; align-items:flex-start; }
+.dup-warning.visible { display:flex; }
 .dup-warning strong { font-weight:600; }
 
 /* ── Table controls ── */
@@ -245,7 +245,7 @@ input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--acc
 .wizard-page.active { display:block; }
 .wizard-instruction { background:var(--accent-light); border:1px solid var(--accent-line); border-radius:8px; padding:13px 15px; margin-bottom:12px; }
 .wizard-instruction ol { padding-left:18px; font-size:13px; line-height:2.1; }
-.wizard-instruction code { background:rgba(51,86,127,.12); padding:1px 6px; border-radius:4px; font-family:monospace; font-size:12px; color:var(--accent); }
+.wizard-instruction code { background:rgba(124,45,62,.12); padding:1px 6px; border-radius:4px; font-family:monospace; font-size:12px; color:var(--accent); }
 .connected-box { background:var(--success-light); border:1px solid var(--success-line); border-radius:8px; padding:14px; text-align:center; }
 
 /* ── Requests list ── */
@@ -293,15 +293,15 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <header>
   <div class="brand">
-    <div class="brand-mark">𝄞</div>
+    <div class="brand-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
     <div class="brand-text">
-      <div class="brand-title">Choral Library</div>
+      <div class="brand-title">Music Library</div>
       <div class="brand-sub">Sheet Music Catalog</div>
     </div>
   </div>
   <div class="header-actions">
     <span id="auth-pill" class="auth-pill disconnected admin-only"><span class="dot"></span>Google</span>
-    <button id="admin-btn" class="btn-header btn-sm" onclick="toggleAdmin()">🔓 Sign In</button>
+    <button id="admin-btn" class="btn-header btn-sm" onclick="toggleAdmin()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Sign In</button>
   </div>
 </header>
 
@@ -314,8 +314,8 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
   <button class="tab-btn viewer-only" data-tab="all">Library <span class="tab-count" id="count-all">0</span></button>
   <button class="tab-btn active admin-only" data-tab="work">Work <span class="tab-count" id="count-work">0</span></button>
   <button class="tab-btn admin-only" data-tab="personal">Personal <span class="tab-count" id="count-personal">0</span></button>
-  <button class="tab-btn admin-only" data-tab="import">📷 Import</button>
-  <button class="tab-btn admin-only" data-tab="settings">⚙ Settings</button>
+  <button class="tab-btn admin-only" data-tab="import"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Import</button>
+  <button class="tab-btn admin-only" data-tab="settings"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
 </nav>
 
 <!-- ═══ LIBRARY TABS (work + personal share markup, generated) ═══ -->
@@ -327,7 +327,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 <div class="tab-panel" id="tab-import">
 
   <div class="card" id="gemini-setup-card" style="margin-bottom:18px;display:none;">
-    <div class="card-header"><h3>🔑 One-time setup — free scanning key</h3></div>
+    <div class="card-header"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg> One-time setup — free scanning key</h3></div>
     <div class="card-body">
       <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">
         Photo scanning uses Google's free AI tier (no credit card, 1,500 scans/day free).
@@ -346,7 +346,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
   <div class="card" style="margin-bottom:18px;">
     <div class="card-header">
-      <h3>📷 Scan Cover Photos</h3>
+      <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Scan Cover Photos</h3>
       <span id="scan-status" class="text-muted" style="font-size:12px;"></span>
     </div>
     <div class="card-body">
@@ -366,7 +366,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
   <div class="card" style="margin-bottom:18px;">
     <div class="card-header">
-      <h3>📋 Review &amp; Add</h3>
+      <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Review &amp; Add</h3>
       <div style="display:flex;gap:8px;align-items:center;">
         <label style="font-size:12px;color:var(--muted);">Add to:</label>
         <select class="filter-select" id="import-target">
@@ -384,9 +384,9 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
     <div class="table-footer">
       <span id="import-count"></span>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn-secondary btn-sm" id="merge-all-btn" onclick="mergeAllDuplicates()" title="For every duplicate: update the existing entry's title, count, and fields to match this list, then remove from import. Kept rows are left alone.">🔀 Merge All Duplicates</button>
-        <button class="btn-secondary btn-sm" onclick="removeImportDuplicates()" title="Just drop duplicate rows without changing anything in your library">🧹 Remove Without Merging</button>
-        <button class="btn-gold btn-sm" id="suggest-genre-btn" onclick="suggestGenres()" title="AI-suggest a genre for rows that don't have one — review before adding">✨ Suggest Genres</button>
+        <button class="btn-secondary btn-sm" id="merge-all-btn" onclick="mergeAllDuplicates()" title="For every duplicate: update the existing entry's title, count, and fields to match this list, then remove from import. Kept rows are left alone."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6l4-4 4 4"/><path d="M12 2v10.3a4 4 0 0 1-1.17 2.83"/><path d="m6.5 17.5-.88.88A4 4 0 0 1 2.7 19.6"/><path d="M16 18h6"/><path d="M21 15l3 3-3 3"/></svg> Merge All Duplicates</button>
+        <button class="btn-secondary btn-sm" onclick="removeImportDuplicates()" title="Just drop duplicate rows without changing anything in your library"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Remove Without Merging</button>
+        <button class="btn-gold btn-sm" id="suggest-genre-btn" onclick="suggestGenres()" title="AI-suggest a genre for rows that don't have one — review before adding"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg> Suggest Genres</button>
         <button class="btn-ghost btn-sm" onclick="clearImportRows()">Clear All</button>
         <button class="btn-primary btn-sm" id="import-add-btn" onclick="addImportRows()">Add All to Library</button>
       </div>
@@ -394,7 +394,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
   </div>
 
   <div class="card">
-    <div class="card-header"><h3>⌨️ Or paste a list</h3></div>
+    <div class="card-header"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg> Or paste a list</h3></div>
     <div class="card-body">
       <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">
         Copy rows straight from Google Sheets or Excel and paste here — columns: <code style="background:var(--bg);padding:1px 6px;border-radius:4px;">Title · Composer · Voicing · Genre · Copies</code>
@@ -412,7 +412,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
     <div class="settings-section admin-only" style="grid-column:1/-1;">
       <div class="settings-section-header">
-        📬 Requests
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Requests
         <span id="request-count-badge" style="background:var(--warning-light);color:var(--warning);border:1px solid var(--warning-line);padding:1px 8px;border-radius:20px;font-size:11px;margin-left:4px;display:none;"></span>
       </div>
       <div class="settings-section-body" style="padding:0;">
@@ -423,11 +423,11 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
     </div>
 
     <div class="settings-section admin-only">
-      <div class="settings-section-header">📧 Email Notifications</div>
+      <div class="settings-section-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Email Notifications</div>
       <div class="settings-section-body">
         <p style="font-size:13px;color:var(--muted);">Get an email whenever someone submits a request. Uses Gmail by default — create an <a href="https://myaccount.google.com/apppasswords" target="_blank">App Password</a> for this.</p>
-        <div class="form-group"><label>Send notifications to</label><input type="email" id="cfg-notify-email" placeholder="you@example.com"></div>
-        <div class="form-group"><label>Gmail address (sends from)</label><input type="email" id="cfg-smtp-user" placeholder="you@gmail.com"></div>
+        <div class="form-group"><label>Send notifications to</label><input type="email" id="cfg-notify-email" placeholder="your@email.com"></div>
+        <div class="form-group"><label>Gmail address (sends from)</label><input type="email" id="cfg-smtp-user" placeholder="your@gmail.com"></div>
         <div class="form-group">
           <label>Gmail App Password</label>
           <input type="password" id="cfg-smtp-pass" placeholder="xxxx xxxx xxxx xxxx" autocomplete="new-password">
@@ -449,7 +449,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
     </div>
 
     <div class="settings-section admin-only">
-      <div class="settings-section-header">🔐 Librarian Access</div>
+      <div class="settings-section-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Librarian Access</div>
       <div class="settings-section-body" id="admin-access-body">
         <p style="font-size:13px;color:var(--muted);">Set a password so visitors get view-only access while you can add, edit, and delete.</p>
         <div class="form-group">
@@ -462,7 +462,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
     </div>
 
     <div class="settings-section">
-      <div class="settings-section-header">🔗 Share This Library</div>
+      <div class="settings-section-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share This Library</div>
       <div class="settings-section-body" id="share-body">
         <div id="share-urls" style="display:flex;flex-direction:column;gap:6px;"></div>
       </div>
@@ -470,7 +470,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
     <div class="settings-section admin-only">
       <div class="settings-section-header">
-        📊 Google Sheets
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg> Google Sheets
         <span id="settings-auth-pill" class="auth-pill disconnected" style="margin-left:auto;font-size:11px;"><span class="dot"></span></span>
       </div>
       <div class="settings-section-body">
@@ -493,7 +493,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
           <div style="margin-top:10px;"><button class="btn-primary btn-sm" onclick="gotoWizardStep(2)">I have my credentials →</button></div>
         </div>
         <div class="wizard-page" id="wpage-2">
-          <div id="google-env-note" class="env-note" style="display:none;margin-bottom:10px;">Google credentials are managed by environment variables on the server.</div>
+          <div id="google-env-note" class="env-note" style="display:none;margin-bottom:10px;">Your Google credentials are managed by your hosting configuration.</div>
           <div class="form-group" style="margin-bottom:10px;"><label>Client ID</label><input type="text" id="cfg-client-id" placeholder="…googleusercontent.com" autocomplete="off"></div>
           <div class="form-group" style="margin-bottom:12px;"><label>Client Secret</label><input type="password" id="cfg-client-secret" placeholder="GOCSPX-…" autocomplete="off"></div>
           <div style="display:flex;gap:8px;">
@@ -504,7 +504,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
         <div class="wizard-page" id="wpage-3">
           <div id="google-connected-view" style="display:none;">
             <div class="connected-box">
-              <p style="font-weight:600;color:var(--success);">✅ Connected to Google!</p>
+              <p style="font-weight:600;color:var(--success);display:flex;align-items:center;gap:6px;justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Connected to Google!</p>
               <p style="font-size:12px;color:var(--muted);margin-top:4px;" id="sheet-link-line"></p>
             </div>
             <div style="margin-top:10px;"><button class="btn-danger btn-sm" onclick="disconnectGoogle()">Disconnect</button></div>
@@ -527,14 +527,14 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 <!-- ═══ MODALS ═══ -->
 <div class="modal-overlay" id="request-modal">
   <div class="modal" style="max-width:500px;">
-    <div class="modal-header"><h2>📬 Request This Item</h2><button class="btn-ghost btn-icon" onclick="closeRequestModal()">✕</button></div>
+    <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Request This Item</h2><button class="btn-ghost btn-icon" onclick="closeRequestModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body" id="request-modal-body"></div>
   </div>
 </div>
 
 <div class="modal-overlay" id="csv-tip-modal">
   <div class="modal" style="max-width:460px;">
-    <div class="modal-header"><h2>📊 Copy to Google Sheets</h2><button class="btn-ghost btn-icon" onclick="document.getElementById('csv-tip-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg> Copy to Google Sheets</h2><button class="btn-ghost btn-icon" onclick="document.getElementById('csv-tip-modal').classList.remove('open')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
       <ol style="padding-left:20px;font-size:13px;line-height:2.2;">
         <li>Click <strong>Export CSV</strong> to download the file</li>
@@ -551,7 +551,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <div class="modal-overlay" id="scanner-modal">
   <div class="modal" style="max-width:420px;">
-    <div class="modal-header"><h2>📷 Scan Barcode</h2><button class="btn-ghost btn-icon" onclick="closeScanner()">✕</button></div>
+    <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Scan Barcode</h2><button class="btn-ghost btn-icon" onclick="closeScanner()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
       <div id="reader"></div>
       <p class="scanner-hint">Point at the barcode on the back of the book</p>
@@ -561,7 +561,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <div class="modal-overlay" id="edit-modal">
   <div class="modal">
-    <div class="modal-header"><h2 id="modal-title">Edit Entry</h2><button class="btn-ghost btn-icon" onclick="closeModal()">✕</button></div>
+    <div class="modal-header"><h2 id="modal-title">Edit Entry</h2><button class="btn-ghost btn-icon" onclick="closeModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
       <form id="form-edit" onsubmit="submitEdit(event)"><div class="form-grid" id="fields-edit"></div></form>
     </div>
@@ -574,7 +574,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <div class="modal-overlay" id="admin-modal">
   <div class="modal" style="max-width:360px;">
-    <div class="modal-header"><h2>🔐 Librarian Login</h2><button class="btn-ghost btn-icon" onclick="closeAdminModal()">✕</button></div>
+    <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Librarian Login</h2><button class="btn-ghost btn-icon" onclick="closeAdminModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
       <div class="form-group">
         <label>Password</label>
@@ -591,7 +591,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <div class="modal-overlay" id="delete-modal">
   <div class="modal" style="max-width:400px;">
-    <div class="modal-header"><h2 id="delete-modal-title">Delete Entry</h2><button class="btn-ghost btn-icon" onclick="closeDeleteModal()">✕</button></div>
+    <div class="modal-header"><h2 id="delete-modal-title">Delete Entry</h2><button class="btn-ghost btn-icon" onclick="closeDeleteModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body"><p id="delete-modal-text">Are you sure?</p></div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeDeleteModal()">Cancel</button>
@@ -602,7 +602,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <div class="modal-overlay" id="dup-modal">
   <div class="modal" style="max-width:460px;">
-    <div class="modal-header"><h2>⚠️ Possible Duplicate</h2><button class="btn-ghost btn-icon" onclick="closeDupModal(false)">✕</button></div>
+    <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Possible Duplicate</h2><button class="btn-ghost btn-icon" onclick="closeDupModal(false)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">This looks like it may already be in your library:</p>
       <div id="dup-matches"></div>
@@ -616,14 +616,14 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <div class="modal-overlay" id="pepper-modal">
   <div class="modal" style="max-width:540px;">
-    <div class="modal-header"><h2>🔎 JW Pepper Results</h2><button class="btn-ghost btn-icon" onclick="closePepperModal()">✕</button></div>
+    <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> JW Pepper Results</h2><button class="btn-ghost btn-icon" onclick="closePepperModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body" id="pepper-modal-body"></div>
   </div>
 </div>
 
 <div class="modal-overlay" id="bulk-tag-modal">
   <div class="modal" style="max-width:400px;">
-    <div class="modal-header"><h2 id="bulk-tag-title">Tag Selected</h2><button class="btn-ghost btn-icon" onclick="closeBulkTagModal()">✕</button></div>
+    <div class="modal-header"><h2 id="bulk-tag-title">Tag Selected</h2><button class="btn-ghost btn-icon" onclick="closeBulkTagModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
       <div class="form-group" id="bulk-tag-field"></div>
     </div>
@@ -636,7 +636,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <div class="modal-overlay" id="merge-modal">
   <div class="modal" style="max-width:640px;">
-    <div class="modal-header"><h2>Merge Two Entries</h2><button class="btn-ghost btn-icon" onclick="closeMergeModal()">✕</button></div>
+    <div class="modal-header"><h2>Merge Two Entries</h2><button class="btn-ghost btn-icon" onclick="closeMergeModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body" id="merge-modal-body"></div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeMergeModal()">Cancel</button>
@@ -647,7 +647,32 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <div id="toast-container"></div>
 
+<footer style="text-align:center;padding:20px 24px;font-size:12px;color:var(--faint);border-top:1px solid var(--line);margin-top:auto;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Music Library</footer>
+
 <script>
+// ── SVG Icon constants ────────────────────────────────────────────────────
+const ICO={
+  search:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>`,
+  sparkles:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>`,
+  link:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
+  download:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  table:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg>`,
+  sync:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>`,
+  trash:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
+  edit:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  check:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  ban:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`,
+  merge:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/><path d="M21 12v4a5 5 0 0 1-5 5H8"/><path d="M3 12V8a5 5 0 0 1 5-5h4"/></svg>`,
+  tag:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`,
+  music:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="18" r="4"/><path d="M12 18V2l7 4"/></svg>`,
+  lock:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  unlock:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`,
+  mail:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`,
+  copy:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  x:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  camera:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
+};
+
 // ── State ─────────────────────────────────────────────────────────────────
 let data        = { work:[], personal:[] };
 let entryTypes  = { work:'octavo', personal:'octavo' };
@@ -699,7 +724,7 @@ function buildPanel(tab){
           <div class="dup-warning" id="dup-inline-${tab}"></div>
           <div class="form-footer">
             <button type="submit" class="btn-primary">Add Entry</button>
-            <button type="button" class="btn-gold" id="pepper-btn-${tab}" onclick="pepperLookup('${tab}')">🔎 Search JW Pepper</button>
+            <button type="button" class="btn-gold" id="pepper-btn-${tab}" onclick="pepperLookup('${tab}')">${ICO.search} Search JW Pepper</button>
             <button type="button" class="btn-ghost" onclick="resetForm('${tab}')">Clear</button>
           </div>
         </form>
@@ -715,24 +740,24 @@ function buildPanel(tab){
       </select>
       <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"></select>
       <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"></select>
-      <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">✕ Clear</button>
-      <button class="btn-secondary btn-sm" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">🔍 Find Duplicates</button>
-      <button class="btn-gold btn-sm admin-only" id="suggest-genre-lib-btn-${tab}" onclick="suggestGenresForLib('${tab}')" title="AI-suggest genres for entries that don't have one">✨ Suggest Genres</button>
-      <button class="btn-gold btn-sm admin-only" id="find-links-btn-${tab}" onclick="findAllLinks('${tab}')" title="Auto-find links for all entries that don't have one (JW Pepper for octavos, Amazon for books)">🔗 Find Links</button>
+      <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">${ICO.x} Clear</button>
+      <button class="btn-secondary btn-sm admin-only" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">${ICO.search} Find Duplicates</button>
+      <button class="btn-gold btn-sm admin-only" id="suggest-genre-lib-btn-${tab}" onclick="suggestGenresForLib('${tab}')" title="AI-suggest genres for entries that don't have one">${ICO.sparkles} Suggest Genres</button>
+      <button class="btn-gold btn-sm admin-only" id="find-links-btn-${tab}" onclick="findAllLinks('${tab}')" title="Auto-find links for all entries that don't have one (JW Pepper for octavos, Amazon for books)">${ICO.link} Find Links</button>
       <span style="flex:1"></span>
-      <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}')" id="export-btn-${tab}">⬇ Export CSV</button>
-      <button class="btn-secondary btn-sm" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">📊</button>
-      <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncSheets('${tab}')">⟳ Sync to Google Sheet</button>
+      <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}')" id="export-btn-${tab}">${ICO.download} Export CSV</button>
+      <button class="btn-secondary btn-sm btn-icon" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
+      <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncSheets('${tab}')">${ICO.sync} Sync to Sheets</button>
     </div>
     <div class="bulk-bar" id="bulk-bar-${tab}">
       <span class="bulk-count" id="bulk-count-${tab}"></span>
-      <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}',true)">⬇ Export Selected</button>
-      <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','genre')">♪ Set Genre</button>
-      <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','tags')">🏷 Add Tag</button>
-      <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',true)">🚫 Mark In Use</button>
-      <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',false)">✅ Mark Available</button>
-      <button class="btn-danger btn-sm" onclick="openBulkDelete('${tab}')">🗑 Delete</button>
-      <button class="btn-primary btn-sm" id="bulk-merge-btn-${tab}" style="display:none;" onclick="openMergeModal('${tab}')">⊕ Merge 2</button>
+      <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}',true)">${ICO.download} Export Selected</button>
+      <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','genre')">${ICO.music} Set Genre</button>
+      <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','tags')">${ICO.tag} Add Tag</button>
+      <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',true)">${ICO.ban} Mark In Use</button>
+      <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',false)">${ICO.check} Mark Available</button>
+      <button class="btn-danger btn-sm" onclick="openBulkDelete('${tab}')">${ICO.trash} Delete</button>
+      <button class="btn-primary btn-sm" id="bulk-merge-btn-${tab}" style="display:none;" onclick="openMergeModal('${tab}')">${ICO.merge} Merge 2</button>
       <span style="flex:1"></span>
       <button class="btn-ghost btn-sm" onclick="clearSelection('${tab}')">Deselect All</button>
     </div>
@@ -774,11 +799,11 @@ function applyAdminMode() {
   const btn=document.getElementById('admin-btn'), banner=document.getElementById('viewer-banner');
   const active=document.querySelector('.tab-btn.active');
   if (isAdmin) {
-    btn.className='btn-header btn-sm active'; btn.textContent='🔒 Librarian'; banner.classList.add('hidden');
+    btn.className='btn-header btn-sm active'; btn.innerHTML=ICO.lock+' Librarian'; banner.classList.add('hidden');
     if(active&&active.dataset.tab==='all') switchTab('work');
   }
   else {
-    btn.className='btn-header btn-sm'; btn.innerHTML='🔓 Sign In'; banner.classList.remove('hidden');
+    btn.className='btn-header btn-sm'; btn.innerHTML=ICO.unlock+' Sign In'; banner.classList.remove('hidden');
     if(!active||active.dataset.tab!=='all') switchTab('all');
     selected.work.clear(); selected.personal.clear();
   }
@@ -868,7 +893,7 @@ function buildFieldHTML(f,prefix,value){
     inner=`<select id="${id}" name="${f.key}" ${req}><option value="">Select…</option>${opts}${extra}</select>`;
   }
   else if(f.type==='textarea') inner=`<textarea id="${id}" name="${f.key}" ${req}>${esc(String(value??''))}</textarea>`;
-  else if(f.isbnField) inner=`<div class="input-row"><input type="text" id="${id}" name="${f.key}" value="${val}" placeholder="e.g. 9780739044148" onblur="autoIsbnLookup('${prefix}',this.value)"><button type="button" class="btn-scan" title="Scan barcode" onclick="openScanner('${prefix}')">📷</button><button type="button" class="btn-secondary btn-sm" onclick="isbnLookup('${prefix}')">Look up</button></div>`;
+  else if(f.isbnField) inner=`<div class="input-row"><input type="text" id="${id}" name="${f.key}" value="${val}" placeholder="e.g. 9780739044148" onblur="autoIsbnLookup('${prefix}',this.value)"><button type="button" class="btn-scan" title="Scan barcode" onclick="openScanner('${prefix}')">${ICO.camera}</button><button type="button" class="btn-secondary btn-sm" onclick="isbnLookup('${prefix}')">Look up</button></div>`;
   else inner=`<input type="${f.type}" id="${id}" name="${f.key}" value="${val}" ${req} ${f.min!==undefined?'min="'+f.min+'"':''}>`;
   return `<div class="form-group${f.full?' full':''}"><label for="${id}">${f.label}</label>${inner}</div>`;
 }
@@ -929,7 +954,7 @@ function attachDupListeners(prefix){
     if(!w) return;
     if(t.value.trim()&&matches.length){
       const m=matches[0];
-      w.innerHTML=`⚠️ <strong>${esc(m.entry.title)}</strong> by ${esc(m.entry.composer||m.entry.author||'unknown')} is already in your ${m.tab} library (${m.entry.copies||'?'} copies)${matches.length>1?` — and ${matches.length-1} more match${matches.length>2?'es':''}`:''}.`;
+      w.innerHTML=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <strong>${esc(m.entry.title)}</strong> by ${esc(m.entry.composer||m.entry.author||'unknown')} is already in your ${m.tab} library (${m.entry.copies||'?'} copies)${matches.length>1?` — and ${matches.length-1} more match${matches.length>2?'es':''}`:''}.`;
       w.classList.add('visible');
     } else w.classList.remove('visible');
   };
@@ -984,11 +1009,11 @@ async function pepperLookup(prefix){
   try{
     const r=await fetch(`/api/pepper-lookup?title=${encodeURIComponent(title)}&composer=${encodeURIComponent(composer)}`);
     const j=await r.json();
-    if(!r.ok){body.innerHTML=`<div class="empty-state" style="padding:24px;"><div class="empty-icon">🔎</div><strong>No results</strong><p>${esc(j.error||'Nothing found — try fewer words.')}</p></div>`;return;}
+    if(!r.ok){body.innerHTML=`<div class="empty-state" style="padding:24px;"><div class="empty-icon" style="font-size:28px;opacity:.4;">${ICO.search}</div><strong>No results</strong><p>${esc(j.error||'Nothing found — try fewer words.')}</p></div>`;return;}
     window._pepperResults=j.results;
     body.innerHTML=j.results.map((p,i)=>`
       <div class="pepper-result">
-        ${p.image?`<img class="pepper-cover" src="${escAttr(p.image)}" alt="" loading="lazy" onerror="this.outerHTML='&lt;div class=&quot;pepper-cover placeholder&quot;&gt;♪&lt;/div&gt;'">`:`<div class="pepper-cover placeholder">♪</div>`}
+        ${p.image?`<img class="pepper-cover" src="${escAttr(p.image)}" alt="" loading="lazy" onerror="this.outerHTML='&lt;div class=&quot;pepper-cover placeholder&quot;&gt;&lt;svg width=&quot;22&quot; height=&quot;22&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.5&quot;&gt;&lt;circle cx=&quot;8&quot; cy=&quot;18&quot; r=&quot;4&quot;/&gt;&lt;path d=&quot;M12 18V2l7 4&quot;/&gt;&lt;/svg&gt;&lt;/div&gt;'">`:`<div class="pepper-cover placeholder"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="18" r="4"/><path d="M12 18V2l7 4"/></svg></div>`}
         <div class="pepper-main">
           <div class="pepper-title">${esc(p.title)}</div>
           <div class="pepper-meta">${esc([p.composer,p.publisher].filter(Boolean).join(' · '))||'&nbsp;'}</div>
@@ -1048,11 +1073,11 @@ async function pepperLookupEntry(tab,id){
   try{
     const r=await fetch(`/api/pepper-lookup?title=${encodeURIComponent(title)}&composer=${encodeURIComponent(composer)}`);
     const j=await r.json();
-    if(!r.ok){body.innerHTML=`<div class="empty-state" style="padding:24px;"><div class="empty-icon">🔎</div><strong>No results</strong><p>${esc(j.error||'Nothing found.')}</p></div>`;return;}
+    if(!r.ok){body.innerHTML=`<div class="empty-state" style="padding:24px;"><div class="empty-icon" style="font-size:28px;opacity:.4;">${ICO.search}</div><strong>No results</strong><p>${esc(j.error||'Nothing found.')}</p></div>`;return;}
     window._pepperResults=j.results;
     body.innerHTML=j.results.map((p,i)=>`
       <div class="pepper-result">
-        ${p.image?`<img class="pepper-cover" src="${escAttr(p.image)}" alt="" loading="lazy" onerror="this.outerHTML='&lt;div class=&quot;pepper-cover placeholder&quot;&gt;♪&lt;/div&gt;'">`:`<div class="pepper-cover placeholder">♪</div>`}
+        ${p.image?`<img class="pepper-cover" src="${escAttr(p.image)}" alt="" loading="lazy" onerror="this.outerHTML='&lt;div class=&quot;pepper-cover placeholder&quot;&gt;&lt;svg width=&quot;22&quot; height=&quot;22&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.5&quot;&gt;&lt;circle cx=&quot;8&quot; cy=&quot;18&quot; r=&quot;4&quot;/&gt;&lt;path d=&quot;M12 18V2l7 4&quot;/&gt;&lt;/svg&gt;&lt;/div&gt;'">`:`<div class="pepper-cover placeholder"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="18" r="4"/><path d="M12 18V2l7 4"/></svg></div>`}
         <div class="pepper-main">
           <div class="pepper-title">${esc(p.title)}</div>
           <div class="pepper-meta">${esc([p.composer,p.publisher].filter(Boolean).join(' · '))||'&nbsp;'}</div>
@@ -1459,7 +1484,7 @@ async function submitRequest() {
     if (!r.ok) { toast(j.error||'Failed to send request','error'); btn.disabled=false; btn.innerHTML='Send Request'; return; }
     document.getElementById('request-modal-body').innerHTML = `
       <div class="request-success">
-        <div class="success-icon">📬</div>
+        <div class="success-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--success)"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></div>
         <h3>Request sent!</h3>
         <p>The librarian has been notified and will be in touch.<br>Thank you, ${esc(name)}!</p>
         <button class="btn-primary" style="margin-top:16px;" onclick="closeRequestModal()">Done</button>
@@ -1499,9 +1524,9 @@ async function loadRequests() {
           </div>
         </div>
         <div class="request-row-actions">
-          ${req.status==='pending'?`<button class="btn-success btn-sm" onclick="updateRequestStatus(${req.id},'fulfilled')">✓ Fulfill</button>`:''}
-          ${req.status!=='declined'?`<button class="btn-danger btn-sm" onclick="updateRequestStatus(${req.id},'declined')">✕</button>`:''}
-          <button class="btn-ghost btn-icon btn-sm" onclick="deleteRequest(${req.id})" title="Remove">🗑</button>
+          ${req.status==='pending'?`<button class="btn-success btn-sm" onclick="updateRequestStatus(${req.id},'fulfilled')">${ICO.check} Fulfill</button>`:''}
+          ${req.status!=='declined'?`<button class="btn-danger btn-sm" onclick="updateRequestStatus(${req.id},'declined')">${ICO.x}</button>`:''}
+          <button class="btn-ghost btn-icon btn-sm" onclick="deleteRequest(${req.id})" title="Remove">${ICO.trash}</button>
         </div>
       </div>`;
     }).join('');
@@ -1597,9 +1622,9 @@ function refreshFilterOptions(tab){
 }
 
 // ── Tables ────────────────────────────────────────────────────────────────
-const OCTAVO_COLS=[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Arranger'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'lastPerformed',label:'Last Performed'}];
+const OCTAVO_COLS=[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Arranger'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'}];
 const BOOK_COLS  =[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'author',label:'Author / Editor'},{key:'isbn',label:'ISBN'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'description',label:'Description'}];
-const MIXED_COLS =[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Author'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'lastPerformed',label:'Last Performed'}];
+const MIXED_COLS =[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Author'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'}];
 function getColumns(tab){
   const t=filters[tab].type;
   let cols=t==='octavo'?OCTAVO_COLS:t==='book'?BOOK_COLS:MIXED_COLS;
@@ -1645,11 +1670,16 @@ function renderTable(tab){
 
   if(!sorted.length){
     const anyFilter=filters[tab].search||filters[tab].type||filters[tab].genre||filters[tab].voicing;
+    const emptyMusicSvg=`<svg width=”36” height=”36” viewBox=”0 0 24 24” fill=”none” stroke=”currentColor” stroke-width=”1.5” stroke-linecap=”round” stroke-linejoin=”round” style=”opacity:.35”><path d=”M9 18V5l12-2v13”/><circle cx=”6” cy=”18” r=”3”/><circle cx=”18” cy=”16” r=”3”/></svg>`;
+    const emptyCheckSvg=`<svg width=”36” height=”36” viewBox=”0 0 24 24” fill=”none” stroke=”currentColor” stroke-width=”1.5” stroke-linecap=”round” stroke-linejoin=”round” style=”opacity:.35;color:var(--success)”><polyline points=”20 6 9 17 4 12”/></svg>`;
+    const isPublicEmpty=tab==='all'&&!isAdmin&&!anyFilter&&!showDupsOnly[tab];
     const msg=showDupsOnly[tab]
-      ?{icon:'✅',title:'No duplicate titles found',body:'Every title in this tab is unique.'}
+      ?{icon:emptyCheckSvg,title:'No duplicate titles found',body:'Every title in this tab is unique.'}
       :anyFilter
-        ?{icon:'𝄞',title:'No matches',body:'Try adjusting your search or filters.'}
-        :{icon:'𝄞',title:'No entries yet',body:isAdmin?'Use “Add to Library” above to add your first piece.':'Nothing here yet.'};
+        ?{icon:emptyMusicSvg,title:'No matches',body:'Try adjusting your search or filters.'}
+        :isPublicEmpty
+          ?{icon:emptyMusicSvg,title:'Welcome to Music Library',body:'Browse the catalog or use the Request button to ask about a piece.'}
+          :{icon:emptyMusicSvg,title:'No entries yet',body:isAdmin?'Use “Add to Library” above to add your first piece.':'Nothing here yet.'};
     table.querySelector('tbody').innerHTML=`<tr><td colspan=”${cols.length+2}”><div class=”empty-state”><div class=”empty-icon”>${msg.icon}</div><strong>${msg.title}</strong><p>${msg.body}</p></div></td></tr>`;
   } else {
     // When Find Duplicates is on, compute group membership for visual separators
@@ -1696,8 +1726,8 @@ function renderTable(tab){
         }
         return `<td>${esc(e[c.key]||'')||'<span class="text-muted">—</span>'}</td>`;
       }).join('');
-      const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="Find link (JW Pepper / Amazon)" onclick="pepperLookupEntry('${srcTab}',${e._id})">🔎</button><button class="btn-ghost btn-icon btn-sm" title="${e.unavailable?'Marked IN USE — click to mark available':'Available — click to mark in use'}" onclick="toggleAvail('${srcTab}',${e._id})">${e.unavailable?'🚫':'✅'}</button><button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${srcTab}',${e._id})">✏️</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${srcTab}',${e._id})" style="color:var(--danger)">🗑</button>`:'';
-      return sep+`<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request" onclick="openRequestModal('${srcTab}',${e._id})">📬 Request</button>${adminActions}</div></td></tr>`;
+      const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="Find link (JW Pepper / Amazon)" onclick="pepperLookupEntry('${srcTab}',${e._id})">${ICO.search}</button><button class="btn-ghost btn-icon btn-sm" title="${e.unavailable?'Marked IN USE — click to mark available':'Available — click to mark in use'}" onclick="toggleAvail('${srcTab}',${e._id})">${e.unavailable?ICO.ban:ICO.check}</button><button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${srcTab}',${e._id})">${ICO.edit}</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${srcTab}',${e._id})" style="color:var(--danger)">${ICO.trash}</button>`:'';
+      return sep+`<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request" onclick="openRequestModal('${srcTab}',${e._id})">${ICO.mail} Request</button>${adminActions}</div></td></tr>`;
     }).join('');
   }
   const visCopies=sorted.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
@@ -1731,7 +1761,7 @@ function showCSVImportTip(){document.getElementById('csv-tip-modal').classList.a
 
 // ── Google Sync ───────────────────────────────────────────────────────────
 async function syncSheets(tab){
-  if(!authStatus.authenticated){toast('Connect Google in ⚙ Settings first','error');return;}
+  if(!authStatus.authenticated){toast('Connect Google in Settings first','error');return;}
   const btn=document.getElementById(`sync-${tab}-btn`);btn.disabled=true;const orig=btn.innerHTML;btn.innerHTML='<span class="spinner"></span> Syncing…';
   try{
     const rows=data[tab];if(!rows.length){toast('Nothing to sync','info');return;}
@@ -1774,7 +1804,7 @@ async function prefillSettings(){
     if(c.smtpPort)    document.getElementById('cfg-smtp-port').value=c.smtpPort;
     if(c.hasAdminPassword)document.getElementById('admin-pw-status').textContent='A password is currently set.';
     if(c.envManaged?.adminPassword){
-      document.getElementById('admin-access-body').innerHTML='<p style="font-size:13px;color:var(--muted);">The password is managed securely on the server (ADMIN_PASSWORD environment variable). To change it, update the variable in your hosting dashboard.</p>';
+      document.getElementById('admin-access-body').innerHTML='<p style="font-size:13px;color:var(--muted);">Your password is managed by your hosting configuration. To change it, update your Render environment settings.</p>';
     }
     if(c.envManaged?.google){
       document.getElementById('google-env-note').style.display='';
@@ -1848,7 +1878,7 @@ async function loadShareInfo(){
     c.innerHTML=rows.join('');
   }catch{}
 }
-function shareRow(url){return `<div class="share-url-row"><span>${esc(url)}</span><button class="btn-ghost btn-icon btn-sm" onclick="copyText('${escAttr(url)}')" title="Copy">⎘</button></div>`;}
+function shareRow(url){return `<div class="share-url-row"><span>${esc(url)}</span><button class="btn-ghost btn-icon btn-sm" onclick="copyText('${escAttr(url)}')" title="Copy">${ICO.copy}</button></div>`;}
 function copyText(t){navigator.clipboard.writeText(t).then(()=>toast('Copied!','success')).catch(()=>toast('Copy failed','error'));}
 
 // ── Photo import ──────────────────────────────────────────────────────────
@@ -1953,7 +1983,7 @@ function renderImportRows(){
     const matchInfo=dups.length?`<div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4;">
       ${isFuzzy?'~':'='} <em>${esc(dups[0].entry.title)}</em>${dups[0].entry.composer||dups[0].entry.author?' · '+esc(dups[0].entry.composer||dups[0].entry.author):''}${dups[0].entry.voicing?' · '+esc(dups[0].entry.voicing):''} · ${dups[0].entry.copies||'?'} copies · ${cap(dups[0].tab)}${dups.length>1?` <span style="opacity:.7;">+${dups.length-1} more</span>`:''}
     </div>`:'';
-    const icon=r._keep&&dups.length?'✓':countMismatch?'🔢':isFuzzy?'〜':'⚠️';
+    const icon=r._keep&&dups.length?'✓':countMismatch?'#':isFuzzy?'~':'!';
     const rowBtns=dups.length
       ? r._keep
         ? `<button class="btn-ghost btn-sm" title="Undo — treat as duplicate again" onclick="importRows[${i}]._keep=false;renderImportRows()" style="font-size:11px;padding:2px 7px;color:var(--success,#27ae60);">✓ Kept</button>`
@@ -1965,7 +1995,7 @@ function renderImportRows(){
       <td><select class="filter-select" onchange="importRows[${i}].voicing=this.value"><option value="">—</option>${vOpts}${vExtra}</select></td>
       <td><select class="filter-select" onchange="importRows[${i}].genre=this.value"><option value="">—</option>${gOpts}</select></td>
       <td><input type="number" min="0" style="width:64px;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.copies)}" oninput="importRows[${i}].copies=this.value"></td>
-      <td style="white-space:nowrap;display:flex;align-items:center;gap:3px;">${r.link?`<a href="${escAttr(r.link)}" target="_blank" title="JW Pepper link found" style="font-size:12px;">🔗↗</a>`:''}${rowBtns}<button class="btn-ghost btn-icon btn-sm" title="Remove this row without changing anything" onclick="importRows.splice(${i},1);renderImportRows()" style="color:var(--danger,#c0392b);">🗑</button></td>
+      <td style="white-space:nowrap;display:flex;align-items:center;gap:3px;">${r.link?`<a href="${escAttr(r.link)}" target="_blank" title="JW Pepper link found" style="display:inline-flex;align-items:center;gap:2px;font-size:12px;color:var(--accent);">${ICO.link}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:''}${rowBtns}<button class="btn-ghost btn-icon btn-sm" title="Remove this row without changing anything" onclick="importRows.splice(${i},1);renderImportRows()" style="color:var(--danger,#c0392b);">${ICO.trash}</button></td>
     </tr>`;
   }).join('');
   const allDups=importRows.map(r=>r._keep?[]:findDuplicates(r.title,r.composer));
@@ -1973,7 +2003,7 @@ function renderImportRows(){
   const fuzzyCount=allDups.filter(d=>d.length&&d[0].fuzzy).length;
   const countMismatchTotal=allDups.filter((d,i)=>d.length&&String(d[0].entry.copies||'')!==String(importRows[i].copies||'')).length;
   const keptCount=importRows.filter(r=>r._keep).length;
-  document.getElementById('import-count').textContent=`${importRows.length} piece${importRows.length>1?'s':''} ready`+(dupCount?` · ${dupCount} duplicate${dupCount>1?'s':''}${fuzzyCount?` (〜${fuzzyCount} fuzzy)`:''}`+(countMismatchTotal?` · 🔢 ${countMismatchTotal} count diff${countMismatchTotal>1?'s':''}`:''): '')+(keptCount?` · ✓ ${keptCount} kept`:'');
+  document.getElementById('import-count').textContent=`${importRows.length} piece${importRows.length>1?'s':''} ready`+(dupCount?` · ${dupCount} duplicate${dupCount>1?'s':''}${fuzzyCount?` (~${fuzzyCount} fuzzy)`:''}`+(countMismatchTotal?` · ${countMismatchTotal} count diff${countMismatchTotal>1?'s':''}`:''): '')+(keptCount?` · ${keptCount} kept`:'');
 }
 
 function clearImportRows(){importRows=[];renderImportRows();document.getElementById('scan-queue').innerHTML='';document.getElementById('scan-status').textContent='';}
@@ -2115,7 +2145,7 @@ async function addImportRows(){
   btn.disabled=false;btn.innerHTML=orig;
   renderAll();
   if(failed)toast(`Added ${added}, ${failed} failed — try those again`,'error');
-  else{toast(`Added ${added} pieces to your ${cap(tab)} library! 🎉`,'success',5000);clearImportRows();}
+  else{toast(`Added ${added} pieces to your ${cap(tab)} library!`,'success',5000);clearImportRows();}
 }
 
 async function parsePasteBox(){
