@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Music Library — Sheet Music Catalog</title>
+<title>Choral Catalog — Sheet Music Catalog</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -38,7 +38,6 @@ header { background:linear-gradient(135deg,var(--navy-deep) 0%,var(--navy) 100%)
 .brand-mark { width:34px; height:34px; border-radius:9px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
 .brand-text { line-height:1.15; white-space:nowrap; overflow:hidden; }
 .brand-title { font-family:var(--display); font-size:18px; font-weight:600; letter-spacing:.2px; }
-.brand-sub { font-size:11px; color:rgba(243,240,233,.55); letter-spacing:.6px; text-transform:uppercase; }
 .header-actions { display:flex; gap:8px; align-items:center; flex-shrink:0; }
 
 /* ── Buttons ── */
@@ -63,7 +62,7 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 .btn-header.active { background:#f3f0e9; color:var(--navy-deep); border-color:#f3f0e9; }
 
 /* ── Viewer banner ── */
-.viewer-banner { background:#eef4ff; border-bottom:1px solid #c3d9f8; padding:8px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; color:#2563a8; }
+.viewer-banner { background:#eef4ff; border-bottom:1px solid #c3d9f8; padding:9px 24px; display:flex; align-items:center; justify-content:center; gap:14px; font-size:13px; color:#2563a8; }
 .viewer-banner.hidden { display:none; }
 
 /* ── Tabs ── */
@@ -79,6 +78,8 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 /* ── Stats ── */
 .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:18px; }
 .stat-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 16px; box-shadow:var(--shadow); }
+.stat-card.stat-primary { border-left:3px solid var(--accent); padding-left:13px; }
+.stat-card.stat-primary .stat-value { font-size:30px; color:var(--accent); }
 .stat-value { font-family:var(--display); font-size:24px; font-weight:600; line-height:1.1; }
 .stat-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--faint); margin-top:3px; }
 
@@ -144,25 +145,25 @@ table { width:100%; border-collapse:collapse; font-size:13px; }
 thead th { text-align:left; padding:10px 12px; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); border-bottom:1px solid var(--line); white-space:nowrap; cursor:pointer; user-select:none; background:var(--surface); position:sticky; top:0; }
 thead th:hover { color:var(--ink); }
 thead th.sorted { color:var(--accent); }
-thead th .sort-icon { opacity:.4; font-size:10px; margin-left:3px; }
+thead th .sort-icon { opacity:.35; margin-left:4px; display:inline-flex; align-items:center; vertical-align:middle; }
 thead th.sorted .sort-icon { opacity:1; }
 thead th.col-check,tbody td.col-check { width:34px; padding:6px 6px 6px 14px; cursor:default; }
 tbody tr { border-bottom:1px solid var(--line-soft); transition:background .1s; }
 tbody tr:last-child { border-bottom:none; }
-tbody tr:hover { background:var(--navy-soft); }
+tbody tr:hover { background:#f5f0f1; }
 tbody tr.selected { background:var(--accent-light); }
 tbody td { padding:9px 12px; vertical-align:middle; }
 td.cell-title { font-weight:600; max-width:300px; }
 td.cell-title .title-link { color:inherit; }
 td.cell-title .title-link:hover { color:var(--accent); text-decoration:none; }
-td.cell-title .ext { font-size:11px; opacity:.55; margin-left:3px; }
+td.cell-title .ext { opacity:.5; margin-left:4px; display:inline-flex; align-items:center; vertical-align:middle; }
 .tag-chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:3px; }
 .tag-chip { font-size:10px; font-weight:600; background:var(--gold-light); color:var(--gold); border:1px solid var(--gold-line); border-radius:20px; padding:0 7px; line-height:16px; }
 input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
 .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:var(--bg); border:1px solid var(--line); color:var(--muted); }
 .badge.octavo { background:var(--accent-light); color:var(--accent); border-color:var(--accent-line); }
-.badge.book { background:#f2edfa; color:#5e3ea8; border-color:#dccfee; }
-.voicing-chip { display:inline-block; font-size:11px; font-weight:600; font-family:var(--font); background:var(--bg); border:1px solid var(--line); color:var(--muted); border-radius:5px; padding:1px 7px; letter-spacing:.3px; }
+.badge.book { background:#eeecea; color:#5a5550; border-color:#d4d0c8; }
+.voicing-chip { display:inline-block; font-size:11px; font-weight:600; font-family:var(--font); background:var(--bg); border:1px solid var(--line); color:var(--muted); border-radius:5px; padding:1px 7px; letter-spacing:.3px; white-space:nowrap; }
 .row-actions { display:flex; gap:3px; align-items:center; justify-content:flex-end; }
 .btn-request { background:var(--gold-light); color:var(--gold); border:1px solid var(--gold-line); font-size:12px; padding:3px 10px; border-radius:20px; }
 .btn-request:hover:not(:disabled) { background:#f4e8cb; }
@@ -280,7 +281,6 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 @media(max-width:640px){
   header{padding:0 14px;height:54px}
-  .brand-sub{display:none}
   .tabs-nav{padding:6px 14px 0;top:54px}
   .tab-panel{padding:14px 12px 50px}
   .form-grid{grid-template-columns:1fr}
@@ -295,8 +295,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
   <div class="brand">
     <div class="brand-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
     <div class="brand-text">
-      <div class="brand-title">Music Library</div>
-      <div class="brand-sub">Sheet Music Catalog</div>
+      <div class="brand-title">Choral Catalog</div>
     </div>
   </div>
   <div class="header-actions">
@@ -306,7 +305,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 </header>
 
 <div class="viewer-banner hidden" id="viewer-banner">
-  <span>You're browsing the library in read-only mode — search and explore freely, or request an item.</span>
+  <span>Browse and request sheet music from our collection.</span>
   <button class="btn-sm btn-primary" onclick="toggleAdmin()">Librarian Login</button>
 </div>
 
@@ -647,7 +646,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
 <div id="toast-container"></div>
 
-<footer style="text-align:center;padding:20px 24px;font-size:12px;color:var(--faint);border-top:1px solid var(--line);margin-top:auto;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Music Library</footer>
+<footer style="text-align:center;padding:20px 24px;font-size:12px;color:var(--faint);border-top:1px solid var(--line);">Choral Catalog</footer>
 
 <script>
 // ── SVG Icon constants ────────────────────────────────────────────────────
@@ -670,6 +669,10 @@ const ICO={
   mail:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`,
   copy:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
   x:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  sortNone:`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>`,
+  sortAsc:`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m7 9 5-5 5 5"/></svg>`,
+  sortDesc:`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/></svg>`,
+  extLink:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
   camera:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
 };
 
@@ -738,15 +741,15 @@ function buildPanel(tab){
       <select class="filter-select" id="ftype-${tab}" onchange="setFilter('${tab}','type',this.value)">
         <option value="">All Types</option><option value="octavo">Octavos</option><option value="book">Books</option>
       </select>
-      <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"></select>
-      <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"></select>
+      <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"><option value="">Voicing</option></select>
+      <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"><option value="">Genre</option></select>
       <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">${ICO.x} Clear</button>
       <button class="btn-secondary btn-sm admin-only" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">${ICO.search} Find Duplicates</button>
       <button class="btn-gold btn-sm admin-only" id="suggest-genre-lib-btn-${tab}" onclick="suggestGenresForLib('${tab}')" title="AI-suggest genres for entries that don't have one">${ICO.sparkles} Suggest Genres</button>
       <button class="btn-gold btn-sm admin-only" id="find-links-btn-${tab}" onclick="findAllLinks('${tab}')" title="Auto-find links for all entries that don't have one (JW Pepper for octavos, Amazon for books)">${ICO.link} Find Links</button>
       <span style="flex:1"></span>
-      <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}')" id="export-btn-${tab}">${ICO.download} Export CSV</button>
-      <button class="btn-secondary btn-sm btn-icon" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
+      <button class="btn-secondary btn-sm admin-only" onclick="exportCSV('${tab}')" id="export-btn-${tab}">${ICO.download} Export CSV</button>
+      <button class="btn-secondary btn-sm btn-icon admin-only" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
       <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncSheets('${tab}')">${ICO.sync} Sync to Sheets</button>
     </div>
     <div class="bulk-bar" id="bulk-bar-${tab}">
@@ -1645,7 +1648,7 @@ function renderStats(tab){
   const copies=rows.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
   const composers=new Set(rows.map(e=>norm(e.composer||e.author)).filter(Boolean)).size;
   document.getElementById('stats-'+tab).innerHTML=`
-    <div class="stat-card"><div class="stat-value">${rows.length}</div><div class="stat-label">Titles</div></div>
+    <div class="stat-card stat-primary"><div class="stat-value">${rows.length}</div><div class="stat-label">Titles</div></div>
     <div class="stat-card"><div class="stat-value">${octavos}</div><div class="stat-label">Octavos</div></div>
     <div class="stat-card"><div class="stat-value">${books}</div><div class="stat-label">Books</div></div>
     <div class="stat-card"><div class="stat-value">${copies.toLocaleString()}</div><div class="stat-label">Total Copies</div></div>
@@ -1666,7 +1669,7 @@ function renderTable(tab){
   const checkTh=showChecks?`<th class="col-check" onclick="event.stopPropagation()"><input type="checkbox" class="row-check" ${allVisibleSelected?'checked':''} onchange="toggleSelectAll('${tab}',this.checked)" title="Select all shown"></th>`:'';
   table.querySelector('thead').innerHTML=`<tr>${checkTh}${cols.map(c=>c.key.startsWith('__')
     ?`<th style="cursor:default;">${c.label}</th>`
-    :`<th class="${c.key===sc?'sorted':''}" onclick="sortBy('${tab}','${c.key}')">${c.label}<span class="sort-icon">${c.key===sc?(dir===1?'↑':'↓'):'↕'}</span></th>`).join('')}<th style="cursor:default;text-align:right;">Actions</th></tr>`;
+    :`<th class="${c.key===sc?'sorted':''}" onclick="sortBy('${tab}','${c.key}')">${c.label}<span class="sort-icon">${c.key===sc?(dir===1?ICO.sortAsc:ICO.sortDesc):ICO.sortNone}</span></th>`).join('')}<th style="cursor:default;text-align:right;">Actions</th></tr>`;
 
   if(!sorted.length){
     const anyFilter=filters[tab].search||filters[tab].type||filters[tab].genre||filters[tab].voicing;
@@ -1678,7 +1681,7 @@ function renderTable(tab){
       :anyFilter
         ?{icon:emptyMusicSvg,title:'No matches',body:'Try adjusting your search or filters.'}
         :isPublicEmpty
-          ?{icon:emptyMusicSvg,title:'Welcome to Music Library',body:'Browse the catalog or use the Request button to ask about a piece.'}
+          ?{icon:emptyMusicSvg,title:'Welcome to Choral Catalog',body:'Browse the catalog or use the Request button to ask about a piece.'}
           :{icon:emptyMusicSvg,title:'No entries yet',body:isAdmin?'Use “Add to Library” above to add your first piece.':'Nothing here yet.'};
     table.querySelector('tbody').innerHTML=`<tr><td colspan=”${cols.length+2}”><div class=”empty-state”><div class=”empty-icon”>${msg.icon}</div><strong>${msg.title}</strong><p>${msg.body}</p></div></td></tr>`;
   } else {
@@ -1710,7 +1713,7 @@ function renderTable(tab){
         if(c.key==='_type') return `<td><span class="badge ${e._type}">${e._type==='octavo'?'Octavo':'Book'}</span></td>`;
         if(c.key==='title'){
           const tags=(Array.isArray(e.tags)&&e.tags.length)?`<div class="tag-chips">${e.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('')}</div>`:'';
-          const inner=e.link?`<a class="title-link" href="${escAttr(e.link)}" target="_blank" title="Open link">${esc(e.title||'(untitled)')}<span class="ext">↗</span></a>`:esc(e.title||'(untitled)');
+          const inner=e.link?`<a class="title-link" href="${escAttr(e.link)}" target="_blank" title="Open link">${esc(e.title||'(untitled)')}<span class="ext">${ICO.extLink}</span></a>`:esc(e.title||'(untitled)');
           return `<td class="cell-title">${inner}${tags}</td>`;
         }
         if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-fulfilled'}">${e.unavailable?'In Use':'Available'}</span></td>`;
@@ -1848,7 +1851,7 @@ async function testEmail(){
 function gotoWizardStep(n){
   [1,2,3].forEach(i=>{document.getElementById(`wstep-${i}`).className='wizard-step'+(i<n?' done':i===n?' active':'');const p=document.getElementById(`wpage-${i}`);if(p)p.className='wizard-page'+(i===n?' active':'');});
   if(n===3){const cv=document.getElementById('google-connected-view'),dv=document.getElementById('google-connect-view');
-    if(authStatus.authenticated){cv.style.display='';dv.style.display='none';document.getElementById('sheet-link-line').innerHTML=authStatus.spreadsheetId?`<a href="https://docs.google.com/spreadsheets/d/${authStatus.spreadsheetId}" target="_blank">View Sheet Music Library →</a>`:'Ready to sync.';}
+    if(authStatus.authenticated){cv.style.display='';dv.style.display='none';document.getElementById('sheet-link-line').innerHTML=authStatus.spreadsheetId?`<a href="https://docs.google.com/spreadsheets/d/${authStatus.spreadsheetId}" target="_blank">View Sheet Choral Catalog →</a>`:'Ready to sync.';}
     else{cv.style.display='none';dv.style.display='';}
   }
 }
