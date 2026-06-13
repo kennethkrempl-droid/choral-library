@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Choral Catalog — Sheet Music Catalog</title>
+<title>Choral Catalog</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -77,8 +77,7 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 
 /* ── Stats ── */
 .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:18px; }
-.stat-card { background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--line); border-radius:var(--r); padding:12px 16px; box-shadow:var(--shadow); }
-.stat-card.stat-primary { border-left-color:var(--accent); }
+.stat-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 16px; box-shadow:var(--shadow); }
 .stat-card.stat-primary .stat-value { font-size:30px; color:var(--accent); }
 .stat-value { font-family:var(--display); font-size:24px; font-weight:600; line-height:1.1; }
 .stat-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--faint); margin-top:3px; }
@@ -161,7 +160,7 @@ td.cell-title .ext { opacity:.5; margin-left:4px; display:inline-flex; align-ite
 .tag-chip { font-size:10px; font-weight:600; background:var(--gold-light); color:var(--gold); border:1px solid var(--gold-line); border-radius:20px; padding:0 7px; line-height:16px; }
 input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
 .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:var(--bg); border:1px solid var(--line); color:var(--muted); }
-.badge.octavo { background:#edd8dc; color:#5e1928; border-color:#c4929f; }
+.badge.octavo { background:#f5eaeb; color:#7a1e2e; border-color:#d4a0a8; }
 .badge.book { background:#eeecea; color:#5a5550; border-color:#d4d0c8; }
 .voicing-chip { display:inline-block; font-size:11px; font-weight:600; font-family:var(--font); background:var(--bg); border:1px solid var(--line); color:var(--muted); border-radius:5px; padding:1px 7px; letter-spacing:.3px; white-space:nowrap; }
 .row-actions { display:flex; gap:3px; align-items:center; justify-content:flex-end; }
@@ -184,6 +183,7 @@ input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--acc
 .status-badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
 .status-pending { background:var(--warning-light); color:var(--warning); border:1px solid var(--warning-line); }
 .status-fulfilled { background:var(--success-light); color:var(--success); border:1px solid var(--success-line); }
+.status-avail { background:var(--bg); color:var(--muted); border:1px solid var(--line); }
 .status-declined { background:var(--danger-light); color:var(--danger); border:1px solid var(--danger-line); }
 
 /* ── Modals ── */
@@ -1717,7 +1717,7 @@ function renderTable(tab){
           const inner=e.link?`<a class="title-link" href="${escAttr(e.link)}" target="_blank" title="Open link">${esc(e.title||'(untitled)')}<span class="ext">${ICO.extLink}</span></a>`:esc(e.title||'(untitled)');
           return `<td class="cell-title">${inner}${tags}</td>`;
         }
-        if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-fulfilled'}">${e.unavailable?'In Use':'Available'}</span></td>`;
+        if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-avail'}">${e.unavailable?'In Use':'Available'}</span></td>`;
         if(c.key==='voicing') return `<td>${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='genre') return `<td style="white-space:nowrap">${esc(e.genre||'')||'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='composer'){const v=esc(e.composer||e.author||'');return `<td>${v||'<span class="text-muted">—</span>'}</td>`;}
