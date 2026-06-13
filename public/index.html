@@ -129,6 +129,7 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 .filter-select:focus { border-color:var(--accent); }
 .filter-select.active-filter { border-color:var(--accent-line); background-color:var(--accent-light); color:var(--accent); font-weight:500; }
 button.active-filter { background:var(--accent); color:#fff; border-color:var(--accent); }
+tr.dup-group-sep td { padding:0; height:10px; background:var(--bg); border-top:2px solid var(--line); }
 .clear-filters { display:none; }
 .clear-filters.visible { display:inline-flex; }
 
@@ -1379,6 +1380,8 @@ function toggleFindDuplicates(tab){
   showDupsOnly[tab]=!showDupsOnly[tab];
   const btn=document.getElementById('find-dups-btn-'+tab);
   if(btn)btn.classList.toggle('active-filter',showDupsOnly[tab]);
+  // Sort by title when active so duplicates sit next to each other
+  if(showDupsOnly[tab]) sortState[tab]={col:'title',dir:1};
   renderTable(tab);
 }
 function getFiltered(tab){
@@ -1494,8 +1497,29 @@ function renderTable(tab){
         :{icon:'𝄞',title:'No entries yet',body:isAdmin?'Use “Add to Library” above to add your first piece.':'Nothing here yet.'};
     table.querySelector('tbody').innerHTML=`<tr><td colspan=”${cols.length+2}”><div class=”empty-state”><div class=”empty-icon”>${msg.icon}</div><strong>${msg.title}</strong><p>${msg.body}</p></div></td></tr>`;
   } else {
-    table.querySelector('tbody').innerHTML=sorted.map(e=>{
+    // When Find Duplicates is on, compute group membership for visual separators
+    let dupGroups=null;
+    if(showDupsOnly[tab]){
+      const groups=new Map(); // id -> groupId
+      let gid=0;
+      for(let i=0;i<sorted.length;i++){
+        const ti=norm(sorted[i].title);
+        for(let j=i+1;j<sorted.length;j++){
+          const tj=norm(sorted[j].title);
+          if(ti===tj||fuzzyTitleMatch(ti,tj)){
+            const gi=groups.get(sorted[i]._id)??null,gj=groups.get(sorted[j]._id)??null;
+            const g=gi??gj??gid++;
+            groups.set(sorted[i]._id,g);groups.set(sorted[j]._id,g);
+          }
+        }
+      }
+      dupGroups=groups;
+    }
+    table.querySelector('tbody').innerHTML=sorted.map((e,idx)=>{
       const srcTab=tab==='all'?(e.__src||'work'):tab;
+      // Insert a thin separator row between different dup groups
+      const groupChanged=dupGroups&&idx>0&&dupGroups.get(e._id)!==dupGroups.get(sorted[idx-1]._id);
+      const sep=groupChanged?`<tr class="dup-group-sep"><td colspan="${cols.length+2}"></td></tr>`:'';
       const checkTd=showChecks?`<td class="col-check"><input type="checkbox" class="row-check" ${selected[tab].has(e._id)?'checked':''} onchange="toggleSelect('${tab}',${e._id},this.checked)"></td>`:'';
       const cells=cols.map(c=>{
         if(c.key==='_type') return `<td><span class="badge ${e._type}">${e._type==='octavo'?'Octavo':'Book'}</span></td>`;
@@ -1518,7 +1542,7 @@ function renderTable(tab){
         return `<td>${esc(e[c.key]||'')||'<span class="text-muted">—</span>'}</td>`;
       }).join('');
       const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="${e.unavailable?'Marked IN USE — click to mark available':'Available — click to mark in use'}" onclick="toggleAvail('${srcTab}',${e._id})">${e.unavailable?'🚫':'✅'}</button><button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${srcTab}',${e._id})">✏️</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${srcTab}',${e._id})" style="color:var(--danger)">🗑</button>`:'';
-      return `<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request" onclick="openRequestModal('${srcTab}',${e._id})">📬 Request</button>${adminActions}</div></td></tr>`;
+      return sep+`<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request" onclick="openRequestModal('${srcTab}',${e._id})">📬 Request</button>${adminActions}</div></td></tr>`;
     }).join('');
   }
   const visCopies=sorted.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
