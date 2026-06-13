@@ -863,16 +863,16 @@ function personKey(s){const n=norm(s);if(!n)return '';const parts=n.split(' ');r
 
 function editDist(a,b){
   if(!a.length)return b.length; if(!b.length)return a.length;
-  const prev=Array.from({length:b.length+1},(_,i)=>i);
+  let row=Array.from({length:b.length+1},(_,j)=>j);
   for(let i=1;i<=a.length;i++){
-    let cur=i;
+    let diag=row[0]; row[0]=i;
     for(let j=1;j<=b.length;j++){
-      const t=a[i-1]===b[j-1]?prev[j-1]:1+Math.min(prev[j],cur,prev[j-1]);
-      cur=t; if(j<b.length)prev[j]=cur; else prev[j]=t;
+      const save=row[j];
+      row[j]=a[i-1]===b[j-1]?diag:1+Math.min(row[j],row[j-1],diag);
+      diag=save;
     }
-    prev[0]=i;
   }
-  return prev[b.length];
+  return row[b.length];
 }
 function fuzzyTitleMatch(a,b){
   if(!a||!b)return false;
