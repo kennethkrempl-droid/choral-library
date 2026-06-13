@@ -717,6 +717,8 @@ function buildPanel(tab){
       <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"></select>
       <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">✕ Clear</button>
       <button class="btn-secondary btn-sm" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">🔍 Find Duplicates</button>
+      <button class="btn-gold btn-sm admin-only" id="suggest-genre-lib-btn-${tab}" onclick="suggestGenresForLib('${tab}')" title="AI-suggest genres for entries that don't have one">✨ Suggest Genres</button>
+      <button class="btn-gold btn-sm admin-only" id="find-links-btn-${tab}" onclick="findAllLinks('${tab}')" title="Auto-find links for all entries that don't have one (JW Pepper for octavos, Amazon for books)">🔗 Find Links</button>
       <span style="flex:1"></span>
       <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}')" id="export-btn-${tab}">⬇ Export CSV</button>
       <button class="btn-secondary btn-sm" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">📊</button>
@@ -1012,6 +1014,159 @@ function applyPepper(i,voicing){
   toast('Filled in from JW Pepper!','success');
 }
 function closePepperModal(){document.getElementById('pepper-modal').classList.remove('open');}
+
+// ── Pepper / genre lookup for library entries ─────────────────────────────
+let pepperLibTarget=null; // {tab,id} when doing a library entry lookup
+
+async function pepperLookupEntry(tab,id){
+  const entry=data[tab].find(e=>e._id===id);
+  if(!entry)return;
+  // Books: generate an Amazon search link and save directly
+  if(entry._type==='book'){
+    const q=encodeURIComponent([entry.title,entry.author].filter(Boolean).join(' '));
+    const url=`https://www.amazon.com/s?k=${q}`;
+    const updated={...entry,link:url};
+    try{
+      const r=await fetch(`/api/entries/${tab}/${id}`,adminFetchOpts(updated,'PUT'));
+      if(!r.ok)throw new Error((await r.json()).error||'Update failed');
+      const j=await r.json();
+      const idx=data[tab].findIndex(e=>e._id===id);
+      if(idx>-1)data[tab][idx]=j.entry;
+      renderTable(tab);
+      toast(`Amazon search link set — <a href="${url}" target="_blank" style="color:inherit;text-decoration:underline;">open it</a> to find the exact page`,'success',6000);
+    }catch(e){toast('Update failed: '+e.message,'error');}
+    return;
+  }
+  // Octavos: open JW Pepper modal
+  pepperLibTarget={tab,id};
+  pepperTarget='__lib__';
+  const body=document.getElementById('pepper-modal-body');
+  body.innerHTML='<p style="text-align:center;padding:24px;color:var(--muted);"><span class="spinner" style="width:18px;height:18px;"></span><br><br>Searching JW Pepper…</p>';
+  document.getElementById('pepper-modal').classList.add('open');
+  const title=entry.title||'';
+  const composer=entry.composer||entry.author||'';
+  try{
+    const r=await fetch(`/api/pepper-lookup?title=${encodeURIComponent(title)}&composer=${encodeURIComponent(composer)}`);
+    const j=await r.json();
+    if(!r.ok){body.innerHTML=`<div class="empty-state" style="padding:24px;"><div class="empty-icon">🔎</div><strong>No results</strong><p>${esc(j.error||'Nothing found.')}</p></div>`;return;}
+    window._pepperResults=j.results;
+    body.innerHTML=j.results.map((p,i)=>`
+      <div class="pepper-result">
+        ${p.image?`<img class="pepper-cover" src="${escAttr(p.image)}" alt="" loading="lazy" onerror="this.outerHTML='&lt;div class=&quot;pepper-cover placeholder&quot;&gt;♪&lt;/div&gt;'">`:`<div class="pepper-cover placeholder">♪</div>`}
+        <div class="pepper-main">
+          <div class="pepper-title">${esc(p.title)}</div>
+          <div class="pepper-meta">${esc([p.composer,p.publisher].filter(Boolean).join(' · '))||'&nbsp;'}</div>
+          ${p.description?`<div class="pepper-desc">${esc(p.description)}</div>`:''}
+          <div class="pepper-voicings">
+            ${p.voicings.length?p.voicings.map(v=>`<button type="button" class="btn-primary btn-sm" onclick="applyPepperToEntry(${i},'${escAttr(v)}')">Use ${esc(v)}</button>`).join(''):`<button type="button" class="btn-primary btn-sm" onclick="applyPepperToEntry(${i},'')">Use This</button>`}
+            <a class="btn-ghost btn-sm" href="${escAttr(p.url)}" target="_blank" style="display:inline-flex;align-items:center;">View ↗</a>
+          </div>
+        </div>
+      </div>`).join('');
+  }catch(e){body.innerHTML=`<div class="empty-state" style="padding:24px;"><strong>Lookup failed</strong><p>${esc(e.message)}</p></div>`;}
+}
+
+async function applyPepperToEntry(i,voicing){
+  if(!pepperLibTarget)return;
+  const{tab,id}=pepperLibTarget;
+  const entry=data[tab].find(e=>e._id===id);
+  if(!entry)return;
+  const p=window._pepperResults[i];
+  const updated={...entry};
+  if(p.title)updated.title=p.title;
+  if(p.composer)updated.composer=p.composer;
+  if(voicing)updated.voicing=VOICINGS.find(x=>x.toUpperCase()===voicing.toUpperCase())||voicing;
+  if(p.url)updated.link=p.url;
+  closePepperModal();pepperLibTarget=null;
+  try{
+    const r=await fetch(`/api/entries/${tab}/${id}`,adminFetchOpts(updated,'PUT'));
+    if(!r.ok)throw new Error((await r.json()).error||'Update failed');
+    const j=await r.json();
+    const idx=data[tab].findIndex(e=>e._id===id);
+    if(idx>-1)data[tab][idx]=j.entry;
+    renderTable(tab);
+    toast('Updated from JW Pepper!','success');
+  }catch(e){toast('Update failed: '+e.message,'error');}
+}
+
+async function suggestGenresForLib(tab){
+  const targets=data[tab].filter(e=>!e.genre&&e.title);
+  if(!targets.length){toast('Every entry already has a genre','info');return;}
+  if(cfgInfo&&!cfgInfo.geminiKeySet){toast('Set up your free scanning key first (Settings tab)','error');return;}
+  const btn=document.getElementById('suggest-genre-lib-btn-'+tab);
+  btn.disabled=true;const orig=btn.innerHTML;
+  let filled=0;
+  try{
+    for(let o=0;o<targets.length;o+=50){
+      const chunk=targets.slice(o,o+50);
+      btn.innerHTML=`<span class="spinner"></span> ${Math.min(o+50,targets.length)}/${targets.length}…`;
+      let r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:chunk.map(e=>({title:e.title,composer:e.composer||e.author||''}))}));
+      if(r.status===429){btn.innerHTML='rate limit — waiting 30s…';await new Promise(x=>setTimeout(x,30000));r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:chunk.map(e=>({title:e.title,composer:e.composer||e.author||''}))}));}
+      const j=await r.json();
+      if(!r.ok)throw new Error(j.error||'failed');
+      for(let k=0;k<chunk.length;k++){
+        if(j.genres[k]&&!chunk[k].genre){
+          const updated={...chunk[k],genre:j.genres[k]};
+          try{
+            const pr=await fetch(`/api/entries/${tab}/${chunk[k]._id}`,adminFetchOpts(updated,'PUT'));
+            if(pr.ok){const pj=await pr.json();const idx=data[tab].findIndex(e=>e._id===chunk[k]._id);if(idx>-1)data[tab][idx]=pj.entry;filled++;}
+          }catch{}
+        }
+      }
+    }
+    renderTable(tab);
+    toast(`Suggested genres for ${filled} entries — glance over them`,'success',5000);
+  }catch(e){toast('Genre suggestion stopped: '+e.message,'error');}
+  finally{btn.disabled=false;btn.innerHTML=orig;}
+}
+
+async function findAllLinks(tab){
+  const targets=data[tab].filter(e=>!e.link&&e.title);
+  if(!targets.length){toast('All entries already have links','info');return;}
+  const btn=document.getElementById('find-links-btn-'+tab);
+  btn.disabled=true;const orig=btn.innerHTML;
+  const books=targets.filter(e=>e._type==='book');
+  const octavos=targets.filter(e=>e._type==='octavo');
+  let filled=0,notFound=0,total=targets.length;
+
+  async function saveLink(entry,url){
+    const updated={...entry,link:url};
+    const r=await fetch(`/api/entries/${tab}/${entry._id}`,adminFetchOpts(updated,'PUT'));
+    if(r.ok){const j=await r.json();const idx=data[tab].findIndex(e=>e._id===entry._id);if(idx>-1)data[tab][idx]=j.entry;filled++;}
+    else notFound++;
+  }
+
+  // Books: Amazon search URL — instant, no API call needed
+  for(const entry of books){
+    btn.innerHTML=`<span class="spinner"></span> ${filled+notFound+1}/${total}…`;
+    const q=encodeURIComponent([entry.title,entry.author].filter(Boolean).join(' '));
+    await saveLink(entry,`https://www.amazon.com/s?k=${q}`);
+  }
+
+  // Octavos: JW Pepper lookup — auto-pick best result
+  for(const entry of octavos){
+    btn.innerHTML=`<span class="spinner"></span> ${filled+notFound+1}/${total}…`;
+    try{
+      const r=await fetch(`/api/pepper-lookup?title=${encodeURIComponent(entry.title)}&composer=${encodeURIComponent(entry.composer||'')}`);
+      if(r.ok){
+        const j=await r.json();
+        if(j.results&&j.results.length){
+          // Pick result with closest title match
+          const nt=norm(entry.title);
+          const best=j.results.reduce((a,b)=>editDist(norm(a.title),nt)<=editDist(norm(b.title),nt)?a:b);
+          await saveLink(entry,best.url);
+        } else notFound++;
+      } else notFound++;
+    }catch{notFound++;}
+    // Brief pause to avoid hammering JW Pepper
+    await new Promise(x=>setTimeout(x,300));
+  }
+
+  renderTable(tab);
+  btn.disabled=false;btn.innerHTML=orig;
+  const msg=`Found links for ${filled} entr${filled===1?'y':'ies'}${notFound?` · ${notFound} not found`:''}`;
+  toast(msg,'success',6000);
+}
 
 // ── Scanner ───────────────────────────────────────────────────────────────
 function openScanner(prefix){
@@ -1541,7 +1696,7 @@ function renderTable(tab){
         }
         return `<td>${esc(e[c.key]||'')||'<span class="text-muted">—</span>'}</td>`;
       }).join('');
-      const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="${e.unavailable?'Marked IN USE — click to mark available':'Available — click to mark in use'}" onclick="toggleAvail('${srcTab}',${e._id})">${e.unavailable?'🚫':'✅'}</button><button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${srcTab}',${e._id})">✏️</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${srcTab}',${e._id})" style="color:var(--danger)">🗑</button>`:'';
+      const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="Find link (JW Pepper / Amazon)" onclick="pepperLookupEntry('${srcTab}',${e._id})">🔎</button><button class="btn-ghost btn-icon btn-sm" title="${e.unavailable?'Marked IN USE — click to mark available':'Available — click to mark in use'}" onclick="toggleAvail('${srcTab}',${e._id})">${e.unavailable?'🚫':'✅'}</button><button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${srcTab}',${e._id})">✏️</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${srcTab}',${e._id})" style="color:var(--danger)">🗑</button>`:'';
       return sep+`<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request" onclick="openRequestModal('${srcTab}',${e._id})">📬 Request</button>${adminActions}</div></td></tr>`;
     }).join('');
   }
