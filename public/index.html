@@ -632,6 +632,17 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
   </div>
 </div>
 
+<div class="modal-overlay" id="merge-modal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header"><h2>Merge Two Entries</h2><button class="btn-ghost btn-icon" onclick="closeMergeModal()">✕</button></div>
+    <div class="modal-body" id="merge-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeMergeModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmMerge()">Merge →</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 
 <script>
@@ -639,6 +650,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 let data        = { work:[], personal:[] };
 let entryTypes  = { work:'octavo', personal:'octavo' };
 let filters     = { work:{search:'',type:'',genre:'',voicing:''}, personal:{search:'',type:'',genre:'',voicing:''}, all:{search:'',type:'',genre:'',voicing:''} };
+let showDupsOnly = { work:false, personal:false, all:false };
 let sortState   = { work:{col:null,dir:1}, personal:{col:null,dir:1}, all:{col:null,dir:1} };
 let selected    = { work:new Set(), personal:new Set(), all:new Set() };
 
@@ -702,6 +714,7 @@ function buildPanel(tab){
       <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"></select>
       <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"></select>
       <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">✕ Clear</button>
+      <button class="btn-secondary btn-sm" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">🔍 Find Duplicates</button>
       <span style="flex:1"></span>
       <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}')" id="export-btn-${tab}">⬇ Export CSV</button>
       <button class="btn-secondary btn-sm" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">📊</button>
@@ -715,6 +728,7 @@ function buildPanel(tab){
       <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',true)">🚫 Mark In Use</button>
       <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',false)">✅ Mark Available</button>
       <button class="btn-danger btn-sm" onclick="openBulkDelete('${tab}')">🗑 Delete</button>
+      <button class="btn-primary btn-sm" id="bulk-merge-btn-${tab}" style="display:none;" onclick="openMergeModal('${tab}')">⊕ Merge 2</button>
       <span style="flex:1"></span>
       <button class="btn-ghost btn-sm" onclick="clearSelection('${tab}')">Deselect All</button>
     </div>
@@ -1123,6 +1137,85 @@ async function confirmBulkTag(){
 }
 function closeBulkTagModal(){document.getElementById('bulk-tag-modal').classList.remove('open');bulkTagTarget=null;}
 
+// ── Merge two entries ─────────────────────────────────────────────────────
+let mergeState=null;
+function openMergeModal(tab){
+  const ids=[...selected[tab]];
+  if(ids.length!==2)return;
+  const [a,b]=[...data[tab]].find(e=>e._id===ids[0]),[...data[tab]].find(e=>e._id===ids[1]);
+  if(!a||!b)return;
+  mergeState={tab,a,b};
+  const fields=[
+    {key:'title',label:'Title'},
+    {key:'composer',label:'Composer / Author'},
+    {key:'voicing',label:'Voicing'},
+    {key:'genre',label:'Genre'},
+    {key:'copies',label:'Copies',hint:'Values will be added together'},
+    {key:'lastPerformed',label:'Last Performed'},
+    {key:'link',label:'Link'},
+    {key:'description',label:'Description'},
+  ];
+  const row=(label,va,vb,key)=>{
+    const same=String(va||'')===String(vb||'');
+    const aActive=va&&!vb||same;
+    return `<tr style="border-bottom:1px solid var(--line);">
+      <td style="padding:8px 10px;font-size:12px;color:var(--muted);white-space:nowrap;font-weight:600;">${label}</td>
+      <td style="padding:6px 8px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="radio" name="mf_${key}" value="a" ${aActive?'checked':''} style="accent-color:var(--accent);">
+          <span style="${!va?'color:var(--muted);font-style:italic;':''}">${va?esc(va):'(empty)'}</span>
+        </label>
+      </td>
+      <td style="padding:6px 8px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="radio" name="mf_${key}" value="b" ${!aActive&&vb?'checked':''} style="accent-color:var(--accent);">
+          <span style="${!vb?'color:var(--muted);font-style:italic;':''}">${vb?esc(vb):'(empty)'}</span>
+        </label>
+      </td>
+    </tr>`;
+  };
+  document.getElementById('merge-modal-body').innerHTML=`
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Pick which value to keep for each field. The winning entry is kept and updated; the other is deleted. Copies are always added together.</p>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="padding:6px 10px;font-size:11px;text-transform:uppercase;color:var(--muted);text-align:left;"></th>
+        <th style="padding:6px 8px;font-size:12px;font-weight:600;color:var(--accent);text-align:left;">Entry A</th>
+        <th style="padding:6px 8px;font-size:12px;font-weight:600;color:var(--accent);text-align:left;">Entry B</th>
+      </tr></thead>
+      <tbody>
+        ${fields.map(f=>row(f.label+(f.hint?`<br><span style="font-weight:400;font-size:10px;">${f.hint}</span>`:''),a[f.key]||'',b[f.key]||'',f.key)).join('')}
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:var(--muted);margin-top:10px;">Entry not picked will be <strong>permanently deleted</strong>.</p>`;
+  document.getElementById('merge-modal').classList.add('open');
+}
+function closeMergeModal(){document.getElementById('merge-modal').classList.remove('open');mergeState=null;}
+async function confirmMerge(){
+  if(!mergeState)return;
+  const{tab,a,b}=mergeState;
+  const merged={...(document.querySelector('input[name="mf_title"]:checked')?.value==='b'?b:a)};
+  const fields=['title','composer','voicing','genre','lastPerformed','link','description'];
+  fields.forEach(k=>{
+    const v=document.querySelector(`input[name="mf_${k}"]:checked`)?.value;
+    merged[k]=v==='b'?b[k]:a[k];
+  });
+  merged.copies=String((parseInt(a.copies)||0)+(parseInt(b.copies)||0));
+  const keepEntry=document.querySelector('input[name="mf_title"]:checked')?.value==='b'?b:a;
+  const dropEntry=keepEntry===a?b:a;
+  try{
+    const r=await fetch(`/api/entries/${tab}/${keepEntry._id}`,adminFetchOpts(merged,'PUT'));
+    if(!r.ok)throw new Error((await r.json()).error||'Update failed');
+    const j=await r.json();
+    const ki=data[tab].findIndex(e=>e._id===keepEntry._id);
+    if(ki>-1)data[tab][ki]=j.entry;
+    await fetch(`/api/entries/${tab}/${dropEntry._id}`,adminFetchOpts({},'DELETE'));
+    data[tab]=data[tab].filter(e=>e._id!==dropEntry._id);
+    selected[tab].delete(dropEntry._id);selected[tab].delete(keepEntry._id);
+    renderAll();closeMergeModal();
+    toast(`Merged into "${merged.title}" (${merged.copies} copies)`,'success',4000);
+  }catch(e){toast('Merge failed: '+e.message,'error');}
+}
+
 // ── Availability ──────────────────────────────────────────────────────────
 async function toggleAvail(tab,id){
   const e=data[tab].find(x=>x._id===id);if(!e)return;
@@ -1155,6 +1248,8 @@ function updateBulkBar(tab){
   const n=selected[tab].size;
   document.getElementById('bulk-bar-'+tab).classList.toggle('visible',n>0&&isAdmin);
   document.getElementById('bulk-count-'+tab).textContent=n+' selected';
+  const mergeBtn=document.getElementById('bulk-merge-btn-'+tab);
+  if(mergeBtn)mergeBtn.style.display=n===2?'':'none';
 }
 
 // ── Request system ────────────────────────────────────────────────────────
@@ -1266,9 +1361,29 @@ async function deleteRequest(id) {
 }
 
 // ── Filtering / sorting ───────────────────────────────────────────────────
+function getLibraryDupIds(tab){
+  const entries=rowsFor(tab);
+  const dupIds=new Set();
+  for(let i=0;i<entries.length;i++){
+    const ti=norm(entries[i].title);
+    for(let j=i+1;j<entries.length;j++){
+      const tj=norm(entries[j].title);
+      if(ti===tj||fuzzyTitleMatch(ti,tj)){dupIds.add(entries[i]._id);dupIds.add(entries[j]._id);}
+    }
+  }
+  return dupIds;
+}
+function toggleFindDuplicates(tab){
+  showDupsOnly[tab]=!showDupsOnly[tab];
+  const btn=document.getElementById('find-dups-btn-'+tab);
+  if(btn)btn.classList.toggle('active-filter',showDupsOnly[tab]);
+  renderTable(tab);
+}
 function getFiltered(tab){
   const f=filters[tab];
+  const dupIds=showDupsOnly[tab]?getLibraryDupIds(tab):null;
   return rowsFor(tab).filter(e=>{
+    if(dupIds&&!dupIds.has(e._id))return false;
     if(f.type&&e._type!==f.type)return false;
     if(f.genre&&e.genre!==f.genre)return false;
     if(f.voicing&&e.voicing!==f.voicing)return false;
@@ -1297,7 +1412,10 @@ function setFilter(tab,key,val){filters[tab][key]=val;renderTable(tab);}
 function filterTable(tab,v){filters[tab].search=v;renderTable(tab);}
 function clearFilters(tab){
   filters[tab]={search:'',type:'',genre:'',voicing:''};
+  showDupsOnly[tab]=false;
   document.getElementById('search-'+tab).value='';
+  const btn=document.getElementById('find-dups-btn-'+tab);
+  if(btn)btn.classList.remove('active-filter');
   renderTable(tab);
 }
 
