@@ -1654,7 +1654,7 @@ function renderStats(tab){
     <div class="stat-card"><div class="stat-value">${books}</div><div class="stat-label">Books</div></div>
     <div class="stat-card"><div class="stat-value">${copies.toLocaleString()}</div><div class="stat-label">Total Copies</div></div>
     <div class="stat-card"><div class="stat-value">${composers}</div><div class="stat-label">Composers</div></div>`;
-  document.getElementById('count-'+tab).textContent=rows.length;
+  const countEl=document.getElementById('count-'+tab); if(countEl) countEl.textContent=rows.length;
 }
 
 function renderTable(tab){
