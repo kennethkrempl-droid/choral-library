@@ -861,6 +861,27 @@ function setEntryType(tab,type,btn){entryTypes[tab]=type;btn.closest('.entry-typ
 function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim().replace(/^(the|a|an)\s+/,'');}
 function personKey(s){const n=norm(s);if(!n)return '';const parts=n.split(' ');return parts[parts.length-1];}
 
+function editDist(a,b){
+  if(!a.length)return b.length; if(!b.length)return a.length;
+  const prev=Array.from({length:b.length+1},(_,i)=>i);
+  for(let i=1;i<=a.length;i++){
+    let cur=i;
+    for(let j=1;j<=b.length;j++){
+      const t=a[i-1]===b[j-1]?prev[j-1]:1+Math.min(prev[j],cur,prev[j-1]);
+      cur=t; if(j<b.length)prev[j]=cur; else prev[j]=t;
+    }
+    prev[0]=i;
+  }
+  return prev[b.length];
+}
+function fuzzyTitleMatch(a,b){
+  if(!a||!b)return false;
+  if(a===b)return true;
+  if(a.includes(b)||b.includes(a))return true;
+  const maxLen=Math.max(a.length,b.length);
+  return maxLen>=4 && editDist(a,b)/maxLen<=0.2;
+}
+
 function findDuplicates(title,person,excludeId){
   const t=norm(title); if(!t) return [];
   const p=personKey(person);
@@ -868,9 +889,12 @@ function findDuplicates(title,person,excludeId){
   for(const tab of ['work','personal']){
     for(const e of data[tab]){
       if(excludeId&&e._id===excludeId) continue;
-      if(norm(e.title)!==t) continue;
+      const et=norm(e.title);
+      const exact=et===t;
+      const fuzzy=!exact&&fuzzyTitleMatch(t,et);
+      if(!exact&&!fuzzy) continue;
       const ep=personKey(e.composer||e.author);
-      if(!p||!ep||p===ep) out.push({tab,entry:e});
+      if(!p||!ep||p===ep) out.push({tab,entry:e,fuzzy});
     }
   }
   return out;
@@ -1616,11 +1640,16 @@ function renderImportRows(){
     const vExtra=(r.voicing&&!VOICINGS.includes(r.voicing))?`<option selected>${escAttr(r.voicing)}</option>`:'';
     const gOpts=GENRES.map(g=>`<option${r.genre===g?' selected':''}>${g}</option>`).join('');
     const countMismatch=dups.length&&String(dups[0].entry.copies||'')!==String(r.copies||'');
+    const isFuzzy=dups.length&&dups[0].fuzzy;
     const dupTitle=countMismatch
-      ?`Duplicate — count differs: library has ${dups[0].entry.copies||'?'}, importing ${r.copies||'?'}`
-      :dups.length?'Looks like a duplicate of an existing entry':'';
+      ?`${isFuzzy?'Close match':'Duplicate'} — count differs: library has ${dups[0].entry.copies||'?'}, importing ${r.copies||'?'}`
+      :isFuzzy?'Possible duplicate (close spelling match)'
+      :dups.length?'Duplicate already in your library':'';
+    const matchInfo=dups.length?`<div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4;">
+      ${isFuzzy?'~':'='} <em>${esc(dups[0].entry.title)}</em>${dups[0].entry.composer||dups[0].entry.author?' · '+esc(dups[0].entry.composer||dups[0].entry.author):''}${dups[0].entry.voicing?' · '+esc(dups[0].entry.voicing):''} · ${dups[0].entry.copies||'?'} copies · ${cap(dups[0].tab)}${dups.length>1?` <span style="opacity:.7;">+${dups.length-1} more</span>`:''}
+    </div>`:'';
     return `<tr>
-      <td style="min-width:200px;">${dups.length?`<span title="${dupTitle}" style="cursor:help;">${countMismatch?'🔢':'⚠️'} </span>`:''}<input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.title)}" oninput="importRows[${i}].title=this.value"></td>
+      <td style="min-width:200px;">${dups.length?`<span title="${dupTitle}" style="cursor:help;">${countMismatch?'🔢':isFuzzy?'〜':'⚠️'} </span>`:''}<input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.title)}" oninput="importRows[${i}].title=this.value">${matchInfo}</td>
       <td style="min-width:160px;"><input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.composer)}" oninput="importRows[${i}].composer=this.value"></td>
       <td><select class="filter-select" onchange="importRows[${i}].voicing=this.value"><option value="">—</option>${vOpts}${vExtra}</select></td>
       <td><select class="filter-select" onchange="importRows[${i}].genre=this.value"><option value="">—</option>${gOpts}</select></td>
@@ -1628,9 +1657,11 @@ function renderImportRows(){
       <td style="white-space:nowrap;">${r.link?`<a href="${escAttr(r.link)}" target="_blank" title="JW Pepper link found" style="font-size:12px;">🔗↗</a>`:'<span class="text-muted" style="font-size:11px;" title="No confident JW Pepper match — you can add a link later by editing the entry">—</span>'}<button class="btn-ghost btn-icon btn-sm" title="Remove" onclick="importRows.splice(${i},1);renderImportRows()">✕</button></td>
     </tr>`;
   }).join('');
-  const dupCount=importRows.filter(r=>findDuplicates(r.title,r.composer).length).length;
-  const countMismatchTotal=importRows.filter(r=>{const d=findDuplicates(r.title,r.composer);return d.length&&String(d[0].entry.copies||'')!==String(r.copies||'');}).length;
-  document.getElementById('import-count').textContent=`${importRows.length} piece${importRows.length>1?'s':''} ready`+(dupCount?` · ⚠️ ${dupCount} duplicate${dupCount>1?'s':''}${countMismatchTotal?` (🔢 ${countMismatchTotal} with different counts)`:''}`:'');
+  const allDups=importRows.map(r=>findDuplicates(r.title,r.composer));
+  const dupCount=allDups.filter(d=>d.length).length;
+  const fuzzyCount=allDups.filter(d=>d.length&&d[0].fuzzy).length;
+  const countMismatchTotal=allDups.filter((d,i)=>d.length&&String(d[0].entry.copies||'')!==String(importRows[i].copies||'')).length;
+  document.getElementById('import-count').textContent=`${importRows.length} piece${importRows.length>1?'s':''} ready`+(dupCount?` · ${dupCount} duplicate${dupCount>1?'s':''}${fuzzyCount?` (〜${fuzzyCount} fuzzy)`:''}`+(countMismatchTotal?` · 🔢 ${countMismatchTotal} count diff${countMismatchTotal>1?'s':''}`:''): '');
 }
 
 function clearImportRows(){importRows=[];renderImportRows();document.getElementById('scan-queue').innerHTML='';document.getElementById('scan-status').textContent='';}
