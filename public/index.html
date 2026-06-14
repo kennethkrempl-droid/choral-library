@@ -306,6 +306,11 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.07); color:rgba(24
 .spinner { width:13px; height:13px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spin .6s linear infinite; display:inline-block; }
 @keyframes spin { to{transform:rotate(360deg)} }
 
+/* ── Source chips (Work / Personal in All Music tab) ── */
+.source-chip { display:inline-block; font-size:10.5px; font-weight:600; border-radius:20px; padding:2px 9px; white-space:nowrap; }
+.source-work { background:#edf0f8; color:#3a5a9e; border:1px solid #b8c4de; }
+.source-personal { background:#f3edf8; color:#6e3a9e; border:1px solid #cdb8de; }
+
 /* ── Footer ── */
 footer { padding:28px 28px 24px; border-top:1px solid var(--line); text-align:center; }
 .footer-inner { display:flex; flex-direction:column; align-items:center; gap:5px; }
@@ -347,6 +352,7 @@ footer { padding:28px 28px 24px; border-top:1px solid var(--line); text-align:ce
 
 <nav class="tabs-nav">
   <button class="tab-btn viewer-only" data-tab="all">Library</button>
+  <button class="tab-btn admin-only" data-tab="all">All Music <span class="tab-count" id="count-all">0</span></button>
   <button class="tab-btn active admin-only" data-tab="work">Work <span class="tab-count" id="count-work">0</span></button>
   <button class="tab-btn admin-only" data-tab="personal">Personal <span class="tab-count" id="count-personal">0</span></button>
   <button class="tab-btn admin-only" data-tab="import"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Import</button>
@@ -845,7 +851,8 @@ function applyAdminMode() {
   const active=document.querySelector('.tab-btn.active');
   if (isAdmin) {
     btn.className='btn-header btn-sm active'; btn.innerHTML=ICO.lock+' Librarian'; banner.classList.add('hidden');
-    if(active&&active.dataset.tab==='all') switchTab('work');
+    if(!active) switchTab('work');
+    else if(active.dataset.tab==='all') switchTab('all'); // re-highlight the admin-only 'all' button
   }
   else {
     btn.className='btn-header btn-sm'; btn.innerHTML=ICO.unlock+' Librarian Login'; banner.classList.remove('hidden');
@@ -888,6 +895,7 @@ async function saveAdminPassword() {
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+  if(name==='all') renderTable('all');
 }
 document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
 
@@ -1674,9 +1682,14 @@ function getColumns(tab){
   const t=filters[tab].type;
   let cols=t==='octavo'?OCTAVO_COLS:t==='book'?BOOK_COLS:MIXED_COLS;
   if(tab==='all'){
-    // visitor view: hide private "Last Performed", show Availability instead
-    cols=cols.map(c=>c.key==='lastPerformed'?{key:'__avail',label:'Availability'}:c);
-    if(!cols.some(c=>c.key==='__avail'))cols=[...cols,{key:'__avail',label:'Availability'}];
+    if(isAdmin){
+      // admin all-view: add a Library column showing Work / Personal source
+      cols=[...cols,{key:'__src',label:'Library'}];
+    } else {
+      // visitor view: hide private "Last Performed", show Availability instead
+      cols=cols.map(c=>c.key==='lastPerformed'?{key:'__avail',label:'Availability'}:c);
+      if(!cols.some(c=>c.key==='__avail'))cols=[...cols,{key:'__avail',label:'Availability'}];
+    }
   }
   return cols;
 }
@@ -1760,6 +1773,7 @@ function renderTable(tab){
           return `<td class="cell-title">${inner}${tags}</td>`;
         }
         if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-avail'}">${e.unavailable?'In Use':'Available'}</span></td>`;
+        if(c.key==='__src') return `<td><span class="source-chip source-${e.__src||'work'}">${cap(e.__src||'work')}</span></td>`;
         if(c.key==='voicing') return `<td>${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='genre') return `<td style="white-space:nowrap">${esc(e.genre||'')||'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='composer'){const v=esc(e.composer||e.author||'');return `<td>${v||'<span class="text-muted">—</span>'}</td>`;}
