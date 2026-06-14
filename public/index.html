@@ -792,12 +792,12 @@ function buildPanel(tab){
       <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"><option value="">All Genres</option></select>
       <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">${ICO.x} Clear</button>
       <button class="btn-secondary btn-sm admin-only" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">${ICO.search} Find Duplicates</button>
-      ${tab!=='all'?`<button class="btn-gold btn-sm admin-only" id="suggest-genre-lib-btn-${tab}" onclick="suggestGenresForLib('${tab}')" title="AI-suggest genres for entries that don't have one">${ICO.sparkles} Suggest Genres</button>`:''}
-      ${tab!=='all'?`<button class="btn-gold btn-sm admin-only" id="find-links-btn-${tab}" onclick="findAllLinks('${tab}')" title="Auto-find links for all entries that don't have one (JW Pepper for octavos, Amazon for books)">${ICO.link} Find Links</button>`:''}
+      <button class="btn-gold btn-sm admin-only" id="suggest-genre-lib-btn-${tab}" onclick="suggestGenresForLib('${tab}')" title="AI-suggest genres for entries that don't have one">${ICO.sparkles} Suggest Genres</button>
+      <button class="btn-gold btn-sm admin-only" id="find-links-btn-${tab}" onclick="findAllLinks('${tab}')" title="Auto-find links for all entries that don't have one (JW Pepper for octavos, Amazon for books)">${ICO.link} Find Links</button>
       <span style="flex:1"></span>
       <button class="btn-secondary btn-sm admin-only" onclick="exportCSV('${tab}')" id="export-btn-${tab}">${ICO.download} Export CSV</button>
       <button class="btn-secondary btn-sm btn-icon admin-only" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
-      ${tab!=='all'?`<button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncSheets('${tab}')">${ICO.sync} Sync to Sheets</button>`:''}
+      <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncSheets('${tab}')">${ICO.sync} Sync to Sheets</button>
     </div>
     <div class="bulk-bar" id="bulk-bar-${tab}">
       <span class="bulk-count" id="bulk-count-${tab}"></span>
@@ -1188,7 +1188,15 @@ async function applyPepperToEntry(i,voicing){
 }
 
 async function suggestGenresForLib(tab){
-  if(!data[tab]){toast('Switch to Work or Personal tab to use this','info');return;}
+  if(tab==='all'){
+    const btn=document.getElementById('suggest-genre-lib-btn-all');
+    const orig=btn?btn.innerHTML:'';
+    if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Suggesting…';}
+    await suggestGenresForLib('work');
+    await suggestGenresForLib('personal');
+    if(btn){btn.disabled=false;btn.innerHTML=orig;}
+    return;
+  }
   const targets=data[tab].filter(e=>!e.genre&&e.title);
   if(!targets.length){toast('Every entry already has a genre','info');return;}
   if(cfgInfo&&!cfgInfo.geminiKeySet){toast('Set up your free scanning key first (Settings tab)','error');return;}
@@ -1220,7 +1228,15 @@ async function suggestGenresForLib(tab){
 }
 
 async function findAllLinks(tab){
-  if(!data[tab]){toast('Switch to Work or Personal tab to use this','info');return;}
+  if(tab==='all'){
+    const btn=document.getElementById('find-links-btn-all');
+    const orig=btn?btn.innerHTML:'';
+    if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Searching…';}
+    await findAllLinks('work');
+    await findAllLinks('personal');
+    if(btn){btn.disabled=false;btn.innerHTML=orig;}
+    return;
+  }
   const targets=data[tab].filter(e=>!e.link&&e.title);
   if(!targets.length){toast('All entries already have links','info');return;}
   const btn=document.getElementById('find-links-btn-'+tab);
@@ -1862,7 +1878,15 @@ function showCSVImportTip(){document.getElementById('csv-tip-modal').classList.a
 
 // ── Google Sync ───────────────────────────────────────────────────────────
 async function syncSheets(tab){
-  if(!data[tab]){toast('Switch to Work or Personal tab to use this','info');return;}
+  if(tab==='all'){
+    const btn=document.getElementById('sync-all-btn');
+    const orig=btn?btn.innerHTML:'';
+    if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Syncing…';}
+    await syncSheets('work');
+    await syncSheets('personal');
+    if(btn){btn.disabled=false;btn.innerHTML=orig;}
+    return;
+  }
   if(!authStatus.authenticated){toast('Connect Google in Settings first','error');return;}
   const btn=document.getElementById(`sync-${tab}-btn`);btn.disabled=true;const orig=btn.innerHTML;btn.innerHTML='<span class="spinner"></span> Syncing…';
   try{
