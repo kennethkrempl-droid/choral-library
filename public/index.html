@@ -1785,6 +1785,8 @@ function renderTable(tab){
       for(let i=0;i<sorted.length;i++){
         const ti=norm(sorted[i].title);
         for(let j=i+1;j<sorted.length;j++){
+          // In the all-music tab, work and personal are intentionally separate — skip cross-library pairs
+          if(tab==='all'&&sorted[i].__src!==sorted[j].__src) continue;
           const tj=norm(sorted[j].title);
           if(ti===tj||fuzzyTitleMatch(ti,tj)){
             const gi=groups.get(sorted[i]._id)??null,gj=groups.get(sorted[j]._id)??null;
