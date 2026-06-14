@@ -77,7 +77,10 @@ button:disabled { opacity:.45; cursor:not-allowed; }
 
 /* ── Stats ── */
 .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:18px; }
-.stat-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 16px; box-shadow:var(--shadow); }
+.stat-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 16px; box-shadow:var(--shadow); cursor:pointer; transition:border-color .15s,box-shadow .15s; }
+.stat-card:hover { border-color:var(--accent-line); box-shadow:0 2px 10px rgba(124,45,62,.1); }
+.stat-card.active-filter { border-color:var(--accent); background:var(--accent-light); }
+.stat-card.active-filter .stat-label { color:var(--accent); }
 .stat-card.stat-primary .stat-value { font-size:30px; }
 .stat-value { font-family:var(--display); font-size:24px; font-weight:600; line-height:1.1; }
 .stat-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--faint); margin-top:3px; }
@@ -300,7 +303,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
   </div>
   <div class="header-actions">
     <span id="auth-pill" class="auth-pill disconnected admin-only"><span class="dot"></span>Google</span>
-    <button id="admin-btn" class="btn-header btn-sm" onclick="toggleAdmin()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Sign In</button>
+    <button id="admin-btn" class="btn-header btn-sm" onclick="toggleAdmin()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Librarian Login</button>
   </div>
 </header>
 
@@ -345,7 +348,7 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(24
 
   <div class="card" style="margin-bottom:18px;">
     <div class="card-header">
-      <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Scan Cover Photos</h3>
+      <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Photograph Covers</h3>
       <span id="scan-status" class="text-muted" style="font-size:12px;"></span>
     </div>
     <div class="card-body">
@@ -765,7 +768,7 @@ function buildPanel(tab){
       <span style="flex:1"></span>
       <button class="btn-ghost btn-sm" onclick="clearSelection('${tab}')">Deselect All</button>
     </div>
-    <div class="table-wrap"><table id="table-${tab}"><thead></thead><tbody></tbody></table></div>
+    <div class="table-wrap"><table id="table-${tab}"><thead></thead><tbody><tr><td colspan="10" style="text-align:center;padding:48px 24px;color:var(--faint);font-size:13px;">Loading catalog…</td></tr></tbody></table></div>
     <div class="table-footer" id="footer-${tab}"></div>
   </div>`;
 }
@@ -807,7 +810,7 @@ function applyAdminMode() {
     if(active&&active.dataset.tab==='all') switchTab('work');
   }
   else {
-    btn.className='btn-header btn-sm'; btn.innerHTML=ICO.unlock+' Sign In'; banner.classList.remove('hidden');
+    btn.className='btn-header btn-sm'; btn.innerHTML=ICO.unlock+' Librarian Login'; banner.classList.remove('hidden');
     if(!active||active.dataset.tab!=='all') switchTab('all');
     selected.work.clear(); selected.personal.clear();
   }
@@ -1457,7 +1460,7 @@ function openRequestModal(tab, id) {
       <div class="form-group"><label>Email</label><input type="email" id="req-email" placeholder="jane@school.edu"></div>
       <div class="form-group"><label>School / Organization</label><input type="text" id="req-school" placeholder="Lincoln Elementary"></div>
       <div class="form-group"><label>School District</label><input type="text" id="req-district" placeholder="Springfield USD"></div>
-      ${entry._type==='octavo'?`<div class="form-group"><label>Copies Needed</label><input type="number" id="req-copies" min="1" placeholder="e.g. 30"></div>`:''}
+      ${entry._type==='octavo'?`<div class="form-group"><label>Copies Needed</label><input type="number" id="req-copies" min="1" placeholder="How many copies?"></div>`:''}
       <div class="form-group full"><label>Message (optional)</label><textarea id="req-message" placeholder="Tell us about your ensemble, performance date, etc."></textarea></div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft);">
@@ -1648,12 +1651,13 @@ function renderStats(tab){
   const books=rows.filter(e=>e._type==='book').length;
   const copies=rows.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
   const composers=new Set(rows.map(e=>norm(e.composer||e.author)).filter(Boolean)).size;
+  const tf=filters[tab].type;
   document.getElementById('stats-'+tab).innerHTML=`
-    <div class="stat-card stat-primary"><div class="stat-value">${rows.length}</div><div class="stat-label">Titles</div></div>
-    <div class="stat-card"><div class="stat-value">${octavos}</div><div class="stat-label">Octavos</div></div>
-    <div class="stat-card"><div class="stat-value">${books}</div><div class="stat-label">Books</div></div>
-    <div class="stat-card"><div class="stat-value">${copies.toLocaleString()}</div><div class="stat-label">Total Copies</div></div>
-    <div class="stat-card"><div class="stat-value">${composers}</div><div class="stat-label">Composers</div></div>`;
+    <div class="stat-card stat-primary${tf===''?' active-filter':''}" onclick="setFilter('${tab}','type','');document.getElementById('ftype-${tab}').value=''" title="Show all types"><div class="stat-value">${rows.length}</div><div class="stat-label">Titles</div></div>
+    <div class="stat-card${tf==='octavo'?' active-filter':''}" onclick="setFilter('${tab}','type',tf==='octavo'?'':'octavo');document.getElementById('ftype-${tab}').value=tf==='octavo'?'':'octavo'" title="Filter by Octavo"><div class="stat-value">${octavos}</div><div class="stat-label">Octavos</div></div>
+    <div class="stat-card${tf==='book'?' active-filter':''}" onclick="setFilter('${tab}','type',tf==='book'?'':'book');document.getElementById('ftype-${tab}').value=tf==='book'?'':'book'" title="Filter by Book"><div class="stat-value">${books}</div><div class="stat-label">Books</div></div>
+    <div class="stat-card" title="Total copy count across all items"><div class="stat-value">${copies.toLocaleString()}</div><div class="stat-label">Total Copies</div></div>
+    <div class="stat-card" title="Unique composers and authors"><div class="stat-value">${composers}</div><div class="stat-label">Composers</div></div>`;
   const countEl=document.getElementById('count-'+tab); if(countEl) countEl.textContent=rows.length;
 }
 
@@ -1732,7 +1736,7 @@ function renderTable(tab){
         return `<td>${esc(e[c.key]||'')||'<span class="text-muted">—</span>'}</td>`;
       }).join('');
       const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="Find link (JW Pepper / Amazon)" onclick="pepperLookupEntry('${srcTab}',${e._id})">${ICO.search}</button><button class="btn-ghost btn-icon btn-sm" title="${e.unavailable?'Marked IN USE — click to mark available':'Available — click to mark in use'}" onclick="toggleAvail('${srcTab}',${e._id})">${e.unavailable?ICO.ban:ICO.check}</button><button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${srcTab}',${e._id})">${ICO.edit}</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${srcTab}',${e._id})" style="color:var(--danger)">${ICO.trash}</button>`:'';
-      return sep+`<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request" onclick="openRequestModal('${srcTab}',${e._id})">${ICO.mail} Request</button>${adminActions}</div></td></tr>`;
+      return sep+`<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request viewer-only" onclick="openRequestModal('${srcTab}',${e._id})">${ICO.mail} Request</button>${adminActions}</div></td></tr>`;
     }).join('');
   }
   const visCopies=sorted.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
