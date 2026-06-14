@@ -305,6 +305,74 @@ app.get('/api/pepper-lookup', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'JW Pepper lookup failed: ' + e.message }); }
 });
 
+// ── Multi-source link finder (Pepper → CPDL → search URLs) ──────────────────
+app.get('/api/find-links', async (req, res) => {
+  const title    = (req.query.title    || '').trim();
+  const composer = (req.query.composer || '').trim();
+  if (!title) return res.status(400).json({ error: 'Title required' });
+
+  const query = [title, composer].filter(Boolean).join(' ');
+  const qEnc  = encodeURIComponent(query);
+  const results = []; // [{ source, items }]
+
+  // 1. JW Pepper (primary)
+  try {
+    let pepperItems = [];
+    try {
+      const { status, body } = await httpsGet(
+        `https://www.jwpepper.com/api/io/_v/api/intelligent-search/product_search/?query=${qEnc}&count=6`
+      );
+      if (status === 200) pepperItems = parsePepperProducts(JSON.parse(body).products);
+    } catch (e) { /* fall through to legacy */ }
+    if (!pepperItems.length) {
+      const { status, body } = await httpsGet(
+        `https://www.jwpepper.com/api/catalog_system/pub/products/search/?ft=${qEnc}&_from=0&_to=5`
+      );
+      if (status === 200 || status === 206) {
+        const arr = JSON.parse(body);
+        pepperItems = (arr || []).slice(0, 6).map(p => {
+          const voicings = [...new Set((p.items || []).map(i => (String(i.name || '').match(VOICING_RE) || [])[1])
+            .filter(Boolean).map(v => v.toUpperCase().replace('TWO-PART', '2-Part')))];
+          return { title: p.productName || '', composer: (p.Composer || p.Arranger || [])[0] || '',
+            publisher: p.brand || '', voicings, description: (p.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400),
+            url: p.linkText ? `https://www.jwpepper.com/${p.linkText}/p` : '', image: p.items?.[0]?.images?.[0]?.imageUrl || '' };
+        }).filter(r => r.title && r.url);
+      }
+    }
+    if (pepperItems.length) results.push({ source: 'JW Pepper', items: pepperItems });
+  } catch (e) { console.error('find-links Pepper:', e.message); }
+
+  // 2. CPDL – Choral Public Domain Library (only when Pepper found nothing)
+  if (results.length === 0) {
+    try {
+      const { status, body } = await httpsGet(
+        `https://cpdl.org/wiki/api.php?action=query&list=search&srsearch=${qEnc}&srlimit=6&format=json`
+      );
+      if (status === 200) {
+        const j = JSON.parse(body);
+        const items = (j.query?.search || []).map(s => ({
+          title: s.title, composer: '', publisher: 'CPDL', voicings: [],
+          description: (s.snippet || '').replace(/<[^>]+>/g, '').trim().slice(0, 300),
+          url: `https://cpdl.org/wiki/index.php?curid=${s.pageid}`, image: '',
+        })).filter(r => r.title && r.url);
+        if (items.length) results.push({ source: 'CPDL (Free / Public Domain)', items });
+      }
+    } catch (e) { console.error('find-links CPDL:', e.message); }
+  }
+
+  // Always return manual search URLs as a last resort
+  const searchUrls = {
+    'Sheet Music Plus': `https://www.sheetmusicplus.com/search?Ntt=${qEnc}`,
+    'Hal Leonard':      `https://www.halleonard.com/search.action?keywords=${qEnc}`,
+    'GIA Publications': `https://www.giamusic.com/search/products?q=${qEnc}`,
+    'Alfred Music':     `https://www.alfred.com/search/?q=${qEnc}`,
+    'MusicNotes':       `https://www.musicnotes.com/search/go?w=${qEnc}`,
+    'CPDL':             `https://cpdl.org/wiki/index.php/Special:Search?search=${qEnc}`,
+  };
+
+  res.json({ results, searchUrls });
+});
+
 // ── Cover photo scan (Google AI free tier) ────────────────────────────────────
 
 const SCAN_VOICINGS = ['SATB','SAB','SSA','SSAA','SSATB','SATTBB','SSAATTBB','TTB','TTBB','TBB','SA','2-Part','3-Part','3-Part Mixed','Unison'];
