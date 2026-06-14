@@ -656,7 +656,7 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
 
 <div class="modal-overlay" id="pepper-modal">
   <div class="modal" style="max-width:540px;">
-    <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> JW Pepper Results</h2><button class="btn-ghost btn-icon" onclick="closePepperModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Find Links</h2><button class="btn-ghost btn-icon" onclick="closePepperModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body" id="pepper-modal-body"></div>
   </div>
 </div>
@@ -1114,32 +1114,53 @@ async function pepperLookupEntry(tab,id){
     }catch(e){toast('Update failed: '+e.message,'error');}
     return;
   }
-  // Octavos: open JW Pepper modal
+  // Octavos: open multi-source link finder modal
   pepperLibTarget={tab,id};
   pepperTarget='__lib__';
   const body=document.getElementById('pepper-modal-body');
-  body.innerHTML='<p style="text-align:center;padding:24px;color:var(--muted);"><span class="spinner" style="width:18px;height:18px;"></span><br><br>Searching JW Pepper…</p>';
+  body.innerHTML='<p style="text-align:center;padding:24px;color:var(--muted);"><span class="spinner" style="width:18px;height:18px;"></span><br><br>Searching JW Pepper &amp; other sources…</p>';
   document.getElementById('pepper-modal').classList.add('open');
   const title=entry.title||'';
   const composer=entry.composer||entry.author||'';
   try{
-    const r=await fetch(`/api/pepper-lookup?title=${encodeURIComponent(title)}&composer=${encodeURIComponent(composer)}`);
+    const r=await fetch(`/api/find-links?title=${encodeURIComponent(title)}&composer=${encodeURIComponent(composer)}`);
     const j=await r.json();
-    if(!r.ok){body.innerHTML=`<div class="empty-state" style="padding:24px;"><div class="empty-icon" style="font-size:28px;opacity:.4;">${ICO.search}</div><strong>No results</strong><p>${esc(j.error||'Nothing found.')}</p></div>`;return;}
-    window._pepperResults=j.results;
-    body.innerHTML=j.results.map((p,i)=>`
-      <div class="pepper-result">
-        ${p.image?`<img class="pepper-cover" src="${escAttr(p.image)}" alt="" loading="lazy" onerror="this.outerHTML='&lt;div class=&quot;pepper-cover placeholder&quot;&gt;&lt;svg width=&quot;22&quot; height=&quot;22&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.5&quot;&gt;&lt;circle cx=&quot;8&quot; cy=&quot;18&quot; r=&quot;4&quot;/&gt;&lt;path d=&quot;M12 18V2l7 4&quot;/&gt;&lt;/svg&gt;&lt;/div&gt;'">`:`<div class="pepper-cover placeholder"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="18" r="4"/><path d="M12 18V2l7 4"/></svg></div>`}
-        <div class="pepper-main">
-          <div class="pepper-title">${esc(p.title)}</div>
-          <div class="pepper-meta">${esc([p.composer,p.publisher].filter(Boolean).join(' · '))||'&nbsp;'}</div>
-          ${p.description?`<div class="pepper-desc">${esc(p.description)}</div>`:''}
-          <div class="pepper-voicings">
-            ${p.voicings.length?p.voicings.map(v=>`<button type="button" class="btn-primary btn-sm" onclick="applyPepperToEntry(${i},'${escAttr(v)}')">Use ${esc(v)}</button>`).join(''):`<button type="button" class="btn-primary btn-sm" onclick="applyPepperToEntry(${i},'')">Use This</button>`}
-            <a class="btn-ghost btn-sm" href="${escAttr(p.url)}" target="_blank" style="display:inline-flex;align-items:center;">View ↗</a>
-          </div>
-        </div>
-      </div>`).join('');
+    if(!r.ok){body.innerHTML=`<div class="empty-state" style="padding:24px;"><div class="empty-icon" style="font-size:28px;opacity:.4;">${ICO.search}</div><strong>Lookup failed</strong><p>${esc(j.error||'Something went wrong.')}</p></div>`;return;}
+    // Flatten all results into window._pepperResults so applyPepperToEntry indices still work
+    window._pepperResults=[];
+    (j.results||[]).forEach(sg=>sg.items.forEach(item=>window._pepperResults.push(item)));
+    let html='';
+    if(!(j.results||[]).length){
+      html+=`<div class="empty-state" style="padding:24px 0;"><div class="empty-icon" style="font-size:28px;opacity:.4;">${ICO.search}</div><strong>Nothing found automatically</strong><p>Try the manual searches below.</p></div>`;
+    }else{
+      let gi=0;
+      (j.results||[]).forEach((sg,si)=>{
+        html+=`<div style="padding:${si===0?'4px':'12px'} 0 4px;font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);${si>0?'border-top:1px solid var(--line);':''}">${esc(sg.source)}</div>`;
+        sg.items.forEach(p=>{
+          const i=gi++;
+          html+=`<div class="pepper-result">
+            ${p.image?`<img class="pepper-cover" src="${escAttr(p.image)}" alt="" loading="lazy" onerror="this.outerHTML='&lt;div class=&quot;pepper-cover placeholder&quot;&gt;&lt;svg width=&quot;22&quot; height=&quot;22&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.5&quot;&gt;&lt;circle cx=&quot;8&quot; cy=&quot;18&quot; r=&quot;4&quot;/&gt;&lt;path d=&quot;M12 18V2l7 4&quot;/&gt;&lt;/svg&gt;&lt;/div&gt;'">`:`<div class="pepper-cover placeholder"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="18" r="4"/><path d="M12 18V2l7 4"/></svg></div>`}
+            <div class="pepper-main">
+              <div class="pepper-title">${esc(p.title)}</div>
+              <div class="pepper-meta">${esc([p.composer,p.publisher].filter(Boolean).join(' · '))||'&nbsp;'}</div>
+              ${p.description?`<div class="pepper-desc">${esc(p.description)}</div>`:''}
+              <div class="pepper-voicings">
+                ${p.voicings&&p.voicings.length?p.voicings.map(v=>`<button type="button" class="btn-primary btn-sm" onclick="applyPepperToEntry(${i},'${escAttr(v)}')">Use ${esc(v)}</button>`).join(''):`<button type="button" class="btn-primary btn-sm" onclick="applyPepperToEntry(${i},'')">Use This</button>`}
+                <a class="btn-ghost btn-sm" href="${escAttr(p.url)}" target="_blank" style="display:inline-flex;align-items:center;">View ↗</a>
+              </div>
+            </div>
+          </div>`;
+        });
+      });
+    }
+    // Manual search URLs
+    if(j.searchUrls&&Object.keys(j.searchUrls).length){
+      html+=`<div style="padding:14px 0 6px;border-top:1px solid var(--line);margin-top:8px;">
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);margin-bottom:8px;">Search manually</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">${Object.entries(j.searchUrls).map(([name,url])=>`<a href="${escAttr(url)}" target="_blank" class="btn-secondary btn-sm">${esc(name)} ↗</a>`).join('')}</div>
+      </div>`;
+    }
+    body.innerHTML=html;
   }catch(e){body.innerHTML=`<div class="empty-state" style="padding:24px;"><strong>Lookup failed</strong><p>${esc(e.message)}</p></div>`;}
 }
 
@@ -1220,23 +1241,39 @@ async function findAllLinks(tab){
     await saveLink(entry,`https://www.amazon.com/s?k=${q}`);
   }
 
-  // Octavos: JW Pepper lookup — auto-pick best result
+  // Octavos: Pepper first, then CPDL, then Sheet Music Plus search URL
   for(const entry of octavos){
     btn.innerHTML=`<span class="spinner"></span> ${filled+notFound+1}/${total}…`;
+    let linkFound=false;
     try{
-      const r=await fetch(`/api/pepper-lookup?title=${encodeURIComponent(entry.title)}&composer=${encodeURIComponent(entry.composer||'')}`);
+      const r=await fetch(`/api/find-links?title=${encodeURIComponent(entry.title)}&composer=${encodeURIComponent(entry.composer||'')}`);
       if(r.ok){
         const j=await r.json();
-        if(j.results&&j.results.length){
-          // Pick result with closest title match
-          const nt=norm(entry.title);
-          const best=j.results.reduce((a,b)=>editDist(norm(a.title),nt)<=editDist(norm(b.title),nt)?a:b);
-          await saveLink(entry,best.url);
-        } else notFound++;
-      } else notFound++;
-    }catch{notFound++;}
-    // Brief pause to avoid hammering JW Pepper
-    await new Promise(x=>setTimeout(x,300));
+        // Use first source that has results; for Pepper pick closest title match
+        for(const sg of (j.results||[])){
+          if(sg.items&&sg.items.length){
+            let url;
+            if(sg.source==='JW Pepper'){
+              const nt=norm(entry.title);
+              const best=sg.items.reduce((a,b)=>editDist(norm(a.title),nt)<=editDist(norm(b.title),nt)?a:b);
+              url=best.url;
+            }else{
+              url=sg.items[0].url;
+            }
+            await saveLink(entry,url);
+            linkFound=true;
+            break;
+          }
+        }
+        // Last resort: Sheet Music Plus search URL
+        if(!linkFound&&j.searchUrls&&j.searchUrls['Sheet Music Plus']){
+          await saveLink(entry,j.searchUrls['Sheet Music Plus']);
+          linkFound=true;
+        }
+      }
+    }catch{}
+    if(!linkFound)notFound++;
+    await new Promise(x=>setTimeout(x,400));
   }
 
   renderTable(tab);
