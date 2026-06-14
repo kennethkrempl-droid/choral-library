@@ -745,8 +745,8 @@ function buildPanel(tab){
       <select class="filter-select" id="ftype-${tab}" onchange="setFilter('${tab}','type',this.value)">
         <option value="">All Types</option><option value="octavo">Octavos</option><option value="book">Books</option>
       </select>
-      <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"><option value="">Voicing</option></select>
-      <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"><option value="">Genre</option></select>
+      <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"><option value="">All Voicings</option></select>
+      <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"><option value="">All Genres</option></select>
       <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">${ICO.x} Clear</button>
       <button class="btn-secondary btn-sm admin-only" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">${ICO.search} Find Duplicates</button>
       <button class="btn-gold btn-sm admin-only" id="suggest-genre-lib-btn-${tab}" onclick="suggestGenresForLib('${tab}')" title="AI-suggest genres for entries that don't have one">${ICO.sparkles} Suggest Genres</button>
@@ -1653,11 +1653,11 @@ function renderStats(tab){
   const composers=new Set(rows.map(e=>norm(e.composer||e.author)).filter(Boolean)).size;
   const tf=filters[tab].type;
   document.getElementById('stats-'+tab).innerHTML=`
-    <div class="stat-card stat-primary${tf===''?' active-filter':''}" onclick="setFilter('${tab}','type','');document.getElementById('ftype-${tab}').value=''" title="Show all types"><div class="stat-value">${rows.length}</div><div class="stat-label">Titles</div></div>
-    <div class="stat-card${tf==='octavo'?' active-filter':''}" onclick="setFilter('${tab}','type',tf==='octavo'?'':'octavo');document.getElementById('ftype-${tab}').value=tf==='octavo'?'':'octavo'" title="Filter by Octavo"><div class="stat-value">${octavos}</div><div class="stat-label">Octavos</div></div>
-    <div class="stat-card${tf==='book'?' active-filter':''}" onclick="setFilter('${tab}','type',tf==='book'?'':'book');document.getElementById('ftype-${tab}').value=tf==='book'?'':'book'" title="Filter by Book"><div class="stat-value">${books}</div><div class="stat-label">Books</div></div>
-    <div class="stat-card" title="Total copy count across all items"><div class="stat-value">${copies.toLocaleString()}</div><div class="stat-label">Total Copies</div></div>
-    <div class="stat-card" title="Unique composers and authors"><div class="stat-value">${composers}</div><div class="stat-label">Composers</div></div>`;
+    <div class="stat-card stat-primary" onclick="setFilter('${tab}','type','');document.getElementById('ftype-${tab}').value=''" title="Show all types"><div class="stat-value">${rows.length}</div><div class="stat-label">Titles</div></div>
+    <div class="stat-card${tf==='octavo'?' active-filter':''}" onclick="setFilter('${tab}','type','${tf==='octavo'?'':'octavo'}');document.getElementById('ftype-${tab}').value='${tf==='octavo'?'':'octavo'}'" title="Filter to octavos only"><div class="stat-value">${octavos}</div><div class="stat-label">Octavos</div></div>
+    <div class="stat-card${tf==='book'?' active-filter':''}" onclick="setFilter('${tab}','type','${tf==='book'?'':'book'}');document.getElementById('ftype-${tab}').value='${tf==='book'?'':'book'}'" title="Filter to books only"><div class="stat-value">${books}</div><div class="stat-label">Books</div></div>
+    <div class="stat-card" style="cursor:default;" title="Total copy count across all items"><div class="stat-value">${copies.toLocaleString()}</div><div class="stat-label">Total Copies</div></div>
+    <div class="stat-card" style="cursor:default;" title="Unique composers and authors"><div class="stat-value">${composers}</div><div class="stat-label">Composers</div></div>`;
   const countEl=document.getElementById('count-'+tab); if(countEl) countEl.textContent=rows.length;
 }
 
