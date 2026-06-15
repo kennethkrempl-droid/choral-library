@@ -1369,7 +1369,9 @@ async function submitEdit(e){
   const j=await r.json();
   if(!r.ok){toast(j.error||'Could not save','error');return;}
   const i=data[tab].findIndex(x=>x._id===id);
-  if(i>-1)data[tab][i]=j.entry;
+  // Merge: keep existing fields (e.g. unavailable), overlay server response, then locally-built
+  // entry (which has the user's exact edits from the form) takes priority for form fields
+  if(i>-1)data[tab][i]={...data[tab][i],...(j.entry||{}),...entry};
   renderTable(tab);renderTable('all');closeModal();toast('Entry updated','success');
 }
 function closeModal(){document.getElementById('edit-modal').classList.remove('open');editTarget=null;}
