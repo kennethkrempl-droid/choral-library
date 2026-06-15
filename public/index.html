@@ -1886,37 +1886,33 @@ function showCSVImportTip(){document.getElementById('csv-tip-modal').classList.a
 
 // ── Google Sync ───────────────────────────────────────────────────────────
 async function syncSheets(tab){
-  if(tab==='all'){
-    const btn=document.getElementById('sync-all-btn');
-    const orig=btn?btn.innerHTML:'';
-    if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Syncing…';}
-    await syncSheets('work');
-    await syncSheets('personal');
-    if(btn){btn.disabled=false;btn.innerHTML=orig;}
-    return;
-  }
   if(!authStatus.authenticated){toast('Connect Google in Settings first','error');return;}
-  const btn=document.getElementById(`sync-${tab}-btn`);btn.disabled=true;const orig=btn.innerHTML;btn.innerHTML='<span class="spinner"></span> Syncing…';
+  // Always sync both libraries combined — a Library column distinguishes Work vs Personal
+  const btn=document.getElementById(`sync-${tab}-btn`);
+  btn.disabled=true;const orig=btn.innerHTML;btn.innerHTML='<span class="spinner"></span> Syncing…';
   try{
-    const rows=data[tab];if(!rows.length){toast('Nothing to sync','info');return;}
-    const headers=['Type','Title','Composer / Author','Voicing','Genre','Copies','Last Performed','ISBN','Publisher','Year','Description','Tags','Link'];
-    const toRow=e=>[e._type==='octavo'?'Octavo':'Book',e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||''];
-    const T=cap(tab);
+    const allRows=[...data.work.map(e=>({...e,__src:'work'})),...data.personal.map(e=>({...e,__src:'personal'}))];
+    if(!allRows.length){toast('Nothing to sync','info');return;}
+    const headers=['Library','Type','Title','Composer / Author','Voicing','Genre','Copies','Last Performed','ISBN','Publisher','Year','Description','Tags','Link'];
+    const toRow=e=>[cap(e.__src||'work'),e._type==='octavo'?'Octavo':'Book',e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||''];
     const san=s=>String(s||'').replace(/[\\\/\?\*\[\]:]/g,' ').replace(/\s+/g,' ').trim().slice(0,60);
     const groupBy=(arr,fn)=>{const m={};arr.forEach(e=>{const k=fn(e);(m[k]=m[k]||[]).push(e);});return m;};
-    // Main sheet + per-voicing sheets (octavos only) + per-genre sheets (octavos and books kept separate)
-    const sheets=[{title:T,headers,rows:rows.map(toRow)}];
-    const octavos=rows.filter(e=>e._type==='octavo'), books=rows.filter(e=>e._type==='book');
+    const octavos=allRows.filter(e=>e._type==='octavo'), books=allRows.filter(e=>e._type==='book');
+    const sheets=[{title:'All Music',headers,rows:allRows.map(toRow)}];
     const vGroups=groupBy(octavos,e=>san(e.voicing)||'(none)');
-    Object.keys(vGroups).sort().forEach(v=>sheets.push({title:`${T} – Voicing – ${v}`,headers,rows:vGroups[v].map(toRow)}));
+    Object.keys(vGroups).sort().forEach(v=>sheets.push({title:`Voicing – ${v}`,headers,rows:vGroups[v].map(toRow)}));
     const ogGroups=groupBy(octavos,e=>san(e.genre)||'(none)');
-    Object.keys(ogGroups).sort().forEach(g=>sheets.push({title:`${T} – Octavos – ${g}`,headers,rows:ogGroups[g].map(toRow)}));
+    Object.keys(ogGroups).sort().forEach(g=>sheets.push({title:`Octavos – ${g}`,headers,rows:ogGroups[g].map(toRow)}));
     const bgGroups=groupBy(books,e=>san(e.genre)||'(none)');
-    Object.keys(bgGroups).sort().forEach(g=>sheets.push({title:`${T} – Books – ${g}`,headers,rows:bgGroups[g].map(toRow)}));
-    const r=await fetch('/api/sync-sheets',adminFetchOpts({tab,sheets}));const j=await r.json();
-    if(!r.ok){if(j.reauth){authStatus.authenticated=false;updateGoogleUI();toast('Google session expired — reconnect in Settings','error');}else toast('Sync failed: '+j.error,'error');return;}
-    authStatus.spreadsheetId=j.spreadsheetId;
-    toast(`Synced ${j.sheetCount||sheets.length} sheets! <a href="https://docs.google.com/spreadsheets/d/${j.spreadsheetId}" target="_blank">Open ↗</a>`,'success',6000);
+    Object.keys(bgGroups).sort().forEach(g=>sheets.push({title:`Books – ${g}`,headers,rows:bgGroups[g].map(toRow)}));
+    // Two calls: each cleans up stale "Work – *" and "Personal – *" sub-sheets respectively
+    const handleErr=(r,j)=>{if(j.reauth){authStatus.authenticated=false;updateGoogleUI();toast('Google session expired — reconnect in Settings','error');return true;}toast('Sync failed: '+j.error,'error');return true;};
+    const r1=await fetch('/api/sync-sheets',adminFetchOpts({tab:'work',sheets}));const j1=await r1.json();
+    if(!r1.ok){handleErr(r1,j1);return;}
+    const r2=await fetch('/api/sync-sheets',adminFetchOpts({tab:'personal',sheets}));const j2=await r2.json();
+    if(!r2.ok){handleErr(r2,j2);return;}
+    authStatus.spreadsheetId=j1.spreadsheetId;
+    toast(`Synced ${sheets.length} sheets! <a href="https://docs.google.com/spreadsheets/d/${j1.spreadsheetId}" target="_blank">Open ↗</a>`,'success',6000);
   }finally{btn.disabled=false;btn.innerHTML=orig;}
 }
 
