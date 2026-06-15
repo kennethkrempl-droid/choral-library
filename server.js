@@ -654,7 +654,8 @@ app.post('/api/sync-sheets', adminRequired, async (req, res) => {
     payloads = payloads.filter(p => p.title && Array.isArray(p.headers) && Array.isArray(p.rows));
 
     // Group sheets we manage (and may delete when empty/stale)
-    const managedPrefixes = [`${tabTitle} – Voicing – `, `${tabTitle} – Genre – `, `${tabTitle} – Octavos – `, `${tabTitle} – Books – `];
+    // Include both legacy prefixed titles ("Work – Voicing – ...") and current unprefixed titles ("Voicing – ...")
+    const managedPrefixes = [`${tabTitle} – Voicing – `, `${tabTitle} – Genre – `, `${tabTitle} – Octavos – `, `${tabTitle} – Books – `, 'Voicing – ', 'Octavos – ', 'Books – '];
 
     // 1. Add missing sheets, delete stale managed ones — single batch
     const ss = await sheetsApi.spreadsheets.get({ spreadsheetId });
