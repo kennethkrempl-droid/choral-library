@@ -1370,7 +1370,7 @@ async function submitEdit(e){
   if(!r.ok){toast(j.error||'Could not save','error');return;}
   const i=data[tab].findIndex(x=>x._id===id);
   if(i>-1)data[tab][i]=j.entry;
-  renderTable(tab);closeModal();toast('Entry updated','success');
+  renderTable(tab);renderTable('all');closeModal();toast('Entry updated','success');
 }
 function closeModal(){document.getElementById('edit-modal').classList.remove('open');editTarget=null;}
 
