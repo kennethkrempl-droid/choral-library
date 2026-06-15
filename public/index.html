@@ -305,6 +305,13 @@ header .auth-pill.disconnected { background:rgba(255,255,255,.07); color:rgba(24
 .spinner { width:13px; height:13px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spin .6s linear infinite; display:inline-block; }
 @keyframes spin { to{transform:rotate(360deg)} }
 
+/* ── Cover preview popover ── */
+#cover-preview { position:fixed; z-index:600; pointer-events:none; display:none; }
+#cover-preview-inner { background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow-md); padding:11px; width:156px; }
+#cover-preview-img { width:134px; height:176px; object-fit:cover; border-radius:7px; display:block; background:var(--line-soft); border:1px solid var(--line); }
+#cover-preview-title { font-size:11.5px; font-weight:600; margin-top:8px; line-height:1.35; color:var(--ink); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+#cover-preview-meta { font-size:10.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 /* ── Source chips (Work / Personal in All Music tab) ── */
 .source-chip { display:inline-block; font-size:10.5px; font-weight:600; border-radius:20px; padding:2px 9px; white-space:nowrap; }
 .source-work { background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; }
@@ -685,6 +692,7 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
   </div>
 </div>
 
+<div id="cover-preview"><div id="cover-preview-inner"><img id="cover-preview-img" alt=""><div id="cover-preview-title"></div><div id="cover-preview-meta"></div></div></div>
 <div id="toast-container"></div>
 
 <footer>
@@ -1826,7 +1834,7 @@ function renderTable(tab){
         if(c.key==='title'){
           const tags=(Array.isArray(e.tags)&&e.tags.length)?`<div class="tag-chips">${e.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('')}</div>`:'';
           const inner=e.link?`<a class="title-link" href="${escAttr(e.link)}" target="_blank" title="Open link">${esc(e.title||'(untitled)')}<span class="ext">${ICO.extLink}</span></a>`:esc(e.title||'(untitled)');
-          return `<td class="cell-title">${inner}${tags}</td>`;
+          return `<td class="cell-title" onmouseenter="scheduleCoverPreview('${srcTab}',${e._id})" onmouseleave="hideCoverPreview()">${inner}${tags}</td>`;
         }
         if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-avail'}">${e.unavailable?'In Use':'Available'}</span></td>`;
         if(c.key==='__src') return `<td><span class="source-chip source-${e.__src||'work'}">${cap(e.__src||'work')}</span></td>`;
@@ -2280,6 +2288,57 @@ function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 function flash(el){el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1200);}
 function debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
 function toast(msg,type='info',duration=3200){const el=Object.assign(document.createElement('div'),{className:`toast ${type}`,innerHTML:msg});el.onclick=()=>el.remove();document.getElementById('toast-container').appendChild(el);setTimeout(()=>el.remove(),duration);}
+
+// ── Cover preview ──────────────────────────────────────────────────────────
+const _cvCache=new Map();
+let _cvTimer=null,_cvX=0,_cvY=0;
+document.addEventListener('mousemove',e=>{_cvX=e.clientX;_cvY=e.clientY;});
+function scheduleCoverPreview(srcTab,id){
+  clearTimeout(_cvTimer);
+  _cvTimer=setTimeout(()=>{
+    const entry=(data[srcTab]||[]).find(e=>e._id===id);
+    if(entry) showCoverPreview(entry);
+  },350);
+}
+function hideCoverPreview(){
+  clearTimeout(_cvTimer);
+  document.getElementById('cover-preview').style.display='none';
+}
+function showCoverPreview(entry){
+  const el=document.getElementById('cover-preview');
+  const img=document.getElementById('cover-preview-img');
+  document.getElementById('cover-preview-title').textContent=entry.title||'(untitled)';
+  document.getElementById('cover-preview-meta').textContent=entry.composer||entry.author||'';
+  const pw=178,ph=236;
+  let x=_cvX+18,y=_cvY-Math.round(ph/2);
+  if(x+pw>window.innerWidth-8) x=_cvX-pw-18;
+  y=Math.max(8,Math.min(y,window.innerHeight-ph-8));
+  el.style.left=x+'px'; el.style.top=y+'px'; el.style.display='';
+  const key=entry._type==='book'?`b:${entry.isbn||entry.title}`:`o:${(entry.title||'').slice(0,30)}:${(entry.composer||'').slice(0,20)}`;
+  if(_cvCache.has(key)){
+    const url=_cvCache.get(key);
+    img.style.display=url?'':'none';
+    if(url) img.src=url;
+    return;
+  }
+  img.src=''; img.style.display='';
+  if(entry._type==='book'&&entry.isbn){
+    const url=`https://covers.openlibrary.org/b/isbn/${entry.isbn}-M.jpg`;
+    img.onload=function(){if(this.naturalWidth<=1){this.style.display='none';_cvCache.set(key,null);}else _cvCache.set(key,url);};
+    img.onerror=()=>{img.style.display='none';_cvCache.set(key,null);};
+    img.src=url;
+  } else if(entry.title){
+    fetch(`/api/pepper-lookup?title=${encodeURIComponent(entry.title)}&composer=${encodeURIComponent(entry.composer||'')}`)
+      .then(r=>r.ok?r.json():null)
+      .then(j=>{
+        const url=j?.results?.[0]?.image||null;
+        _cvCache.set(key,url);
+        if(document.getElementById('cover-preview').style.display!=='none'){
+          if(url){img.src=url;}else{img.style.display='none';}
+        }
+      }).catch(()=>{img.style.display='none';_cvCache.set(key,null);});
+  } else { img.style.display='none'; }
+}
 
 ['edit-modal','delete-modal','scanner-modal','admin-modal','request-modal','csv-tip-modal','dup-modal','pepper-modal','bulk-tag-modal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){
