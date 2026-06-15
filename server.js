@@ -122,6 +122,10 @@ app.post('/api/entries/:tab', adminRequired, async (req, res) => {
     if (!['work', 'personal'].includes(tab)) return res.status(400).json({ error: 'Invalid tab' });
     const entry = { ...req.body, _id: req.body._id || Date.now() };
     if (!entry.title || !String(entry.title).trim()) return res.status(400).json({ error: 'Title is required' });
+    // Guard against column-shift corruption: composer should never equal title exactly
+    if (entry.composer && entry.title && entry.composer.trim() === entry.title.trim()) {
+      return res.status(400).json({ error: `Data integrity error: composer ("${entry.composer}") equals title — check column mapping in your import.` });
+    }
     await db.addEntry(tab, entry);
     res.json({ success: true, entry });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -129,7 +133,12 @@ app.post('/api/entries/:tab', adminRequired, async (req, res) => {
 
 app.put('/api/entries/:tab/:id', adminRequired, async (req, res) => {
   try {
-    const updated = await db.updateEntry(req.params.tab, parseInt(req.params.id), req.body);
+    const body = req.body;
+    // Guard against column-shift corruption: composer should never equal title exactly
+    if (body.composer && body.title && body.composer.trim() === body.title.trim()) {
+      return res.status(400).json({ error: `Data integrity error: composer ("${body.composer}") equals title — check column mapping in your import.` });
+    }
+    const updated = await db.updateEntry(req.params.tab, parseInt(req.params.id), body);
     if (!updated) return res.status(404).json({ error: 'Entry not found' });
     res.json({ success: true, entry: updated });
   } catch (e) { res.status(500).json({ error: e.message }); }
