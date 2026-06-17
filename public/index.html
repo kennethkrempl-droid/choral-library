@@ -260,6 +260,13 @@ input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--acc
 .settings-section-header { padding:13px 18px; background:var(--bg); border-bottom:1px solid var(--line); font-weight:600; font-size:13px; display:flex; align-items:center; gap:8px; }
 .settings-section-body { padding:16px; display:flex; flex-direction:column; gap:12px; }
 .env-note { font-size:11px; color:var(--faint); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 10px; }
+/* ── Option chip editor ── */
+.option-chips { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; min-height:22px; }
+.option-chip { display:inline-flex; align-items:center; gap:4px; background:var(--bg); border:1px solid var(--line); border-radius:20px; padding:3px 8px 3px 11px; font-size:12px; color:var(--ink); }
+.option-chip button { background:none; border:none; cursor:pointer; color:var(--muted); padding:0 0 0 2px; line-height:1; font-size:15px; display:flex; align-items:center; }
+.option-chip button:hover { color:var(--danger); }
+.option-chip-add { display:flex; gap:6px; align-items:center; }
+.option-chip-add input { flex:1; font-size:12px; padding:5px 10px; }
 
 /* ── Google wizard ── */
 .wizard-steps { display:flex; margin-bottom:16px; }
@@ -569,6 +576,30 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
       </div>
     </div>
 
+    <div class="settings-section admin-only" style="grid-column:1/-1;">
+      <div class="settings-section-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Voicings &amp; Genres
+      </div>
+      <div class="settings-section-body">
+        <div>
+          <label style="font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Voicings</label>
+          <div class="option-chips" id="voicings-chip-list"></div>
+          <div class="option-chip-add">
+            <input type="text" id="add-voicing-input" placeholder="e.g. SSATTBB, 4-Part Mixed…" autocomplete="off" onkeydown="if(event.key==='Enter')addVoicingFromUI()">
+            <button class="btn-secondary btn-sm" onclick="addVoicingFromUI()">Add</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Genres</label>
+          <div class="option-chips" id="genres-chip-list"></div>
+          <div class="option-chip-add">
+            <input type="text" id="add-genre-input" placeholder="e.g. World Music, Renaissance…" autocomplete="off" onkeydown="if(event.key==='Enter')addGenreFromUI()">
+            <button class="btn-secondary btn-sm" onclick="addGenreFromUI()">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -757,26 +788,61 @@ let cfgInfo     = null;
 let VOICINGS = ['SATB','SAB','SSA','SSAA','SSATB','SATTBB','SSAATTBB','TTB','TTBB','TBB','SA','3-Part Mixed','3-Part','2-Part','Unison','Other'];
 let GENRES   = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater','Jazz','Sacred','Other'];
 
+function _saveVoicings(){try{localStorage.setItem('voicings',JSON.stringify(VOICINGS));}catch{}}
+function _saveGenres(){try{localStorage.setItem('genres',JSON.stringify(GENRES));}catch{}}
 function addToVoicings(v){
   if(!v||VOICINGS.includes(v))return;
-  VOICINGS.push(v);
-  try{const c=JSON.parse(localStorage.getItem('customVoicings')||'[]');if(!c.includes(v)){c.push(v);localStorage.setItem('customVoicings',JSON.stringify(c));}}catch{}
+  VOICINGS.push(v);_saveVoicings();
   const dl=document.getElementById('voicings-dl');
   if(dl)dl.insertAdjacentHTML('beforeend',`<option value="${esc(v)}">`);
   ['work','personal','all'].forEach(t=>{const s=document.getElementById('fvoicing-'+t);if(s&&![...s.options].some(o=>o.value===v))s.insertAdjacentHTML('beforeend',`<option value="${esc(v)}">${esc(v)}</option>`);});
 }
 function addToGenres(g){
   if(!g||GENRES.includes(g))return;
-  GENRES.push(g);
-  try{const c=JSON.parse(localStorage.getItem('customGenres')||'[]');if(!c.includes(g)){c.push(g);localStorage.setItem('customGenres',JSON.stringify(c));}}catch{}
+  GENRES.push(g);_saveGenres();
   const dl=document.getElementById('genres-dl');
   if(dl)dl.insertAdjacentHTML('beforeend',`<option value="${esc(g)}">`);
   ['work','personal','all'].forEach(t=>{const s=document.getElementById('fgenre-'+t);if(s&&![...s.options].some(o=>o.value===g))s.insertAdjacentHTML('beforeend',`<option value="${esc(g)}">${esc(g)}</option>`);});
 }
+function removeVoicing(v){
+  const i=VOICINGS.indexOf(v);if(i<0)return;
+  VOICINGS.splice(i,1);_saveVoicings();
+  const dl=document.getElementById('voicings-dl');
+  if(dl)[...dl.options].filter(o=>o.value===v).forEach(o=>o.remove());
+  ['work','personal','all'].forEach(t=>{const s=document.getElementById('fvoicing-'+t);if(s)[...s.options].filter(o=>o.value===v).forEach(o=>o.remove());});
+  renderOptionChips();
+}
+function removeGenre(g){
+  const i=GENRES.indexOf(g);if(i<0)return;
+  GENRES.splice(i,1);_saveGenres();
+  const dl=document.getElementById('genres-dl');
+  if(dl)[...dl.options].filter(o=>o.value===g).forEach(o=>o.remove());
+  ['work','personal','all'].forEach(t=>{const s=document.getElementById('fgenre-'+t);if(s)[...s.options].filter(o=>o.value===g).forEach(o=>o.remove());});
+  renderOptionChips();
+}
+function addVoicingFromUI(){
+  const inp=document.getElementById('add-voicing-input');
+  const v=(inp.value||'').trim();if(!v)return;
+  addToVoicings(v);inp.value='';renderOptionChips();toast(`Voicing "${v}" added`,'success');
+}
+function addGenreFromUI(){
+  const inp=document.getElementById('add-genre-input');
+  const g=(inp.value||'').trim();if(!g)return;
+  addToGenres(g);inp.value='';renderOptionChips();toast(`Genre "${g}" added`,'success');
+}
+function renderOptionChips(){
+  const vl=document.getElementById('voicings-chip-list');
+  const gl=document.getElementById('genres-chip-list');
+  if(vl)vl.innerHTML=VOICINGS.map(v=>`<span class="option-chip">${esc(v)}<button onclick="removeVoicing('${esc(v).replace(/'/g,'&#039;')}')" title="Remove">×</button></span>`).join('');
+  if(gl)gl.innerHTML=GENRES.map(g=>`<span class="option-chip">${esc(g)}<button onclick="removeGenre('${esc(g).replace(/'/g,'&#039;')}')" title="Remove">×</button></span>`).join('');
+}
 function initDatalists(){
-  // Load custom options persisted from previous sessions
-  try{JSON.parse(localStorage.getItem('customVoicings')||'[]').forEach(v=>{if(!VOICINGS.includes(v))VOICINGS.push(v);});}catch{}
-  try{JSON.parse(localStorage.getItem('customGenres')||'[]').forEach(g=>{if(!GENRES.includes(g))GENRES.push(g);});}catch{}
+  // Load persisted full lists (or keep defaults if nothing stored)
+  try{const sv=JSON.parse(localStorage.getItem('voicings')||'null');if(sv&&Array.isArray(sv)){VOICINGS.length=0;VOICINGS.push(...sv);}}catch{}
+  try{const sg=JSON.parse(localStorage.getItem('genres')||'null');if(sg&&Array.isArray(sg)){GENRES.length=0;GENRES.push(...sg);}}catch{}
+  // Backward compat: merge any old-format custom entries
+  try{JSON.parse(localStorage.getItem('customVoicings')||'[]').forEach(v=>{if(!VOICINGS.includes(v)){VOICINGS.push(v);}});}catch{}
+  try{JSON.parse(localStorage.getItem('customGenres')||'[]').forEach(g=>{if(!GENRES.includes(g)){GENRES.push(g);}});}catch{}
   const vdl=document.getElementById('voicings-dl');
   if(vdl)vdl.innerHTML=VOICINGS.map(v=>`<option value="${esc(v)}">`).join('');
   const gdl=document.getElementById('genres-dl');
@@ -933,6 +999,7 @@ function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
   if(name==='all') renderTable('all');
+  if(name==='settings') renderOptionChips();
 }
 document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
 
@@ -944,6 +1011,7 @@ function octavoFields(){return[
   {key:'genre',label:'Genre',type:'datalist'},
   {key:'copies',label:'Copy Count',type:'number',min:0},
   {key:'lastPerformed',label:'Last Performed',type:'date'},
+  {key:'yearsPerformed',label:'Years Performed',type:'text',placeholder:'e.g. 2019, 2022, 2024'},
   {key:'link',label:'Song Link (URL)',type:'url'},
   {key:'tags',label:'Tags (comma-separated)',type:'text'},
 ];}
@@ -989,7 +1057,7 @@ function buildFieldHTML(f,prefix,value){
   }
   else if(f.type==='textarea') inner=`<textarea id="${id}" name="${f.key}" ${req}>${esc(String(value??''))}</textarea>`;
   else if(f.isbnField) inner=`<div class="input-row"><input type="text" id="${id}" name="${f.key}" value="${val}" placeholder="e.g. 9780739044148" onblur="autoIsbnLookup('${prefix}',this.value)"><button type="button" class="btn-scan" title="Scan barcode" onclick="openScanner('${prefix}')">${ICO.camera}</button><button type="button" class="btn-secondary btn-sm" onclick="isbnLookup('${prefix}')">Look up</button></div>`;
-  else inner=`<input type="${f.type}" id="${id}" name="${f.key}" value="${val}" ${req} ${f.min!==undefined?'min="'+f.min+'"':''}>`;
+  else inner=`<input type="${f.type}" id="${id}" name="${f.key}" value="${val}" ${req} ${f.min!==undefined?'min="'+f.min+'"':''} ${f.placeholder?'placeholder="'+escAttr(f.placeholder)+'"':''}>`;
   return `<div class="form-group${f.full?' full':''}"><label for="${id}">${f.label}</label>${inner}</div>`;
 }
 
@@ -1018,7 +1086,9 @@ function fuzzyTitleMatch(a,b){
   const minLen=Math.min(a.length,b.length),maxLen=Math.max(a.length,b.length);
   // Only treat as substring match if shorter string is ≥70% of longer (avoids "Angel"⊂"Angels Among Us")
   if(minLen/maxLen>=0.7&&(a.includes(b)||b.includes(a)))return true;
-  return maxLen>=4 && editDist(a,b)/maxLen<=0.2;
+  // Early bailout: length difference alone exceeds the 20% edit distance threshold
+  if(maxLen<4||(maxLen-minLen)>maxLen*0.2)return false;
+  return editDist(a,b)/maxLen<=0.2;
 }
 
 function findDuplicates(title,person,excludeId){
@@ -1737,13 +1807,17 @@ async function deleteRequest(id) {
 
 // ── Filtering / sorting ───────────────────────────────────────────────────
 function getLibraryDupIds(tab){
-  const entries=rowsFor(tab);
+  // Check each visible entry against ALL entries (both libraries) to catch cross-library dupes
+  const viewEntries=tab==='all'?rowsFor('all'):data[tab];
+  const allEntries=[...data.work,...data.personal];
   const dupIds=new Set();
-  for(let i=0;i<entries.length;i++){
-    const ti=norm(entries[i].title);
-    for(let j=i+1;j<entries.length;j++){
-      const tj=norm(entries[j].title);
-      if(ti===tj||fuzzyTitleMatch(ti,tj)){dupIds.add(entries[i]._id);dupIds.add(entries[j]._id);}
+  for(const e of viewEntries){
+    const ti=norm(e.title);
+    if(!ti) continue;
+    for(const f of allEntries){
+      if(f._id===e._id) continue;
+      const tj=norm(f.title);
+      if(ti===tj||fuzzyTitleMatch(ti,tj)){dupIds.add(e._id);break;}
     }
   }
   return dupIds;
@@ -1911,7 +1985,8 @@ function renderTable(tab){
         if(c.key==='title'){
           const tags=(Array.isArray(e.tags)&&e.tags.length)?`<div class="tag-chips">${e.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('')}</div>`:'';
           const inner=e.link?`<a class="title-link" href="${escAttr(e.link)}" target="_blank" title="Open link">${esc(e.title||'(untitled)')}<span class="ext">${ICO.extLink}</span></a>`:esc(e.title||'(untitled)');
-          const lp=(isAdmin&&e._type==='octavo'&&e.lastPerformed)?`<div class="lp-chip">Last performed: ${esc(e.lastPerformed)}</div>`:'';
+          const lpParts=isAdmin&&e._type==='octavo'?[e.lastPerformed?`Last performed: ${esc(e.lastPerformed)}`:'',e.yearsPerformed?`Years: ${esc(e.yearsPerformed)}`:''].filter(Boolean):[];
+          const lp=lpParts.length?`<div class="lp-chip">${lpParts.join(' · ')}</div>`:'';
           return `<td class="cell-title" onmouseenter="scheduleCoverPreview('${srcTab}',${e._id})" onmouseleave="hideCoverPreview()">${inner}${tags}${lp}</td>`;
         }
         if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-avail'}">${e.unavailable?'In Use':'Available'}</span></td>`;
@@ -1944,8 +2019,8 @@ function sortBy(tab,col){const s=sortState[tab];s.dir=s.col===col?s.dir*-1:1;s.c
 function exportCSV(tab,selectedOnly=false){
   let rows=selectedOnly?rowsFor(tab).filter(e=>selected[tab].has(e._id)):getSorted(tab,getFiltered(tab));
   if(!rows.length){toast('Nothing to export','info');return;}
-  const keys=['_type','title','composer','author','voicing','genre','copies','lastPerformed','unavailable','isbn','publisher','year','description','tags','link'];
-  const labels={_type:'Type',title:'Title',composer:'Composer/Arranger',author:'Author/Editor',voicing:'Voicing',genre:'Genre',copies:'Copies',lastPerformed:'Last Performed',unavailable:'Availability',isbn:'ISBN',publisher:'Publisher',year:'Year',description:'Description',tags:'Tags',link:'Link'};
+  const keys=['_type','title','composer','author','voicing','genre','copies','lastPerformed','yearsPerformed','unavailable','isbn','publisher','year','description','tags','link'];
+  const labels={_type:'Type',title:'Title',composer:'Composer/Arranger',author:'Author/Editor',voicing:'Voicing',genre:'Genre',copies:'Copies',lastPerformed:'Last Performed',yearsPerformed:'Years Performed',unavailable:'Availability',isbn:'ISBN',publisher:'Publisher',year:'Year',description:'Description',tags:'Tags',link:'Link'};
   let usedKeys=keys.filter(k=>rows.some(r=>{const v=r[k];return Array.isArray(v)?v.length:v;}));
   if(tab==='all')usedKeys=usedKeys.filter(k=>k!=='lastPerformed'); // private field stays out of the public view's export
   const header=usedKeys.map(k=>labels[k]).join(',');
