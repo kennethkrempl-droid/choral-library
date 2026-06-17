@@ -618,6 +618,24 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
   </div>
 </div>
 
+<div class="modal-overlay" id="import-copies-modal">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header"><h2>How should we handle copy counts?</h2><button class="btn-ghost btn-icon" onclick="_importCopiesCancel()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <p id="import-copies-desc" style="font-size:13px;color:var(--muted);margin-bottom:14px;"></p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label style="display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer;"><input type="radio" name="imc_copies" value="a" checked> <span id="imc-label-a">Keep library count</span></label>
+        <label style="display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer;"><input type="radio" name="imc_copies" value="b"> <span id="imc-label-b">Use import count</span></label>
+        <label style="display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer;"><input type="radio" name="imc_copies" value="sum"> <span id="imc-label-sum">Add together</span></label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="_importCopiesCancel()">Cancel</button>
+      <button class="btn-primary" onclick="_importCopiesConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="csv-tip-modal">
   <div class="modal" style="max-width:460px;">
     <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg> Copy to Google Sheets</h2><button class="btn-ghost btn-icon" onclick="document.getElementById('csv-tip-modal').classList.remove('open')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -2343,14 +2361,65 @@ function removeImportDuplicates(){
 }
 
 
-function buildMergedEntry(existing, importRow){
+function buildMergedEntry(existing, importRow, copiesChoice){
   const merged={...existing};
   if(importRow.title&&importRow.title.trim()) merged.title=importRow.title.trim();
-  if(importRow.copies) merged.copies=String(importRow.copies);
   if(importRow.composer) merged.composer=importRow.composer.trim();
   if(importRow.voicing) merged.voicing=importRow.voicing;
   if(importRow.genre) merged.genre=importRow.genre;
+  const ca=parseInt(existing.copies)||0, cb=parseInt(importRow.copies)||0;
+  if(copiesChoice==='sum') merged.copies=String(ca+cb);
+  else if(copiesChoice==='b') merged.copies=String(cb);
+  else merged.copies=String(ca); // 'a' = keep library
   return merged;
+}
+
+// ── Copies-choice modal (promise-based) ──────────────────────────────────
+let _importCopiesResolve=null;
+function _showImportCopiesModal(desc,labelA,labelB,labelSum,defaultChoice){
+  document.getElementById('import-copies-desc').textContent=desc;
+  document.getElementById('imc-label-a').textContent=labelA;
+  document.getElementById('imc-label-b').textContent=labelB;
+  document.getElementById('imc-label-sum').textContent=labelSum;
+  const radios=document.querySelectorAll('input[name="imc_copies"]');
+  radios.forEach(r=>{r.checked=r.value===defaultChoice;});
+  document.getElementById('import-copies-modal').classList.add('open');
+}
+function _importCopiesConfirm(){
+  const choice=document.querySelector('input[name="imc_copies"]:checked')?.value||'a';
+  document.getElementById('import-copies-modal').classList.remove('open');
+  if(_importCopiesResolve){_importCopiesResolve(choice);_importCopiesResolve=null;}
+}
+function _importCopiesCancel(){
+  document.getElementById('import-copies-modal').classList.remove('open');
+  if(_importCopiesResolve){_importCopiesResolve(null);_importCopiesResolve=null;}
+}
+function _askCopiesChoice(libCount,importCount){
+  // If counts are identical, no need to ask
+  if(libCount===importCount) return Promise.resolve('a');
+  return new Promise(resolve=>{
+    _importCopiesResolve=resolve;
+    const def=libCount>=importCount?'a':'b';
+    _showImportCopiesModal(
+      `Library has ${libCount} cop${libCount===1?'y':'ies'}, import says ${importCount}.`,
+      `Keep library: ${libCount}`,
+      `Use import: ${importCount}`,
+      `Add together: ${libCount+importCount}`,
+      def
+    );
+  });
+}
+function _askBatchCopiesChoice(count){
+  return new Promise(resolve=>{
+    _importCopiesResolve=resolve;
+    _showImportCopiesModal(
+      `Applies to all ${count} merge${count===1?'':'s'}. When library and import counts differ:`,
+      'Keep library count',
+      'Use import count',
+      'Add together',
+      'a'
+    );
+  });
 }
 
 async function mergeImportRow(i){
@@ -2358,7 +2427,10 @@ async function mergeImportRow(i){
   const dups=findDuplicates(r.title,r.composer);
   if(!dups.length)return;
   const {tab,entry}=dups[0];
-  const merged=buildMergedEntry(entry,r);
+  const ca=parseInt(entry.copies)||0, cb=parseInt(r.copies)||0;
+  const choice=await _askCopiesChoice(ca,cb);
+  if(choice===null)return; // user cancelled
+  const merged=buildMergedEntry(entry,r,choice);
   try{
     const resp=await fetch(`/api/entries/${tab}/${entry._id}`,adminFetchOpts(merged,'PUT'));
     if(!resp.ok)throw new Error((await resp.json()).error||'failed');
@@ -2374,6 +2446,8 @@ async function mergeImportRow(i){
 async function mergeAllDuplicates(){
   const toMerge=importRows.map((r,i)=>({r,i})).filter(({r})=>!r._keep&&findDuplicates(r.title,r.composer).length);
   if(!toMerge.length){toast('No duplicates to merge','info');return;}
+  const choice=await _askBatchCopiesChoice(toMerge.length);
+  if(choice===null)return; // user cancelled
   const btn=document.getElementById('merge-all-btn');btn.disabled=true;const orig=btn.innerHTML;
   let updated=0,failed=0;
   for(let k=toMerge.length-1;k>=0;k--){
@@ -2382,7 +2456,7 @@ async function mergeAllDuplicates(){
     const dups=findDuplicates(r.title,r.composer);
     if(!dups.length){importRows.splice(i,1);updated++;continue;}
     const {tab,entry}=dups[0];
-    const merged=buildMergedEntry(entry,r);
+    const merged=buildMergedEntry(entry,r,choice);
     try{
       const resp=await fetch(`/api/entries/${tab}/${entry._id}`,adminFetchOpts(merged,'PUT'));
       if(resp.ok){const j=await resp.json();const idx=data[tab].findIndex(e=>e._id===entry._id);if(idx>-1)data[tab][idx]=j.entry;importRows.splice(i,1);updated++;}
