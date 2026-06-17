@@ -760,6 +760,7 @@ let GENRES   = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater'
 function addToVoicings(v){
   if(!v||VOICINGS.includes(v))return;
   VOICINGS.push(v);
+  try{const c=JSON.parse(localStorage.getItem('customVoicings')||'[]');if(!c.includes(v)){c.push(v);localStorage.setItem('customVoicings',JSON.stringify(c));}}catch{}
   const dl=document.getElementById('voicings-dl');
   if(dl)dl.insertAdjacentHTML('beforeend',`<option value="${esc(v)}">`);
   ['work','personal','all'].forEach(t=>{const s=document.getElementById('fvoicing-'+t);if(s&&![...s.options].some(o=>o.value===v))s.insertAdjacentHTML('beforeend',`<option value="${esc(v)}">${esc(v)}</option>`);});
@@ -767,11 +768,15 @@ function addToVoicings(v){
 function addToGenres(g){
   if(!g||GENRES.includes(g))return;
   GENRES.push(g);
+  try{const c=JSON.parse(localStorage.getItem('customGenres')||'[]');if(!c.includes(g)){c.push(g);localStorage.setItem('customGenres',JSON.stringify(c));}}catch{}
   const dl=document.getElementById('genres-dl');
   if(dl)dl.insertAdjacentHTML('beforeend',`<option value="${esc(g)}">`);
   ['work','personal','all'].forEach(t=>{const s=document.getElementById('fgenre-'+t);if(s&&![...s.options].some(o=>o.value===g))s.insertAdjacentHTML('beforeend',`<option value="${esc(g)}">${esc(g)}</option>`);});
 }
 function initDatalists(){
+  // Load custom options persisted from previous sessions
+  try{JSON.parse(localStorage.getItem('customVoicings')||'[]').forEach(v=>{if(!VOICINGS.includes(v))VOICINGS.push(v);});}catch{}
+  try{JSON.parse(localStorage.getItem('customGenres')||'[]').forEach(g=>{if(!GENRES.includes(g))GENRES.push(g);});}catch{}
   const vdl=document.getElementById('voicings-dl');
   if(vdl)vdl.innerHTML=VOICINGS.map(v=>`<option value="${esc(v)}">`).join('');
   const gdl=document.getElementById('genres-dl');
@@ -1235,12 +1240,12 @@ async function suggestGenresForLib(tab){
     if(btn){btn.disabled=false;btn.innerHTML=orig;}
     return;
   }
-  const targets=data[tab].filter(e=>!e.genre&&e.title);
-  if(!targets.length){toast('Every entry already has a genre','info');return;}
+  const targets=data[tab].filter(e=>(!e.genre||e.genre==='Other')&&e.title);
+  if(!targets.length){toast('All entries have specific genres assigned','info');return;}
   if(cfgInfo&&!cfgInfo.geminiKeySet){toast('Set up your free scanning key first (Settings tab)','error');return;}
   const btn=document.getElementById('suggest-genre-lib-btn-'+tab);
   btn.disabled=true;const orig=btn.innerHTML;
-  let filled=0;
+  let filled=0,skipped=0;
   try{
     for(let o=0;o<targets.length;o+=50){
       const chunk=targets.slice(o,o+50);
@@ -1250,17 +1255,21 @@ async function suggestGenresForLib(tab){
       const j=await r.json();
       if(!r.ok)throw new Error(j.error||'failed');
       for(let k=0;k<chunk.length;k++){
-        if(j.genres[k]&&!chunk[k].genre){
-          const updated={...chunk[k],genre:j.genres[k]};
+        const suggested=j.genres[k];
+        if(suggested&&suggested!=='Other'&&suggested!==chunk[k].genre){
+          const updated={...chunk[k],genre:suggested};
           try{
             const pr=await fetch(`/api/entries/${tab}/${chunk[k]._id}`,adminFetchOpts(updated,'PUT'));
             if(pr.ok){const pj=await pr.json();const idx=data[tab].findIndex(e=>e._id===chunk[k]._id);if(idx>-1)data[tab][idx]=pj.entry;filled++;}
           }catch{}
+        } else {
+          skipped++;
         }
       }
     }
     renderTable(tab);
-    toast(`Suggested genres for ${filled} entries — glance over them`,'success',5000);
+    const msg=filled>0?`Updated ${filled} genre${filled===1?'':'s'}${skipped>0?`, ${skipped} unchanged`:''}`:`All ${skipped} entries already matched — no changes`;
+    toast(msg,'success',5000);
   }catch(e){toast('Genre suggestion stopped: '+e.message,'error');}
   finally{btn.disabled=false;btn.innerHTML=orig;}
 }
@@ -2367,25 +2376,41 @@ async function parsePasteBox(){
 }
 
 async function autoSuggestImportGenres(count){
-  const targets=importRows.map((r,i)=>({r,i})).filter(x=>!x.r.genre&&x.r.title);
-  if(!targets.length){toast('Links added where found — review below','success');return;}
+  const targets=importRows.map((r,i)=>({r,i})).filter(x=>(!x.r.genre||x.r.genre==='Other')&&x.r.title);
+  if(!targets.length){
+    toast(`Parsed ${count} piece${count===1?'':'s'} — links added where found. Review below.`,'success');
+    return;
+  }
   toast(`Suggesting genres for ${targets.length} piece${targets.length===1?'':'s'}…`,'info');
   try{
     const r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:targets.slice(0,50).map(x=>({title:x.r.title,composer:x.r.composer||''}))}));
-    if(!r.ok){toast('Links added where found — review below','success');return;}
+    if(!r.ok){
+      let errMsg='';
+      try{const ej=await r.json();errMsg=ej.error||'';}catch{}
+      if(errMsg.toLowerCase().includes('key')||r.status===400){
+        toast(`Parsed ${count} piece${count===1?'':'s'} — add a scanning key in Settings to auto-detect genres. Review below.`,'info',5000);
+      } else {
+        toast(`Parsed ${count} piece${count===1?'':'s'} — links added where found. Review below.`,'success');
+      }
+      return;
+    }
     const j=await r.json();
+    let filled=0;
     const newGens=new Set();
     targets.slice(0,50).forEach((x,k)=>{
       const g=j.genres[k];
-      if(g&&!importRows[x.i].genre){importRows[x.i].genre=g;if(!GENRES.includes(g))newGens.add(g);}
+      if(g&&g!=='Other'){importRows[x.i].genre=g;filled++;if(!GENRES.includes(g))newGens.add(g);}
     });
     renderImportRows();
     for(const g of newGens){
       if(confirm(`AI suggests a new genre "${g}" — add it to your list?`)){addToGenres(g);}
-      else{importRows.forEach(r=>{if(r.genre===g)r.genre='';});renderImportRows();}
+      else{importRows.forEach(row=>{if(row.genre===g)row.genre='';});renderImportRows();}
     }
-    toast('Links and genres added — review and adjust below','success',4000);
-  }catch{toast('Links added where found — review below','success');}
+    const summary=filled>0?`genres suggested for ${filled}. `:'';
+    toast(`Parsed ${count} piece${count===1?'':'s'} — ${summary}Review and adjust below.`,'success',4500);
+  }catch{
+    toast(`Parsed ${count} piece${count===1?'':'s'} — links added where found. Review below.`,'success');
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
