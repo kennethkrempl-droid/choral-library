@@ -159,10 +159,11 @@ tr.dup-group-sep td { padding:0; height:8px; background:var(--bg); border-top:2p
 .clear-filters { display:none; }
 .clear-filters.visible { display:inline-flex; }
 
-/* ── Bulk bar ── */
-.bulk-bar { display:none; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 16px; background:var(--navy-soft); border-bottom:1px solid var(--accent-line); font-size:13px; }
+/* ── Bulk bar (fixed bottom) ── */
+.bulk-bar { display:none; align-items:center; gap:8px; flex-wrap:wrap; padding:12px 24px; background:var(--surface); border-top:2px solid var(--accent-line); box-shadow:0 -4px 24px rgba(15,23,42,.18); font-size:13px; position:fixed; bottom:0; left:0; right:0; z-index:150; }
 .bulk-bar.visible { display:flex; }
 .bulk-count { font-weight:600; color:var(--accent); margin-right:4px; }
+body.bulk-active { padding-bottom:60px; }
 
 /* ── Table ── */
 .table-wrap { overflow-x:auto; }
@@ -740,10 +741,17 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
 
 <div class="modal-overlay" id="merge-modal">
   <div class="modal" style="max-width:640px;">
-    <div class="modal-header"><h2>Merge Two Entries</h2><button class="btn-ghost btn-icon" onclick="closeMergeModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-header">
+      <div>
+        <h2 id="merge-modal-title">Merge Two Entries</h2>
+        <div id="merge-modal-progress" style="font-size:12px;color:var(--muted);margin-top:2px;display:none;"></div>
+      </div>
+      <button class="btn-ghost btn-icon" onclick="closeMergeModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
     <div class="modal-body" id="merge-modal-body"></div>
     <div class="modal-footer">
-      <button class="btn-ghost" onclick="closeMergeModal()">Cancel</button>
+      <button class="btn-ghost" onclick="closeMergeModal()">Done</button>
+      <button class="btn-ghost" id="skip-merge-btn" onclick="skipMergePair()" style="display:none;">Skip →</button>
       <button class="btn-primary" onclick="confirmMerge()">Merge →</button>
     </div>
   </div>
@@ -947,6 +955,7 @@ function buildPanel(tab){
       <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"><option value="">All Genres</option></select>
       <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">${ICO.x} Clear</button>
       <button class="btn-secondary btn-sm admin-only" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">${ICO.search} Find Duplicates</button>
+      <button class="btn-secondary btn-sm admin-only" onclick="openMergeQueue('${tab}')" title="Scan for duplicates and merge them one by one">${ICO.merge} Merge Duplicates</button>
       <button class="btn-gold btn-sm admin-only" id="suggest-genre-lib-btn-${tab}" onclick="suggestGenresForLib('${tab}')" title="AI-suggest genres for entries that don't have one">${ICO.sparkles} Suggest Genres</button>
       <button class="btn-gold btn-sm admin-only" id="find-links-btn-${tab}" onclick="findAllLinks('${tab}')" title="Auto-find links for all entries that don't have one (JW Pepper for octavos, Amazon for books)">${ICO.link} Find Links</button>
       <span style="flex:1"></span>
@@ -1613,12 +1622,52 @@ function closeBulkTagModal(){document.getElementById('bulk-tag-modal').classList
 
 // ── Merge two entries ─────────────────────────────────────────────────────
 let mergeState=null;
+
+function buildMergeQueue(tab){
+  const pairs=[];
+  const tabs=tab==='all'?['work','personal']:[tab];
+  const seen=new Set();
+  for(const t of tabs){
+    const entries=data[t];
+    for(let i=0;i<entries.length;i++){
+      const ti=norm(entries[i].title);if(!ti)continue;
+      for(let j=i+1;j<entries.length;j++){
+        const tj=norm(entries[j].title);
+        if(ti===tj||fuzzyTitleMatch(ti,tj)){
+          const key=`${entries[i]._id}|${entries[j]._id}`;
+          if(!seen.has(key)){seen.add(key);pairs.push({tab:t,a:entries[i],b:entries[j]});}
+        }
+      }
+    }
+  }
+  return pairs;
+}
+function openMergeQueue(tab){
+  const queue=buildMergeQueue(tab);
+  if(!queue.length){toast('No duplicates found in this tab','info');return;}
+  _openMergePair(queue[0].tab,queue[0].a,queue[0].b,queue,0);
+}
+function skipMergePair(){
+  if(!mergeState?.queue)return;
+  const next=mergeState.queueIdx+1;
+  const q=mergeState.queue;
+  if(next>=q.length){closeMergeModal();toast('All pairs reviewed','info');return;}
+  // re-fetch live entries (previous merges may have updated them)
+  const pa=data[q[next].tab].find(e=>e._id===q[next].a._id);
+  const pb=data[q[next].tab].find(e=>e._id===q[next].b._id);
+  if(!pa||!pb){mergeState.queueIdx=next;skipMergePair();return;} // already merged, skip
+  _openMergePair(q[next].tab,pa,pb,q,next);
+}
+
 function openMergeModal(tab){
   const ids=[...selected[tab]];
   if(ids.length!==2)return;
   const a=data[tab].find(e=>e._id===ids[0]),b=data[tab].find(e=>e._id===ids[1]);
   if(!a||!b)return;
-  mergeState={tab,a,b};
+  _openMergePair(tab,a,b,null,0);
+}
+function _openMergePair(tab,a,b,queue,queueIdx){
+  mergeState={tab,a,b,queue,queueIdx};
   const fields=[
     {key:'title',label:'Title'},
     {key:'composer',label:'Composer / Author'},
@@ -1668,6 +1717,12 @@ function openMergeModal(tab){
       </div>
     </td>
   </tr>`;
+  const inQueue=queue!==null;
+  document.getElementById('merge-modal-title').textContent=inQueue?'Merge Duplicate':'Merge Two Entries';
+  const prog=document.getElementById('merge-modal-progress');
+  prog.style.display=inQueue?'':'none';
+  if(inQueue)prog.textContent=`Pair ${queueIdx+1} of ${queue.length}`;
+  document.getElementById('skip-merge-btn').style.display=inQueue?'':'none';
   document.getElementById('merge-modal-body').innerHTML=`
     <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Pick which value to keep for each field. The entry not picked will be permanently deleted.</p>
     <table style="width:100%;border-collapse:collapse;">
@@ -1708,8 +1763,20 @@ async function confirmMerge(){
     await fetch(`/api/entries/${tab}/${dropEntry._id}`,adminFetchOpts({},'DELETE'));
     data[tab]=data[tab].filter(e=>e._id!==dropEntry._id);
     selected[tab].delete(dropEntry._id);selected[tab].delete(keepEntry._id);
-    renderAll();closeMergeModal();
-    toast(`Merged into "${merged.title}" (${merged.copies} copies)`,'success',4000);
+    renderAll();
+    const savedQueue=mergeState?.queue, savedIdx=mergeState?.queueIdx??0;
+    toast(`Merged into "${merged.title}" (${merged.copies} copies)`,'success',3000);
+    if(savedQueue){
+      // advance to next pair in queue
+      const next=savedIdx+1;
+      if(next>=savedQueue.length){closeMergeModal();toast(`All ${savedQueue.length} pair${savedQueue.length===1?'':'s'} reviewed`,'success',3000);return;}
+      const pa=data[savedQueue[next].tab].find(e=>e._id===savedQueue[next].a._id);
+      const pb=data[savedQueue[next].tab].find(e=>e._id===savedQueue[next].b._id);
+      if(!pa||!pb){mergeState={...mergeState,queueIdx:next};skipMergePair();return;}
+      _openMergePair(savedQueue[next].tab,pa,pb,savedQueue,next);
+    } else {
+      closeMergeModal();
+    }
   }catch(e){toast('Merge failed: '+e.message,'error');}
 }
 
@@ -1743,10 +1810,17 @@ function toggleSelectAll(tab,checked){
 function clearSelection(tab){selected[tab].clear();renderTable(tab);}
 function updateBulkBar(tab){
   const n=selected[tab].size;
-  document.getElementById('bulk-bar-'+tab).classList.toggle('visible',n>0&&isAdmin);
+  const visible=n>0&&isAdmin;
+  document.getElementById('bulk-bar-'+tab).classList.toggle('visible',visible);
+  document.body.classList.toggle('bulk-active',['work','personal','all'].some(t=>selected[t].size>0&&isAdmin));
   document.getElementById('bulk-count-'+tab).textContent=n+' selected';
   const mergeBtn=document.getElementById('bulk-merge-btn-'+tab);
-  if(mergeBtn)mergeBtn.style.display=n===2?'':'none';
+  if(mergeBtn){
+    mergeBtn.style.display=n>=2?'':'none';
+    mergeBtn.disabled=n!==2;
+    mergeBtn.title=n===2?'Merge these two entries':'Select exactly 2 entries to merge';
+    mergeBtn.innerHTML=n===2?`${ICO.merge} Merge 2`:`${ICO.merge} Merge (deselect ${n-2} to merge)`;
+  }
 }
 
 // ── Request system ────────────────────────────────────────────────────────
