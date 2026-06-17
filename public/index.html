@@ -269,6 +269,10 @@ input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--acc
 .option-list-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; align-items:center; }
 .option-list-saved { font-size:11px; color:var(--success); opacity:0; transition:opacity .4s; }
 .option-list-saved.show { opacity:1; }
+/* Merge queue type tabs */
+.merge-type-tab { background:none; border:none; border-bottom:2px solid transparent; padding:8px 14px; font-size:12px; font-weight:600; color:var(--muted); cursor:pointer; margin-bottom:-1px; transition:color .15s,border-color .15s; }
+.merge-type-tab:hover { color:var(--ink); }
+.merge-type-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
 
 /* ── Google wizard ── */
 .wizard-steps { display:flex; margin-bottom:16px; }
@@ -748,6 +752,7 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
       </div>
       <button class="btn-ghost btn-icon" onclick="closeMergeModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
+    <div id="merge-type-tabbar" style="display:none;gap:0;border-bottom:1px solid var(--line);padding:0 16px;flex-wrap:wrap;"></div>
     <div class="modal-body" id="merge-modal-body"></div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeMergeModal()">Done</button>
@@ -1150,6 +1155,22 @@ function fuzzyTitleMatch(a,b){
   // Early bailout: length difference alone exceeds the 20% edit distance threshold
   if(maxLen<4||(maxLen-minLen)>maxLen*0.2)return false;
   return editDist(a,b)/maxLen<=0.2;
+}
+// Full duplicate check: title (fuzzy) + composer + voicing (for octavos)
+function isDuplicate(a,b){
+  if(!a||!b||a._id===b._id) return false;
+  const ta=norm(a.title), tb=norm(b.title);
+  if(!ta||!tb) return false;
+  if(ta!==tb&&!fuzzyTitleMatch(ta,tb)) return false;
+  // Composer must match when both entries have one
+  const ca=personKey(a.composer||a.author||''), cb=personKey(b.composer||b.author||'');
+  if(ca&&cb&&ca!==cb) return false;
+  // For octavos: voicing must match when both entries have one
+  if(a._type==='octavo'&&b._type==='octavo'){
+    const va=(a.voicing||'').toLowerCase().trim(), vb=(b.voicing||'').toLowerCase().trim();
+    if(va&&vb&&va!==vb) return false;
+  }
+  return true;
 }
 
 function findDuplicates(title,person,excludeId){
@@ -1623,17 +1644,15 @@ function closeBulkTagModal(){document.getElementById('bulk-tag-modal').classList
 // ── Merge two entries ─────────────────────────────────────────────────────
 let mergeState=null;
 
-function buildMergeQueue(tab){
+function buildMergeQueue(tab, typeFilter){
   const pairs=[];
   const tabs=tab==='all'?['work','personal']:[tab];
   const seen=new Set();
   for(const t of tabs){
-    const entries=data[t];
+    const entries=typeFilter?data[t].filter(e=>e._type===typeFilter):data[t];
     for(let i=0;i<entries.length;i++){
-      const ti=norm(entries[i].title);if(!ti)continue;
       for(let j=i+1;j<entries.length;j++){
-        const tj=norm(entries[j].title);
-        if(ti===tj||fuzzyTitleMatch(ti,tj)){
+        if(isDuplicate(entries[i],entries[j])){
           const key=`${entries[i]._id}|${entries[j]._id}`;
           if(!seen.has(key)){seen.add(key);pairs.push({tab:t,a:entries[i],b:entries[j]});}
         }
@@ -1643,9 +1662,21 @@ function buildMergeQueue(tab){
   return pairs;
 }
 function openMergeQueue(tab){
-  const queue=buildMergeQueue(tab);
-  if(!queue.length){toast('No duplicates found in this tab','info');return;}
-  _openMergePair(queue[0].tab,queue[0].a,queue[0].b,queue,0);
+  const allQ=buildMergeQueue(tab);
+  if(!allQ.length){toast('No duplicates found','info');return;}
+  const octQ=allQ.filter(p=>p.a._type==='octavo');
+  const bookQ=allQ.filter(p=>p.a._type==='book');
+  const hasMixed=octQ.length>0&&bookQ.length>0;
+  const queues=hasMixed?{all:allQ,octavo:octQ,book:bookQ}:null;
+  _openMergePair(allQ[0].tab,allQ[0].a,allQ[0].b,allQ,0,queues);
+}
+function switchMergeQueueType(typeKey){
+  if(!mergeState?.queues)return;
+  const q=mergeState.queues[typeKey];
+  if(!q||!q.length){toast('No duplicates of this type','info');return;}
+  const savedQueues=mergeState.queues;
+  mergeState={...mergeState,activeTypeKey:typeKey};
+  _openMergePair(q[0].tab,q[0].a,q[0].b,q,0,savedQueues);
 }
 function skipMergePair(){
   if(!mergeState?.queue)return;
@@ -1656,7 +1687,7 @@ function skipMergePair(){
   const pa=data[q[next].tab].find(e=>e._id===q[next].a._id);
   const pb=data[q[next].tab].find(e=>e._id===q[next].b._id);
   if(!pa||!pb){mergeState.queueIdx=next;skipMergePair();return;} // already merged, skip
-  _openMergePair(q[next].tab,pa,pb,q,next);
+  _openMergePair(q[next].tab,pa,pb,q,next,mergeState.queues);
 }
 
 function openMergeModal(tab){
@@ -1666,8 +1697,8 @@ function openMergeModal(tab){
   if(!a||!b)return;
   _openMergePair(tab,a,b,null,0);
 }
-function _openMergePair(tab,a,b,queue,queueIdx){
-  mergeState={tab,a,b,queue,queueIdx};
+function _openMergePair(tab,a,b,queue,queueIdx,queues){
+  mergeState={tab,a,b,queue,queueIdx,queues,activeTypeKey:mergeState?.activeTypeKey||'all'};
   const fields=[
     {key:'title',label:'Title'},
     {key:'composer',label:'Composer / Author'},
@@ -1723,6 +1754,20 @@ function _openMergePair(tab,a,b,queue,queueIdx){
   prog.style.display=inQueue?'':'none';
   if(inQueue)prog.textContent=`Pair ${queueIdx+1} of ${queue.length}`;
   document.getElementById('skip-merge-btn').style.display=inQueue?'':'none';
+  // Type tab bar (only shown when queue has both octavos and books)
+  const typeTabBar=document.getElementById('merge-type-tabbar');
+  if(queues&&queues.octavo&&queues.book&&queues.octavo.length>0&&queues.book.length>0){
+    const activeKey=mergeState.activeTypeKey||'all';
+    typeTabBar.style.display='flex';
+    typeTabBar.innerHTML=[
+      ['all',`All (${queues.all.length})`],
+      ['octavo',`Octavos (${queues.octavo.length})`],
+      ['book',`Books (${queues.book.length})`]
+    ].map(([k,lbl])=>`<button class="merge-type-tab${activeKey===k?' active':''}" onclick="switchMergeQueueType('${k}')">${lbl}</button>`).join('');
+  } else {
+    typeTabBar.style.display='none';
+    typeTabBar.innerHTML='';
+  }
   document.getElementById('merge-modal-body').innerHTML=`
     <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Pick which value to keep for each field. The entry not picked will be permanently deleted.</p>
     <table style="width:100%;border-collapse:collapse;">
@@ -1764,7 +1809,7 @@ async function confirmMerge(){
     data[tab]=data[tab].filter(e=>e._id!==dropEntry._id);
     selected[tab].delete(dropEntry._id);selected[tab].delete(keepEntry._id);
     renderAll();
-    const savedQueue=mergeState?.queue, savedIdx=mergeState?.queueIdx??0;
+    const savedQueue=mergeState?.queue, savedIdx=mergeState?.queueIdx??0, savedQueues=mergeState?.queues;
     toast(`Merged into "${merged.title}" (${merged.copies} copies)`,'success',3000);
     if(savedQueue){
       // advance to next pair in queue
@@ -1773,7 +1818,7 @@ async function confirmMerge(){
       const pa=data[savedQueue[next].tab].find(e=>e._id===savedQueue[next].a._id);
       const pb=data[savedQueue[next].tab].find(e=>e._id===savedQueue[next].b._id);
       if(!pa||!pb){mergeState={...mergeState,queueIdx:next};skipMergePair();return;}
-      _openMergePair(savedQueue[next].tab,pa,pb,savedQueue,next);
+      _openMergePair(savedQueue[next].tab,pa,pb,savedQueue,next,savedQueues);
     } else {
       closeMergeModal();
     }
@@ -1938,12 +1983,9 @@ function getLibraryDupIds(tab){
   const allEntries=[...data.work,...data.personal];
   const dupIds=new Set();
   for(const e of viewEntries){
-    const ti=norm(e.title);
-    if(!ti) continue;
+    if(!norm(e.title)) continue;
     for(const f of allEntries){
-      if(f._id===e._id) continue;
-      const tj=norm(f.title);
-      if(ti===tj||fuzzyTitleMatch(ti,tj)){dupIds.add(e._id);break;}
+      if(isDuplicate(e,f)){dupIds.add(e._id);break;}
     }
   }
   return dupIds;
@@ -2086,12 +2128,10 @@ function renderTable(tab){
       const groups=new Map(); // id -> groupId
       let gid=0;
       for(let i=0;i<sorted.length;i++){
-        const ti=norm(sorted[i].title);
         for(let j=i+1;j<sorted.length;j++){
           // In the all-music tab, work and personal are intentionally separate — skip cross-library pairs
           if(tab==='all'&&sorted[i].__src!==sorted[j].__src) continue;
-          const tj=norm(sorted[j].title);
-          if(ti===tj||fuzzyTitleMatch(ti,tj)){
+          if(isDuplicate(sorted[i],sorted[j])){
             const gi=groups.get(sorted[i]._id)??null,gj=groups.get(sorted[j]._id)??null;
             const g=gi??gj??gid++;
             groups.set(sorted[i]._id,g);groups.set(sorted[j]._id,g);
