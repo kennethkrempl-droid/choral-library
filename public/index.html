@@ -184,6 +184,7 @@ td.cell-title .title-link:hover { color:var(--accent); text-decoration:none; }
 td.cell-title .ext { opacity:.4; margin-left:4px; display:inline-flex; align-items:center; vertical-align:middle; }
 .tag-chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:3px; }
 .tag-chip { font-size:10px; font-weight:600; background:var(--accent-light); color:var(--accent); border:1px solid var(--accent-line); border-radius:20px; padding:0 7px; line-height:16px; }
+.lp-chip { font-size:10px; color:var(--muted); margin-top:3px; display:block; }
 input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
 .badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:var(--bg); border:1px solid var(--line); color:var(--muted); }
 .badge.octavo { background:#ede9fe; color:#6d28d9; border-color:#ddd6fe; }
@@ -692,6 +693,8 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
   </div>
 </div>
 
+<datalist id="voicings-dl"></datalist>
+<datalist id="genres-dl"></datalist>
 <div id="cover-preview"><div id="cover-preview-inner"><img id="cover-preview-img" alt=""><div id="cover-preview-title"></div><div id="cover-preview-meta"></div></div></div>
 <div id="toast-container"></div>
 
@@ -751,8 +754,29 @@ let html5QrCode = null, scannerPrefix = null, lastAutoIsbn = {};
 let shareInfo   = null;
 let cfgInfo     = null;
 
-const VOICINGS = ['SATB','SAB','SSA','SSAA','SSATB','SATTBB','SSAATTBB','TTB','TTBB','TBB','SA','3-Part Mixed','3-Part','2-Part','Unison','Other'];
-const GENRES   = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater','Jazz','Sacred','Other'];
+let VOICINGS = ['SATB','SAB','SSA','SSAA','SSATB','SATTBB','SSAATTBB','TTB','TTBB','TBB','SA','3-Part Mixed','3-Part','2-Part','Unison','Other'];
+let GENRES   = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater','Jazz','Sacred','Other'];
+
+function addToVoicings(v){
+  if(!v||VOICINGS.includes(v))return;
+  VOICINGS.push(v);
+  const dl=document.getElementById('voicings-dl');
+  if(dl)dl.insertAdjacentHTML('beforeend',`<option value="${esc(v)}">`);
+  ['work','personal','all'].forEach(t=>{const s=document.getElementById('fvoicing-'+t);if(s&&![...s.options].some(o=>o.value===v))s.insertAdjacentHTML('beforeend',`<option value="${esc(v)}">${esc(v)}</option>`);});
+}
+function addToGenres(g){
+  if(!g||GENRES.includes(g))return;
+  GENRES.push(g);
+  const dl=document.getElementById('genres-dl');
+  if(dl)dl.insertAdjacentHTML('beforeend',`<option value="${esc(g)}">`);
+  ['work','personal','all'].forEach(t=>{const s=document.getElementById('fgenre-'+t);if(s&&![...s.options].some(o=>o.value===g))s.insertAdjacentHTML('beforeend',`<option value="${esc(g)}">${esc(g)}</option>`);});
+}
+function initDatalists(){
+  const vdl=document.getElementById('voicings-dl');
+  if(vdl)vdl.innerHTML=VOICINGS.map(v=>`<option value="${esc(v)}">`).join('');
+  const gdl=document.getElementById('genres-dl');
+  if(gdl)gdl.innerHTML=GENRES.map(g=>`<option value="${esc(g)}">`).join('');
+}
 
 // Hide admin-only elements unless body.is-admin
 document.head.insertAdjacentHTML('beforeend','<style>body:not(.is-admin) .admin-only{display:none !important}body.is-admin .viewer-only{display:none !important}</style>');
@@ -833,6 +857,7 @@ async function init() {
   if (p.get('error')) toast('Error: '+decodeURIComponent(p.get('error')),'error');
   history.replaceState(null,'',location.pathname);
   buildPanel('work'); buildPanel('personal'); buildPanel('all'); buildForms();
+  initDatalists();
   await Promise.all([loadData(), loadAuthStatus(), checkAdminStatus()]);
   renderAll(); loadShareInfo();
 }
@@ -910,8 +935,8 @@ document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',
 function octavoFields(){return[
   {key:'title',label:'Title',type:'text',required:true},
   {key:'composer',label:'Composer / Arranger',type:'text'},
-  {key:'voicing',label:'Voicing',type:'select',options:VOICINGS},
-  {key:'genre',label:'Genre',type:'select',options:GENRES},
+  {key:'voicing',label:'Voicing',type:'datalist'},
+  {key:'genre',label:'Genre',type:'datalist'},
   {key:'copies',label:'Copy Count',type:'number',min:0},
   {key:'lastPerformed',label:'Last Performed',type:'date'},
   {key:'link',label:'Song Link (URL)',type:'url'},
@@ -921,7 +946,7 @@ function bookFields(){return[
   {key:'isbn',label:'ISBN',type:'text',isbnField:true},
   {key:'title',label:'Title',type:'text',required:true},
   {key:'author',label:'Author / Editor',type:'text'},
-  {key:'genre',label:'Genre',type:'select',options:GENRES},
+  {key:'genre',label:'Genre',type:'datalist'},
   {key:'copies',label:'Copies',type:'number',min:0},
   {key:'publisher',label:'Publisher',type:'text'},
   {key:'year',label:'Year',type:'text'},
@@ -947,7 +972,12 @@ function buildFieldHTML(f,prefix,value){
   if(f.key==='tags'&&Array.isArray(value)) val=value.join(', ');
   val=(val!==undefined&&val!==null)?escAttr(String(val)):'';
   let inner;
-  if (f.type==='select'){
+  if (f.type==='datalist'){
+    const listId=f.key==='voicing'?'voicings-dl':'genres-dl';
+    const ph=f.key==='voicing'?'e.g. SATB, SSA, 3-Part Mixed':'e.g. Classical, Sacred, Pop';
+    inner=`<input type="text" id="${id}" name="${f.key}" value="${val}" list="${listId}" placeholder="${ph}" autocomplete="off" ${req}>`;
+  }
+  else if (f.type==='select'){
     const opts=f.options.map(o=>`<option value="${escAttr(o)}"${value===o?' selected':''}>${esc(o)}</option>`).join('');
     const extra=(value&&!f.options.includes(value))?`<option value="${escAttr(value)}" selected>${esc(value)}</option>`:'';
     inner=`<select id="${id}" name="${f.key}" ${req}><option value="">Select…</option>${opts}${extra}</select>`;
@@ -1338,6 +1368,13 @@ function submitForm(e,tab){
   e.preventDefault();
   const entry=readFormEntry(e.target,entryTypes[tab]);
   const doAdd=async()=>{
+    // Prompt to add new voicing/genre to lists
+    if(entry.voicing&&!VOICINGS.includes(entry.voicing)){
+      if(confirm(`"${entry.voicing}" isn't in your voicing list — add it?`)) addToVoicings(entry.voicing);
+    }
+    if(entry.genre&&!GENRES.includes(entry.genre)){
+      if(confirm(`"${entry.genre}" isn't in your genre list — add it?`)) addToGenres(entry.genre);
+    }
     entry._id=Date.now();
     const r=await fetch(`/api/entries/${tab}`,adminFetchOpts(entry));
     const j=await r.json();
@@ -1365,6 +1402,12 @@ async function submitEdit(e){
   e.preventDefault();
   const{tab,id,type}=editTarget;
   const entry={...readFormEntry(document.getElementById('form-edit'),type),_type:type,_id:id};
+  if(entry.voicing&&!VOICINGS.includes(entry.voicing)){
+    if(confirm(`"${entry.voicing}" isn't in your voicing list — add it?`)) addToVoicings(entry.voicing);
+  }
+  if(entry.genre&&!GENRES.includes(entry.genre)){
+    if(confirm(`"${entry.genre}" isn't in your genre list — add it?`)) addToGenres(entry.genre);
+  }
   const r=await fetch(`/api/entries/${tab}/${id}`,adminFetchOpts(entry,'PUT'));
   const j=await r.json();
   if(!r.ok){toast(j.error||'Could not save','error');return;}
@@ -1450,7 +1493,7 @@ function openMergeModal(tab){
     {key:'composer',label:'Composer / Author'},
     {key:'voicing',label:'Voicing'},
     {key:'genre',label:'Genre'},
-    {key:'copies',label:'Copies',hint:'Values will be added together'},
+    {key:'copies',label:'Copies',_copiesRow:true},
     {key:'lastPerformed',label:'Last Performed'},
     {key:'link',label:'Link'},
     {key:'description',label:'Description'},
@@ -1474,8 +1517,28 @@ function openMergeModal(tab){
       </td>
     </tr>`;
   };
+  const ca=parseInt(a.copies)||0, cb=parseInt(b.copies)||0;
+  const copiesRow=`<tr style="border-bottom:1px solid var(--line);">
+    <td style="padding:8px 10px;font-size:12px;color:var(--muted);white-space:nowrap;font-weight:600;">Copies</td>
+    <td colspan="2" style="padding:6px 8px;">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="radio" name="mf_copies" value="a" ${ca>=cb?'checked':''} style="accent-color:var(--accent);">
+          Keep A: ${ca}
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="radio" name="mf_copies" value="b" ${cb>ca?'checked':''} style="accent-color:var(--accent);">
+          Keep B: ${cb}
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="radio" name="mf_copies" value="sum" style="accent-color:var(--accent);">
+          Add together: ${ca+cb}
+        </label>
+      </div>
+    </td>
+  </tr>`;
   document.getElementById('merge-modal-body').innerHTML=`
-    <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Pick which value to keep for each field. The winning entry is kept and updated; the other is deleted. Copies are always added together.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Pick which value to keep for each field. The entry not picked will be permanently deleted.</p>
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr>
         <th style="padding:6px 10px;font-size:11px;text-transform:uppercase;color:var(--muted);text-align:left;"></th>
@@ -1483,7 +1546,8 @@ function openMergeModal(tab){
         <th style="padding:6px 8px;font-size:12px;font-weight:600;color:var(--accent);text-align:left;">Entry B</th>
       </tr></thead>
       <tbody>
-        ${fields.map(f=>row(f.label+(f.hint?`<br><span style="font-weight:400;font-size:10px;">${f.hint}</span>`:''),a[f.key]||'',b[f.key]||'',f.key)).join('')}
+        ${fields.filter(f=>!f._copiesRow).map(f=>row(f.label,a[f.key]||'',b[f.key]||'',f.key)).join('')}
+        ${copiesRow}
       </tbody>
     </table>
     <p style="font-size:12px;color:var(--muted);margin-top:10px;">Entry not picked will be <strong>permanently deleted</strong>.</p>`;
@@ -1499,7 +1563,9 @@ async function confirmMerge(){
     const v=document.querySelector(`input[name="mf_${k}"]:checked`)?.value;
     merged[k]=v==='b'?b[k]:a[k];
   });
-  merged.copies=String((parseInt(a.copies)||0)+(parseInt(b.copies)||0));
+  const copiesChoice=document.querySelector('input[name="mf_copies"]:checked')?.value;
+  const ca=parseInt(a.copies)||0, cb=parseInt(b.copies)||0;
+  merged.copies=String(copiesChoice==='sum'?ca+cb:copiesChoice==='b'?cb:ca);
   const keepEntry=document.querySelector('input[name="mf_title"]:checked')?.value==='b'?b:a;
   const dropEntry=keepEntry===a?b:a;
   try{
@@ -1836,7 +1902,8 @@ function renderTable(tab){
         if(c.key==='title'){
           const tags=(Array.isArray(e.tags)&&e.tags.length)?`<div class="tag-chips">${e.tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('')}</div>`:'';
           const inner=e.link?`<a class="title-link" href="${escAttr(e.link)}" target="_blank" title="Open link">${esc(e.title||'(untitled)')}<span class="ext">${ICO.extLink}</span></a>`:esc(e.title||'(untitled)');
-          return `<td class="cell-title" onmouseenter="scheduleCoverPreview('${srcTab}',${e._id})" onmouseleave="hideCoverPreview()">${inner}${tags}</td>`;
+          const lp=(isAdmin&&e._type==='octavo'&&e.lastPerformed)?`<div class="lp-chip">Last performed: ${esc(e.lastPerformed)}</div>`:'';
+          return `<td class="cell-title" onmouseenter="scheduleCoverPreview('${srcTab}',${e._id})" onmouseleave="hideCoverPreview()">${inner}${tags}${lp}</td>`;
         }
         if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-avail'}">${e.unavailable?'In Use':'Available'}</span></td>`;
         if(c.key==='__src') return `<td><span class="source-chip source-${e.__src||'work'}">${cap(e.__src||'work')}</span></td>`;
@@ -2104,7 +2171,8 @@ function renderImportRows(){
     const dups=findDuplicates(r.title,r.composer);
     const vOpts=VOICINGS.map(v=>`<option${r.voicing===v?' selected':''}>${v}</option>`).join('');
     const vExtra=(r.voicing&&!VOICINGS.includes(r.voicing))?`<option selected>${escAttr(r.voicing)}</option>`:'';
-    const gOpts=GENRES.map(g=>`<option${r.genre===g?' selected':''}>${g}</option>`).join('');
+    const gOpts=GENRES.map(g=>`<option value="${g}"${r.genre===g?' selected':''}>${g}</option>`).join('');
+    const gExtra=(r.genre&&!GENRES.includes(r.genre))?('<option value="'+escAttr(r.genre)+'" selected>'+esc(r.genre)+'</option>'):'';
     const countMismatch=dups.length&&String(dups[0].entry.copies||'')!==String(r.copies||'');
     const isFuzzy=dups.length&&dups[0].fuzzy;
     const dupTitle=countMismatch
@@ -2125,7 +2193,7 @@ function renderImportRows(){
       <td style="min-width:200px;">${dups.length?`<span title="${r._keep?'Marked as separate piece':dupTitle}" style="cursor:help;">${icon} </span>`:''}<input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.title)}" oninput="importRows[${i}].title=this.value">${matchInfo}</td>
       <td style="min-width:160px;"><input style="width:100%;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.composer)}" oninput="importRows[${i}].composer=this.value"></td>
       <td><select class="filter-select" onchange="importRows[${i}].voicing=this.value"><option value="">—</option>${vOpts}${vExtra}</select></td>
-      <td><select class="filter-select" onchange="importRows[${i}].genre=this.value"><option value="">—</option>${gOpts}</select></td>
+      <td><select class="filter-select" onchange="importRows[${i}].genre=this.value"><option value="">—</option>${gOpts}${gExtra}</select></td>
       <td><input type="number" min="0" style="width:64px;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;" value="${escAttr(r.copies)}" oninput="importRows[${i}].copies=this.value"></td>
       <td style="white-space:nowrap;display:flex;align-items:center;gap:3px;">${r.link?`<a href="${escAttr(r.link)}" target="_blank" title="JW Pepper link found" style="display:inline-flex;align-items:center;gap:2px;font-size:12px;color:var(--accent);">${ICO.link}<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:''}${rowBtns}<button class="btn-ghost btn-icon btn-sm" title="Remove this row without changing anything" onclick="importRows.splice(${i},1);renderImportRows()" style="color:var(--danger,#c0392b);">${ICO.trash}</button></td>
     </tr>`;
@@ -2234,6 +2302,11 @@ async function suggestGenres(){
 async function addImportRows(){
   const rows=importRows.filter(r=>r.title&&r.title.trim());
   if(!rows.length){toast('Nothing to add','info');return;}
+  // Prompt for any new voicings/genres not yet in lists
+  const newVs=[...new Set(rows.map(r=>r.voicing).filter(v=>v&&!VOICINGS.includes(v)))];
+  for(const v of newVs){if(confirm(`Add voicing "${v}" to your list?`))addToVoicings(v);}
+  const newGs=[...new Set(rows.map(r=>r.genre).filter(g=>g&&!GENRES.includes(g)))];
+  for(const g of newGs){if(confirm(`Add genre "${g}" to your list?`))addToGenres(g);}
   const tab=document.getElementById('import-target').value;
   const btn=document.getElementById('import-add-btn');btn.disabled=true;const orig=btn.innerHTML;
   let added=0,failed=0;
@@ -2256,27 +2329,63 @@ async function parsePasteBox(){
   const lines=document.getElementById('paste-box').value.split('\n').map(l=>l.trim()).filter(Boolean);
   if(!lines.length){toast('Paste some lines first','error');return;}
   const newRows=[];
+  const potVoicings={}; // unknown voicing string → array of row indices in newRows
+  const isVoicingLike=s=>/^[SATB]{2,8}$/i.test(s)||/^(unison|\d-?part(\s+mixed)?)$/i.test(s);
   for(const line of lines){
-    // Tab-separated (straight copy-paste from Google Sheets / Excel) or comma-separated
     const parts=(line.includes('\t')?line.split('\t'):line.split(',')).map(s=>s.trim());
     if(!parts[0])continue;
     let voicing='',genre='',copies='1',rest=parts.slice(1).filter(Boolean);
-    // recognize voicing, genre, and copy-count cells by their values, wherever they sit
     const vIdx=rest.findIndex(p=>VOICINGS.some(v=>v.toLowerCase()===p.toLowerCase()));
-    if(vIdx>-1)voicing=VOICINGS.find(v=>v.toLowerCase()===rest[vIdx].toLowerCase()),rest.splice(vIdx,1);
+    if(vIdx>-1){voicing=VOICINGS.find(v=>v.toLowerCase()===rest[vIdx].toLowerCase());rest.splice(vIdx,1);}
+    else{
+      // Detect voicing-like strings not yet in our list
+      const potIdx=rest.findIndex(p=>isVoicingLike(p));
+      if(potIdx>-1){
+        const raw=rest[potIdx];voicing=raw;rest.splice(potIdx,1);
+        (potVoicings[raw]=potVoicings[raw]||[]).push(newRows.length);
+      }
+    }
     const gIdx=rest.findIndex(p=>GENRES.some(g=>g.toLowerCase()===p.toLowerCase()));
-    if(gIdx>-1)genre=GENRES.find(g=>g.toLowerCase()===rest[gIdx].toLowerCase()),rest.splice(gIdx,1);
+    if(gIdx>-1){genre=GENRES.find(g=>g.toLowerCase()===rest[gIdx].toLowerCase());rest.splice(gIdx,1);}
     const nIdx=rest.findIndex(p=>/^\d+$/.test(p));
     if(nIdx>-1)copies=rest.splice(nIdx,1)[0];
     newRows.push({title:parts[0],composer:rest.join(', '),voicing,genre,copies,link:''});
   }
+  // Prompt user about unrecognized voicings
+  for(const[raw,indices]of Object.entries(potVoicings)){
+    if(confirm(`Found voicing "${raw}" not in your list — add it?`)){addToVoicings(raw);}
+    else{indices.forEach(i=>{newRows[i].voicing='';});}
+  }
   document.getElementById('paste-box').value='';
   importRows.push(...newRows);
   renderImportRows();
-  toast(`Parsed ${newRows.length} lines — finding JW Pepper links…`,'info');
+  toast(`Parsed ${newRows.length} ${newRows.length===1?'piece':'pieces'} — finding JW Pepper links…`,'info');
   for(const row of newRows){await enrichFromPepper(row);}
   renderImportRows();
-  toast('Links added where found — review below','success');
+  // Auto-suggest genres for pieces without one
+  await autoSuggestImportGenres(newRows.length);
+}
+
+async function autoSuggestImportGenres(count){
+  const targets=importRows.map((r,i)=>({r,i})).filter(x=>!x.r.genre&&x.r.title);
+  if(!targets.length){toast('Links added where found — review below','success');return;}
+  toast(`Suggesting genres for ${targets.length} piece${targets.length===1?'':'s'}…`,'info');
+  try{
+    const r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:targets.slice(0,50).map(x=>({title:x.r.title,composer:x.r.composer||''}))}));
+    if(!r.ok){toast('Links added where found — review below','success');return;}
+    const j=await r.json();
+    const newGens=new Set();
+    targets.slice(0,50).forEach((x,k)=>{
+      const g=j.genres[k];
+      if(g&&!importRows[x.i].genre){importRows[x.i].genre=g;if(!GENRES.includes(g))newGens.add(g);}
+    });
+    renderImportRows();
+    for(const g of newGens){
+      if(confirm(`AI suggests a new genre "${g}" — add it to your list?`)){addToGenres(g);}
+      else{importRows.forEach(r=>{if(r.genre===g)r.genre='';});renderImportRows();}
+    }
+    toast('Links and genres added — review and adjust below','success',4000);
+  }catch{toast('Links added where found — review below','success');}
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
