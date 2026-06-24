@@ -195,6 +195,39 @@ input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--acc
 .needs-cat-badge { display:inline-block; font-size:11px; font-weight:600; background:#fef3c7; border:1px solid #fde68a; color:#b45309; border-radius:6px; padding:2px 8px; white-space:nowrap; }
 .loc-tag-badge { display:inline-block; font-size:11px; font-weight:600; font-family:var(--mono,monospace); background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; border-radius:6px; padding:2px 8px; white-space:nowrap; }
 .computed-field { padding:7px 10px; background:var(--bg); border:1px solid var(--line); border-radius:var(--r-sm); min-height:34px; display:flex; align-items:center; }
+/* ── Zone / Shelving ─────────────────────────────────────────────────────── */
+.zone-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+.zone-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px; }
+.zone-card-warn { border-color:#fca5a5; background:#fff5f5; }
+.zone-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; gap:8px; }
+.zone-card-name { font-size:14px; font-weight:700; color:var(--ink); }
+.zone-card-stats { display:flex; flex-direction:column; align-items:flex-end; gap:2px; min-width:52px; }
+.zone-pct { font-size:16px; font-weight:800; color:var(--accent); }
+.zone-pct-warn { color:#dc2626; }
+.zone-progress-bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-bottom:8px; }
+.zone-progress-fill { height:100%; border-radius:3px; transition:width .3s; }
+.zone-warn-msg { font-size:11px; color:#b91c1c; font-weight:600; margin-bottom:8px; }
+.zone-no-cap-notice { font-size:13px; color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); padding:10px 14px; margin-bottom:20px; }
+.zone-shelves summary { font-size:12px; color:var(--muted); cursor:pointer; user-select:none; padding:4px 0; list-style:none; }
+.zone-shelves summary::-webkit-details-marker { display:none; }
+.shelf-list { display:flex; flex-direction:column; gap:4px; padding-top:6px; }
+.shelf-row { display:grid; grid-template-columns:52px 1fr 90px 52px; gap:6px; align-items:center; }
+.shelf-tag { font-size:11px; font-weight:700; font-family:var(--mono,monospace); color:var(--muted); }
+.shelf-bar-wrap { background:var(--line); border-radius:3px; height:5px; overflow:hidden; }
+.shelf-bar { height:5px; border-radius:3px; transition:width .3s; }
+.shelf-count { font-size:11px; color:var(--muted); white-space:nowrap; }
+.shelf-count.full { color:#dc2626; font-weight:600; }
+.shelf-cap-input { width:100%; padding:2px 4px; font-size:11px; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); text-align:right; }
+.zone-lookup { background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px; }
+.zone-suggest-box { font-size:13px; color:var(--muted); }
+.zone-suggest-ok { color:#15803d; font-weight:600; }
+.zone-suggest-warn { color:#b45309; font-weight:600; }
+.zone-suggest-err { color:#dc2626; font-weight:600; }
+.zone-editor-table { width:100%; border-collapse:collapse; font-size:13px; }
+.zone-editor-table th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; color:var(--muted); padding:6px 8px; border-bottom:1px solid var(--line); }
+.zone-editor-table td { padding:6px 8px; vertical-align:middle; border-bottom:1px solid var(--line); }
+.zone-editor-table input[type="text"],.zone-editor-table input[type="number"] { width:100%; padding:4px 6px; font-size:12px; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); }
+.zone-lookup-result-wrap { display:flex; align-items:center; min-height:28px; }
 .row-actions { display:flex; gap:3px; align-items:center; justify-content:flex-end; }
 .btn-request { background:transparent; color:var(--accent); border:1.5px solid var(--accent-line); font-size:12px; padding:3px 10px; border-radius:20px; }
 .btn-request:hover:not(:disabled) { background:var(--accent-light); }
@@ -379,6 +412,7 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
   <button class="tab-btn admin-only" data-tab="all">All Music <span class="tab-count" id="count-all">0</span></button>
   <button class="tab-btn active admin-only" data-tab="work">Work <span class="tab-count" id="count-work">0</span></button>
   <button class="tab-btn admin-only" data-tab="personal">Personal <span class="tab-count" id="count-personal">0</span></button>
+  <button class="tab-btn admin-only" data-tab="shelving"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg> Shelving</button>
   <button class="tab-btn admin-only" data-tab="import"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Import</button>
   <button class="tab-btn admin-only" data-tab="settings"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
 </nav>
@@ -387,6 +421,13 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
 <div class="tab-panel" id="tab-all"></div>
 <div class="tab-panel active" id="tab-work"></div>
 <div class="tab-panel" id="tab-personal"></div>
+
+<!-- ═══ SHELVING TAB ═══ -->
+<div class="tab-panel admin-only" id="tab-shelving">
+  <div style="padding:24px 8px;">
+    <div id="zone-dashboard"></div>
+  </div>
+</div>
 
 <!-- ═══ IMPORT TAB ═══ -->
 <div class="tab-panel" id="tab-import">
@@ -627,6 +668,26 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
       </div>
     </div>
 
+    <div class="settings-section admin-only" style="grid-column:1/-1;">
+      <div class="settings-section-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg> Shelving Zones
+        <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:4px;">— map season codes to physical shelf ranges</span>
+      </div>
+      <div class="settings-section-body">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Each zone groups related seasons onto a contiguous set of shelves. Season codes are comma-separated. Shelves are stored as explicit C#-S# assignments — edit them in the Shelving tab's per-shelf capacity inputs. Zone names are editable below.</p>
+        <div id="zone-editor-wrap">
+          <table class="zone-editor-table">
+            <thead><tr><th>Zone Name</th><th>Season Codes (comma-separated)</th><th>Shelf Count</th></tr></thead>
+            <tbody id="zone-editor-tbody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn-primary btn-sm" onclick="saveZoneEditor()">Save Zone Map</button>
+          <button class="btn-ghost btn-sm" onclick="resetZoneMap()">Reset to Defaults</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -763,10 +824,12 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
     <div class="modal-header"><h2>Set Location</h2><button class="btn-ghost btn-icon" onclick="closeBulkLocationModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Assign cabinet and shelf to all selected octavos. Leave a field blank to keep existing values.</p>
+      <div id="bl-zone-info" style="margin-bottom:10px;font-size:12px;color:var(--muted);min-height:20px;"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group"><label for="bl-cabinet">Cabinet (1–5)</label><input type="number" id="bl-cabinet" min="1" max="5" placeholder="1–5"></div>
-        <div class="form-group"><label for="bl-shelf">Shelf (1–7)</label><input type="number" id="bl-shelf" min="1" max="7" placeholder="1–7"></div>
+        <div class="form-group"><label for="bl-cabinet">Cabinet (1–5)</label><input type="number" id="bl-cabinet" min="1" max="5" placeholder="1–5" oninput="_updateBulkLocZone()"></div>
+        <div class="form-group"><label for="bl-shelf">Shelf (1–7)</label><input type="number" id="bl-shelf" min="1" max="7" placeholder="1–7" oninput="_updateBulkLocZone()"></div>
       </div>
+      <div id="bl-slot-info" style="margin-top:10px;font-size:13px;min-height:22px;"></div>
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeBulkLocationModal()">Cancel</button>
@@ -837,7 +900,7 @@ const ICO={
 // ── State ─────────────────────────────────────────────────────────────────
 let data        = { work:[], personal:[] };
 let entryTypes  = { work:'octavo', personal:'octavo' };
-let filters     = { work:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false}, personal:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false}, all:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false} };
+let filters     = { work:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false}, personal:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false}, all:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false} };
 let showDupsOnly = { work:false, personal:false, all:false };
 let sortState   = { work:{col:null,dir:1}, personal:{col:null,dir:1}, all:{col:null,dir:1} };
 let selected    = { work:new Set(), personal:new Set(), all:new Set() };
@@ -901,6 +964,90 @@ function getNextAccessionId(){
   const all=data.work.filter(e=>e._type==='octavo'&&e.accession_id);
   if(!all.length) return 1;
   return Math.max(...all.map(e=>e.accession_id))+1;
+}
+
+// ── Zone map ─────────────────────────────────────────────────────────────────
+const DEFAULT_ZONE_MAP=[
+  {key:'sacred',   name:'Sacred',           seasons:['SAC','EAS','SPR'],shelves:[{c:1,s:1},{c:1,s:2},{c:1,s:3},{c:1,s:4},{c:1,s:5},{c:1,s:6},{c:1,s:7},{c:2,s:1}]},
+  {key:'holiday',  name:'Holiday',           seasons:['HLD'],           shelves:[{c:2,s:2},{c:2,s:3},{c:2,s:4},{c:2,s:5},{c:2,s:6},{c:2,s:7}]},
+  {key:'secular',  name:'Secular/Seasonal',  seasons:['SEA','FOL'],     shelves:[{c:3,s:1},{c:3,s:2},{c:3,s:3},{c:3,s:4},{c:3,s:5},{c:3,s:6},{c:3,s:7}]},
+  {key:'pop',      name:'Pop/Show',          seasons:['POP','MT'],      shelves:[{c:4,s:1},{c:4,s:2},{c:4,s:3},{c:4,s:4},{c:4,s:5}]},
+  {key:'concert',  name:'Concert/Classical', seasons:['CLS'],           shelves:[{c:4,s:6},{c:4,s:7},{c:5,s:1},{c:5,s:2}]},
+  {key:'patriotic',name:'Patriotic/Misc',    seasons:['PAT','MSC'],     shelves:[{c:5,s:3},{c:5,s:4},{c:5,s:5}]},
+  {key:'growth',   name:'Growth (overflow)', seasons:[],                shelves:[{c:5,s:6},{c:5,s:7}]},
+];
+let ZONE_MAP=DEFAULT_ZONE_MAP.map(z=>({...z,shelves:z.shelves.map(s=>({...s}))}));
+let SHELF_CAP={default:null,overrides:{}};
+function _initZoneMap(){
+  try{const z=JSON.parse(localStorage.getItem('zoneMap'));if(z&&z.length)ZONE_MAP=z;}catch{}
+  try{const c=JSON.parse(localStorage.getItem('shelfCap'));if(c)SHELF_CAP=c;}catch{}
+}
+function _saveZoneMap(){try{localStorage.setItem('zoneMap',JSON.stringify(ZONE_MAP));}catch{}}
+function _saveShelfCap(){try{localStorage.setItem('shelfCap',JSON.stringify(SHELF_CAP));}catch{}}
+function getShelfCapacity(c,s){
+  const k=`C${c}-S${s}`;
+  if(SHELF_CAP.overrides[k]!=null)return SHELF_CAP.overrides[k];
+  return SHELF_CAP.default!=null?SHELF_CAP.default:null;
+}
+function getShelfOccupancy(c,s){
+  return data.work.filter(e=>e._type==='octavo'&&Number(e.location_cabinet)===c&&Number(e.location_shelf)===s).length;
+}
+function getShelfOpenSlots(c,s){
+  const cap=getShelfCapacity(c,s);
+  if(cap==null)return null;
+  return Math.max(0,cap-getShelfOccupancy(c,s));
+}
+function getZoneForSeason(code){
+  if(!code)return null;
+  return ZONE_MAP.find(z=>z.seasons.includes(code))||null;
+}
+function findNextOpenSlot(seasonCode){
+  const zone=getZoneForSeason(seasonCode);
+  if(!zone)return{shelf:null,zone:null,reason:'no-zone'};
+  for(const sh of zone.shelves){
+    const open=getShelfOpenSlots(sh.c,sh.s);
+    if(open===null)return{shelf:sh,zone,open:null,reason:'no-cap'};
+    if(open>0)return{shelf:sh,zone,open,reason:'ok'};
+  }
+  const growth=ZONE_MAP.find(z=>z.key==='growth');
+  if(growth){
+    for(const sh of growth.shelves){
+      const open=getShelfOpenSlots(sh.c,sh.s);
+      if(open===null||open>0)return{shelf:sh,zone:growth,open,reason:'overflow'};
+    }
+  }
+  return{shelf:null,zone,reason:'full'};
+}
+function getZoneStats(){
+  return ZONE_MAP.map(zone=>{
+    let totalCap=0,totalOcc=0,capKnown=true;
+    const shelfStats=zone.shelves.map(sh=>{
+      const cap=getShelfCapacity(sh.c,sh.s);
+      const occ=getShelfOccupancy(sh.c,sh.s);
+      if(cap==null)capKnown=false;
+      totalCap+=(cap||0);totalOcc+=occ;
+      return{...sh,cap,occ,open:cap!=null?Math.max(0,cap-occ):null,tag:`C${sh.c}-S${sh.s}`};
+    });
+    const pct=capKnown&&totalCap>0?totalOcc/totalCap:null;
+    return{...zone,shelfStats,totalCap,totalOcc,pct,capKnown,warn:pct!=null&&pct>=0.85};
+  });
+}
+function formatSlotSuggestion(result,short){
+  if(result.reason==='no-zone')return`<span class="zone-suggest-err">No zone assigned for this season.</span>`;
+  if(result.reason==='full')return`<span class="zone-suggest-err">All shelves full — annex more shelves in Settings.</span>`;
+  if(result.reason==='no-cap'){
+    const lbl=`C${result.shelf.c}-S${result.shelf.s}`;
+    if(short)return`<span class="zone-suggest-warn">${lbl} (set capacity to see fill level)</span>`;
+    return`<span class="zone-suggest-warn">Suggested: <strong>${lbl}</strong> — ${esc(result.zone.name)} zone (set capacity to see fill level)</span>`;
+  }
+  const lbl=`C${result.shelf.c}-S${result.shelf.s}`;
+  const slots=result.open!=null?` (${result.open} slot${result.open!==1?'s':''} open)`:'';
+  if(result.reason==='overflow'){
+    if(short)return`<span class="zone-suggest-warn">Growth: ${lbl}${slots}</span>`;
+    return`<span class="zone-suggest-warn">⚠ Zone full → Growth: <strong>${lbl}</strong>${slots}</span>`;
+  }
+  if(short)return`<span class="zone-suggest-ok">${lbl}${slots}</span>`;
+  return`<span class="zone-suggest-ok">Suggested: <strong>${lbl}</strong> — ${esc(result.zone.name)} zone${slots}</span>`;
 }
 
 function _saveVoicings(){try{localStorage.setItem('voicings',JSON.stringify(VOICINGS));}catch{}}
@@ -977,8 +1124,42 @@ function renderOptionChips(){
   const gta=document.getElementById('genres-editor');
   if(vta)vta.value=VOICINGS.join('\n');
   if(gta)gta.value=GENRES.join('\n');
+  renderZoneEditor();
+}
+function renderZoneEditor(){
+  const tbody=document.getElementById('zone-editor-tbody');
+  if(!tbody)return;
+  tbody.innerHTML=ZONE_MAP.map((z,i)=>`<tr>
+    <td><input type="text" data-zi="${i}" data-field="name" value="${escAttr(z.name)}" placeholder="Zone name"></td>
+    <td><input type="text" data-zi="${i}" data-field="seasons" value="${escAttr(z.seasons.join(', '))}" placeholder="SAC, EAS, SPR"></td>
+    <td style="font-size:12px;color:var(--muted);text-align:center;">${z.shelves.length}</td>
+  </tr>`).join('');
+}
+function saveZoneEditor(){
+  const tbody=document.getElementById('zone-editor-tbody');
+  if(!tbody)return;
+  const rows=[...tbody.querySelectorAll('tr')];
+  const validCodes=SEASON_CODES.map(s=>s.code);
+  for(const row of rows){
+    const i=parseInt(row.querySelector('[data-field="name"]').dataset.zi);
+    const name=row.querySelector('[data-field="name"]').value.trim();
+    const rawSeasons=row.querySelector('[data-field="seasons"]').value;
+    const seasons=rawSeasons.split(/[,\s]+/).map(s=>s.trim().toUpperCase()).filter(s=>s);
+    const invalid=seasons.filter(s=>s&&!validCodes.includes(s));
+    if(invalid.length){toast(`Unknown season codes: ${invalid.join(', ')}. Valid: ${validCodes.join(', ')}`,'error',5000);return;}
+    if(!name){toast('Zone names cannot be empty','error');return;}
+    ZONE_MAP[i].name=name;
+    ZONE_MAP[i].seasons=seasons;
+  }
+  // Check for duplicate season assignments
+  const allSeasons=ZONE_MAP.flatMap(z=>z.seasons);
+  const dups=allSeasons.filter((s,i)=>allSeasons.indexOf(s)!==i);
+  if(dups.length){toast(`Season code(s) assigned to multiple zones: ${[...new Set(dups)].join(', ')}`,'error',5000);return;}
+  _saveZoneMap();
+  toast('Zone map saved','success');
 }
 function initDatalists(){
+  _initZoneMap();
   // Load persisted full lists (or keep defaults if nothing stored)
   try{const sv=JSON.parse(localStorage.getItem('voicings')||'null');if(sv&&Array.isArray(sv)){VOICINGS.length=0;VOICINGS.push(...sv);}}catch{}
   try{const sg=JSON.parse(localStorage.getItem('genres')||'null');if(sg&&Array.isArray(sg)){GENRES.length=0;GENRES.push(...sg);}}catch{}
@@ -1036,7 +1217,7 @@ function buildPanel(tab){
       </select>
       <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"><option value="">All Voicings</option></select>
       <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"><option value="">All Genres</option></select>
-      ${tab==='work'?`<select class="filter-select" id="fseason-${tab}" onchange="setFilter('${tab}','season',this.value)"><option value="">All Seasons</option>${SEASON_CODES.map(s=>`<option value="${s.code}">${s.code} — ${s.label}</option>`).join('')}</select><button class="btn-secondary btn-sm admin-only" id="needs-cat-btn-${tab}" onclick="toggleNeedsCat('${tab}')" title="Show octavos missing a season/call number">Needs Cat.</button>`:''}
+      ${tab==='work'?`<select class="filter-select" id="fseason-${tab}" onchange="setFilter('${tab}','season',this.value)"><option value="">All Seasons</option>${SEASON_CODES.map(s=>`<option value="${s.code}">${s.code} — ${s.label}</option>`).join('')}</select><button class="btn-secondary btn-sm admin-only" id="needs-cat-btn-${tab}" onclick="toggleNeedsCat('${tab}')" title="Show octavos missing a season/call number">Needs Cat.</button><button class="btn-secondary btn-sm admin-only" id="unshelved-btn-${tab}" onclick="toggleUnshelved('${tab}')" title="Show octavos with a season but no shelf location">Unshelved</button>`:''}
       <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">${ICO.x} Clear</button>
       <button class="btn-secondary btn-sm admin-only" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">${ICO.search} Find Duplicates</button>
       <button class="btn-secondary btn-sm admin-only" onclick="openMergeQueue('${tab}')" title="Scan for duplicates and merge them one by one">${ICO.merge} Merge Duplicates</button>
@@ -1146,6 +1327,7 @@ function switchTab(name){
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
   if(name==='all') renderTable('all');
   if(name==='settings') renderOptionChips();
+  if(name==='shelving') renderZoneView();
 }
 document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
 
@@ -1165,8 +1347,9 @@ function octavoFields(tab){return[
     {key:'season',label:'Season / Occasion',type:'season-select',workOnly:true},
     {key:'location_cabinet',label:'Cabinet (1–5)',type:'number',min:1,max:5,placeholder:'1–5',workOnly:true},
     {key:'location_shelf',label:'Shelf (1–7)',type:'number',min:1,max:7,placeholder:'1–7',workOnly:true},
-    {key:'__callnum',label:'Call Number',type:'computed-callnum',workOnly:true},
-    {key:'__loctag', label:'Location',     type:'computed-loctag', workOnly:true},
+    {key:'__callnum',  label:'Call Number',         type:'computed-callnum',  workOnly:true},
+    {key:'__loctag',   label:'Location',             type:'computed-loctag',   workOnly:true},
+    {key:'__suggest',  label:'Suggested Location',   type:'computed-suggest',  workOnly:true},
   ]:[]),
 ];}
 function bookFields(){return[
@@ -1213,6 +1396,14 @@ function buildFieldHTML(f,prefix,value,entry,tab){
     const cls=lt==='Unassigned'?'text-muted':'loc-tag-badge';
     inner=`<div class="computed-field" id="${id}"><span class="${cls}">${esc(lt)}</span></div>`;
   }
+  else if(f.type==='computed-suggest'){
+    let sugHtml='<span class="text-muted">Select a season to see suggestion</span>';
+    if(entry&&entry.season){
+      const r=findNextOpenSlot(entry.season);
+      sugHtml=formatSlotSuggestion(r,false);
+    }
+    inner=`<div class="computed-field zone-suggest-box" id="${id}">${sugHtml}</div>`;
+  }
   else if (f.type==='datalist'){
     const listId=f.key==='voicing'?'voicings-dl':'genres-dl';
     const ph=f.key==='voicing'?'e.g. SATB, SSA, 3-Part':'e.g. Classical, Sacred, Pop';
@@ -1253,6 +1444,15 @@ function _updateComputedCatalog(prefix){
     const lt=computeLocationTag(entry);
     const cls=lt==='Unassigned'?'text-muted':'loc-tag-badge';
     ltEl.innerHTML=`<span class="${cls}">${esc(lt)}</span>`;
+  }
+  const sugEl=document.getElementById(`${prefix}___suggest`);
+  if(sugEl){
+    if(!entry.season){
+      sugEl.innerHTML='<span class="text-muted">Select a season to see suggestion</span>';
+    } else {
+      const r=findNextOpenSlot(entry.season);
+      sugEl.innerHTML=formatSlotSuggestion(r,false);
+    }
   }
 }
 
@@ -1821,7 +2021,33 @@ function openBulkLocation(tab){
   _bulkLocTab=tab;
   document.getElementById('bl-cabinet').value='';
   document.getElementById('bl-shelf').value='';
+  document.getElementById('bl-slot-info').innerHTML='';
+  // Show zone context from the selected pieces
+  const entries=ids.map(id=>data[tab].find(x=>x._id===id)).filter(Boolean);
+  const seasons=[...new Set(entries.map(e=>e.season).filter(Boolean))];
+  const zoneEl=document.getElementById('bl-zone-info');
+  if(zoneEl){
+    if(seasons.length){
+      const zones=[...new Set(seasons.map(s=>{const z=getZoneForSeason(s);return z?z.name:'(no zone)';}))].join(', ');
+      const r=seasons.length===1?findNextOpenSlot(seasons[0]):null;
+      zoneEl.innerHTML=`Zones in selection: <strong>${zones}</strong>${r&&r.shelf?` — next slot: <strong>C${r.shelf.c}-S${r.shelf.s}</strong>`:''}`;
+    } else { zoneEl.textContent='No season assigned to selected pieces.'; }
+  }
   document.getElementById('bulk-location-modal').classList.add('open');
+}
+function _updateBulkLocZone(){
+  const c=parseInt(document.getElementById('bl-cabinet').value)||null;
+  const s=parseInt(document.getElementById('bl-shelf').value)||null;
+  const el=document.getElementById('bl-slot-info');
+  if(!el)return;
+  if(!c||!s){el.innerHTML='';return;}
+  const zone=ZONE_MAP.find(z=>z.shelves.some(sh=>sh.c===c&&sh.s===s));
+  const occ=getShelfOccupancy(c,s);
+  const cap=getShelfCapacity(c,s);
+  const openSlots=cap!=null?Math.max(0,cap-occ):null;
+  const zoneName=zone?`<strong>${esc(zone.name)}</strong> zone`:'<span style="color:var(--muted)">No zone assigned to this shelf</span>';
+  const slotTxt=cap!=null?` — ${occ}/${cap} filled${openSlots===0?' <span style="color:#dc2626;font-weight:600">FULL</span>':''}`:` — ${occ} placed (capacity not set)`;
+  el.innerHTML=`C${c}-S${s}: ${zoneName}${slotTxt}`;
 }
 async function confirmBulkLocation(){
   const tab=_bulkLocTab;if(!tab)return;
@@ -1845,6 +2071,105 @@ async function confirmBulkLocation(){
   toast(`Location set on ${updated} entr${updated===1?'y':'ies'}`,'success');
 }
 function closeBulkLocationModal(){document.getElementById('bulk-location-modal').classList.remove('open');_bulkLocTab=null;}
+
+// ── Zone / Shelving view ──────────────────────────────────────────────────
+function renderZoneView(){
+  const el=document.getElementById('zone-dashboard');
+  if(!el)return;
+  const capSet=SHELF_CAP.default!=null;
+  const stats=getZoneStats();
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <h2 style="margin:0;font-size:18px;font-weight:800;">Shelving Dashboard</h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:13px;color:var(--muted);">Default shelf capacity:</label>
+        <input type="number" id="global-cap-input" value="${SHELF_CAP.default!=null?SHELF_CAP.default:''}" placeholder="not set" min="1" style="width:80px;padding:5px 8px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:13px;background:var(--bg);color:var(--ink);">
+        <button class="btn-primary btn-sm" onclick="saveGlobalCap()">Set</button>
+      </div>
+    </div>
+    ${!capSet?'<div class="zone-no-cap-notice">Set a default shelf capacity above to track fill levels and get location suggestions.</div>':''}
+    <div class="zone-lookup" style="margin-bottom:24px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Where does this go?</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="zone-lookup-season" class="filter-select" style="width:260px;">
+          <option value="">Select season…</option>
+          ${SEASON_CODES.map(s=>`<option value="${esc(s.code)}">${esc(s.code)} — ${esc(s.label)}</option>`).join('')}
+        </select>
+        <button class="btn-secondary btn-sm" onclick="runZoneLookup()">Find slot</button>
+        <div class="zone-lookup-result-wrap" id="zone-lookup-result"></div>
+      </div>
+    </div>
+    <div class="zone-grid">
+      ${stats.map(z=>renderZoneCard(z)).join('')}
+    </div>`;
+}
+function renderZoneCard(z){
+  const pctN=z.pct!=null?Math.round(z.pct*100):null;
+  const warnClass=z.warn?' zone-card-warn':'';
+  const seasonTags=z.seasons.length
+    ?z.seasons.map(s=>`<span class="call-number-badge">${esc(s)}</span>`).join(' ')
+    :'<span style="color:var(--muted);font-size:12px;font-style:italic;">overflow</span>';
+  const fillColor=pctN>=85?'#dc2626':pctN>=60?'#d97706':'#16a34a';
+  const shelfRows=z.shelfStats.map(sh=>{
+    const fillPct=sh.cap&&sh.cap>0?Math.min(100,Math.round(sh.occ/sh.cap*100)):0;
+    const capTxt=sh.cap!=null?`${sh.occ}/${sh.cap}`:sh.occ>0?`${sh.occ} placed`:'empty';
+    const barColor=fillPct>=85?'#dc2626':fillPct>=60?'#d97706':'#16a34a';
+    return `<div class="shelf-row">
+      <span class="shelf-tag">${esc(sh.tag)}</span>
+      <div class="shelf-bar-wrap">${sh.cap?`<div class="shelf-bar" style="width:${fillPct}%;background:${barColor}"></div>`:''}</div>
+      <span class="shelf-count${sh.cap&&sh.open===0?' full':''}">${esc(capTxt)}</span>
+      <input type="number" class="shelf-cap-input" min="1" value="${sh.cap!=null?sh.cap:''}" placeholder="cap" title="Per-shelf capacity override for ${esc(sh.tag)}" onchange="setShelfCapOverride(${sh.c},${sh.s},this.value)">
+    </div>`;
+  }).join('');
+  return `<div class="zone-card${warnClass}">
+    <div class="zone-card-header">
+      <div>
+        <div class="zone-card-name">${esc(z.name)}</div>
+        <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${seasonTags}</div>
+      </div>
+      <div class="zone-card-stats">
+        ${pctN!=null?`<span class="zone-pct${z.warn?' zone-pct-warn':''}">${pctN}%</span>`:''}
+        <span style="font-size:11px;color:var(--muted);">${z.totalOcc}${z.capKnown&&z.totalCap?' / '+z.totalCap:''} placed</span>
+      </div>
+    </div>
+    ${pctN!=null?`<div class="zone-progress-bar" style="margin-bottom:8px;"><div class="zone-progress-fill" style="width:${pctN}%;background:${fillColor}"></div></div>`:''}
+    ${z.warn?`<div class="zone-warn-msg">⚠ Above 85% — consider annexing more shelves</div>`:''}
+    <details class="zone-shelves"${z.shelves.length<=2?' open':''}>
+      <summary>${z.shelves.length} shelf${z.shelves.length!==1?'ves':''}</summary>
+      <div class="shelf-list" style="margin-top:6px;">${shelfRows}</div>
+    </details>
+  </div>`;
+}
+function runZoneLookup(){
+  const code=document.getElementById('zone-lookup-season').value;
+  const el=document.getElementById('zone-lookup-result');
+  if(!el)return;
+  if(!code){el.innerHTML='';return;}
+  const r=findNextOpenSlot(code);
+  el.innerHTML=formatSlotSuggestion(r,false);
+}
+function saveGlobalCap(){
+  const v=parseInt(document.getElementById('global-cap-input').value);
+  if(!v||v<1){toast('Enter a valid capacity','error');return;}
+  SHELF_CAP.default=v;
+  _saveShelfCap();
+  renderZoneView();
+  toast(`Default set to ${v} per shelf`,'success');
+}
+function setShelfCapOverride(c,s,val){
+  const k=`C${c}-S${s}`;
+  const v=parseInt(val);
+  if(!val||!v||v<1){delete SHELF_CAP.overrides[k];}
+  else{SHELF_CAP.overrides[k]=v;}
+  _saveShelfCap();
+}
+function resetZoneMap(){
+  if(!confirm('Reset zone map to defaults?'))return;
+  ZONE_MAP=DEFAULT_ZONE_MAP.map(z=>({...z,shelves:z.shelves.map(s=>({...s}))}));
+  _saveZoneMap();
+  renderZoneView();
+  toast('Zone map reset to defaults','success');
+}
 
 // ── Cataloging migration ──────────────────────────────────────────────────
 async function runCatalogMigration(){
@@ -2244,6 +2569,7 @@ function getFiltered(tab){
     if(f.voicing&&e.voicing!==f.voicing)return false;
     if(f.season&&e.season!==f.season)return false;
     if(f.needsCat&&!(e.needs_cataloging||(!e.season&&e._type==='octavo')))return false;
+    if(f.unshelved&&!(e._type==='octavo'&&e.season&&!e.location_cabinet))return false;
     if(f.search){
       const q=f.search.toLowerCase();
       return Object.entries(e).some(([k,v])=>k!=='_id'&&!k.startsWith('__')&&String(Array.isArray(v)?v.join(' '):(v||'')).toLowerCase().includes(q));
@@ -2273,11 +2599,18 @@ function toggleNeedsCat(tab){
   if(btn)btn.classList.toggle('active-filter',filters[tab].needsCat);
   renderTable(tab);
 }
+function toggleUnshelved(tab){
+  filters[tab].unshelved=!filters[tab].unshelved;
+  const btn=document.getElementById('unshelved-btn-'+tab);
+  if(btn)btn.classList.toggle('active-filter',filters[tab].unshelved);
+  renderTable(tab);
+}
 function clearFilters(tab){
-  filters[tab]={search:'',type:'',genre:'',voicing:'',season:'',needsCat:false};
+  filters[tab]={search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false};
   showDupsOnly[tab]=false;
   const sc=document.getElementById('fseason-'+tab);if(sc)sc.value='';
   const nb=document.getElementById('needs-cat-btn-'+tab);if(nb)nb.classList.remove('active-filter');
+  const ub=document.getElementById('unshelved-btn-'+tab);if(ub)ub.classList.remove('active-filter');
   document.getElementById('search-'+tab).value='';
   const btn=document.getElementById('find-dups-btn-'+tab);
   if(btn)btn.classList.remove('active-filter');
@@ -2300,7 +2633,7 @@ function refreshFilterOptions(tab){
   });
   const sSel=document.getElementById('fseason-'+tab);
   if(sSel){sSel.value=f.season||'';sSel.classList.toggle('active-filter',!!f.season);}
-  document.getElementById('clearf-'+tab).classList.toggle('visible',!!(f.search||f.type||f.genre||f.voicing||f.season||f.needsCat));
+  document.getElementById('clearf-'+tab).classList.toggle('visible',!!(f.search||f.type||f.genre||f.voicing||f.season||f.needsCat||f.unshelved));
 }
 
 // ── Tables ────────────────────────────────────────────────────────────────
