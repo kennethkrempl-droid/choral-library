@@ -1382,19 +1382,21 @@ async function applyPepperToEntry(i,voicing){
   }catch(e){toast('Update failed: '+e.message,'error');}
 }
 
-// Fetch /api/suggest-genres with exponential backoff on 429
+// Fetch /api/suggest-genres with exponential backoff on 429 (rate limit) and 503 (overloaded)
 async function _genreFetch(pieces, btnEl, label){
   const opts=adminFetchOpts({pieces});
-  const waits=[20,40,90]; // seconds between retries
+  const waits=[10,25,60]; // seconds between retries
   for(let attempt=0;attempt<=waits.length;attempt++){
     const r=await fetch('/api/suggest-genres',opts);
-    if(r.status!==429) return r;
+    const retry=r.status===429||r.status===503||r.status===500;
+    if(!retry) return r;
     if(attempt<waits.length){
       const s=waits[attempt];
-      if(btnEl) btnEl.innerHTML=`<span class="spinner"></span> Rate limit — retrying in ${s}s (${label})…`;
+      const reason=r.status===429?'Rate limit':'Server busy';
+      if(btnEl) btnEl.innerHTML=`<span class="spinner"></span> ${reason} — retrying in ${s}s (${label})…`;
       await new Promise(x=>setTimeout(x,s*1000));
     } else {
-      return r; // final attempt also 429 → let caller handle
+      return r; // exhausted retries → let caller show the error
     }
   }
 }
