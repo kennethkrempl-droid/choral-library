@@ -191,6 +191,10 @@ input[type=checkbox].row-check { width:15px; height:15px; accent-color:var(--acc
 .badge.octavo { background:#ede9fe; color:#6d28d9; border-color:#ddd6fe; }
 .badge.book { background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
 .voicing-chip { display:inline-block; font-size:11px; font-weight:600; font-family:var(--font); background:var(--accent-light); border:1px solid var(--accent-line); color:var(--accent); border-radius:6px; padding:1px 8px; letter-spacing:.3px; white-space:nowrap; }
+.call-number-badge { display:inline-block; font-size:11px; font-weight:700; font-family:var(--mono,monospace); background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; border-radius:6px; padding:2px 8px; letter-spacing:.5px; white-space:nowrap; }
+.needs-cat-badge { display:inline-block; font-size:11px; font-weight:600; background:#fef3c7; border:1px solid #fde68a; color:#b45309; border-radius:6px; padding:2px 8px; white-space:nowrap; }
+.loc-tag-badge { display:inline-block; font-size:11px; font-weight:600; font-family:var(--mono,monospace); background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; border-radius:6px; padding:2px 8px; white-space:nowrap; }
+.computed-field { padding:7px 10px; background:var(--bg); border:1px solid var(--line); border-radius:var(--r-sm); min-height:34px; display:flex; align-items:center; }
 .row-actions { display:flex; gap:3px; align-items:center; justify-content:flex-end; }
 .btn-request { background:transparent; color:var(--accent); border:1.5px solid var(--accent-line); font-size:12px; padding:3px 10px; border-radius:20px; }
 .btn-request:hover:not(:disabled) { background:var(--accent-light); }
@@ -612,6 +616,17 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
       </div>
     </div>
 
+    <div class="settings-section admin-only" style="grid-column:1/-1;">
+      <div class="settings-section-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Cataloging System
+        <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:4px;">— assign accession IDs and call numbers to work octavos</span>
+      </div>
+      <div class="settings-section-body">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Run this once to initialize the cataloging system. It will assign accession IDs (1, 2, 3…) to all work octavos in chronological order, compute call numbers, and flag any entries that need a season assigned. Safe to run again — only processes entries without an accession ID.</p>
+        <button class="btn-primary btn-sm" id="run-migration-btn" onclick="runCatalogMigration()">Initialize Cataloging</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -743,6 +758,23 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
   </div>
 </div>
 
+<div class="modal-overlay" id="bulk-location-modal">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-header"><h2>Set Location</h2><button class="btn-ghost btn-icon" onclick="closeBulkLocationModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Assign cabinet and shelf to all selected octavos. Leave a field blank to keep existing values.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label for="bl-cabinet">Cabinet (1–5)</label><input type="number" id="bl-cabinet" min="1" max="5" placeholder="1–5"></div>
+        <div class="form-group"><label for="bl-shelf">Shelf (1–7)</label><input type="number" id="bl-shelf" min="1" max="7" placeholder="1–7"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeBulkLocationModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmBulkLocation()">Apply</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="merge-modal">
   <div class="modal" style="max-width:640px;">
     <div class="modal-header">
@@ -805,7 +837,7 @@ const ICO={
 // ── State ─────────────────────────────────────────────────────────────────
 let data        = { work:[], personal:[] };
 let entryTypes  = { work:'octavo', personal:'octavo' };
-let filters     = { work:{search:'',type:'',genre:'',voicing:''}, personal:{search:'',type:'',genre:'',voicing:''}, all:{search:'',type:'',genre:'',voicing:''} };
+let filters     = { work:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false}, personal:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false}, all:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false} };
 let showDupsOnly = { work:false, personal:false, all:false };
 let sortState   = { work:{col:null,dir:1}, personal:{col:null,dir:1}, all:{col:null,dir:1} };
 let selected    = { work:new Set(), personal:new Set(), all:new Set() };
@@ -823,8 +855,53 @@ let html5QrCode = null, scannerPrefix = null, lastAutoIsbn = {};
 let shareInfo   = null;
 let cfgInfo     = null;
 
-let VOICINGS = ['SATB','SAB','SSA','SSAA','SSATB','SATTBB','SSAATTBB','TTB','TTBB','TBB','SA','3-Part Mixed','3-Part','2-Part','Unison','Other'];
+let VOICINGS = ['SATB','SAB','SSA','SSAA','SSATB','SATTBB','SSAATTBB','TTB','TTBB','TBB','SA','3-Part','2-Part','Unison','Other']; // Note: "3-Part Mixed" has been renamed to "3-Part"
 let GENRES   = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater','Jazz','Sacred','Other'];
+
+// ── Cataloging system ────────────────────────────────────────────────────────
+const SEASON_CODES=[
+  {code:'HLD',label:'Holiday / Christmas / Winter'},
+  {code:'EAS',label:'Easter / Lent / Spring Sacred'},
+  {code:'SAC',label:'Sacred (General)'},
+  {code:'PAT',label:'Patriotic / Civic'},
+  {code:'FOL',label:'Folk / Americana'},
+  {code:'SPR',label:'Spiritual'},
+  {code:'SEA',label:'Seasonal Secular'},
+  {code:'POP',label:'Pop / Jazz / Contemporary'},
+  {code:'MT', label:'Musical Theater'},
+  {code:'CLS',label:'Classical / Concert'},
+  {code:'MSC',label:'Miscellaneous'},
+];
+const VOICING_TO_CODE={
+  'SATB':'SATB','SAB':'SAB',
+  'SSA':'SSA','SSAA':'SSA',
+  '3-Part':'3PT','3-Part Mixed':'3PT',
+  '2-Part':'2PT',
+  'SA':'SPC',
+  'TTBB':'TTB','TTB':'TTB','TBB':'TTB',
+  'Unison':'UNI',
+  'SSAATTBB':'SPC','SATTBB':'SPC','SSATB':'SPC','Other':'SPC',
+};
+const GENRE_TO_SEASON={
+  'Pop':'POP','Holiday':'HLD','Musical Theater':'MT',
+  'Classical':'CLS','Sacred':'SAC','Spiritual':'SPR','Folk':'FOL','Jazz':'POP',
+};
+function voicingCode(v){return VOICING_TO_CODE[v]||'SPC';}
+function computeCallNumber(entry){
+  if(!entry.season||!entry.accession_id) return '';
+  const vc=voicingCode(entry.voicing||'');
+  const num=String(entry.accession_id).padStart(4,'0');
+  return `${entry.season}-${vc}-${num}`;
+}
+function computeLocationTag(entry){
+  if(!entry.location_cabinet||!entry.location_shelf) return 'Unassigned';
+  return `C${entry.location_cabinet}-S${entry.location_shelf}`;
+}
+function getNextAccessionId(){
+  const all=data.work.filter(e=>e._type==='octavo'&&e.accession_id);
+  if(!all.length) return 1;
+  return Math.max(...all.map(e=>e.accession_id))+1;
+}
 
 function _saveVoicings(){try{localStorage.setItem('voicings',JSON.stringify(VOICINGS));}catch{}}
 function _saveGenres(){try{localStorage.setItem('genres',JSON.stringify(GENRES));}catch{}}
@@ -938,6 +1015,7 @@ function buildPanel(tab){
           </div>
         </div>
         <form id="form-${tab}" onsubmit="submitForm(event,'${tab}')">
+          ${tab==='work'?`<input type="hidden" id="${tab}_accession_id" name="accession_id" value="">`:''}
           <div class="form-grid" id="fields-${tab}"></div>
           <div class="dup-warning" id="dup-inline-${tab}"></div>
           <div class="form-footer">
@@ -958,6 +1036,7 @@ function buildPanel(tab){
       </select>
       <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"><option value="">All Voicings</option></select>
       <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"><option value="">All Genres</option></select>
+      ${tab==='work'?`<select class="filter-select" id="fseason-${tab}" onchange="setFilter('${tab}','season',this.value)"><option value="">All Seasons</option>${SEASON_CODES.map(s=>`<option value="${s.code}">${s.code} — ${s.label}</option>`).join('')}</select><button class="btn-secondary btn-sm admin-only" id="needs-cat-btn-${tab}" onclick="toggleNeedsCat('${tab}')" title="Show octavos missing a season/call number">Needs Cat.</button>`:''}
       <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">${ICO.x} Clear</button>
       <button class="btn-secondary btn-sm admin-only" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">${ICO.search} Find Duplicates</button>
       <button class="btn-secondary btn-sm admin-only" onclick="openMergeQueue('${tab}')" title="Scan for duplicates and merge them one by one">${ICO.merge} Merge Duplicates</button>
@@ -973,6 +1052,7 @@ function buildPanel(tab){
       <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}',true)">${ICO.download} Export Selected</button>
       <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','genre')">${ICO.music} Set Genre</button>
       <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','tags')">${ICO.tag} Add Tag</button>
+      ${tab==='work'?`<button class="btn-secondary btn-sm admin-only" onclick="openBulkLocation('${tab}')">${ICO.tag} Set Location</button>`:''}
       <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',true)">${ICO.ban} Mark In Use</button>
       <button class="btn-secondary btn-sm" onclick="bulkAvail('${tab}',false)">${ICO.check} Mark Available</button>
       <button class="btn-danger btn-sm" onclick="openBulkDelete('${tab}')">${ICO.trash} Delete</button>
@@ -1070,7 +1150,7 @@ function switchTab(name){
 document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
 
 // ── Fields ────────────────────────────────────────────────────────────────
-function octavoFields(){return[
+function octavoFields(tab){return[
   {key:'title',label:'Title',type:'text',required:true},
   {key:'composer',label:'Composer / Arranger',type:'text'},
   {key:'voicing',label:'Voicing',type:'datalist'},
@@ -1080,6 +1160,14 @@ function octavoFields(){return[
   {key:'yearsPerformed',label:'Years Performed',type:'text',placeholder:'e.g. 2019, 2022, 2024'},
   {key:'link',label:'Song Link (URL)',type:'url'},
   {key:'tags',label:'Tags (comma-separated)',type:'text'},
+  // Cataloging fields — work tab only
+  ...(tab==='work'?[
+    {key:'season',label:'Season / Occasion',type:'season-select',workOnly:true},
+    {key:'location_cabinet',label:'Cabinet (1–5)',type:'number',min:1,max:5,placeholder:'1–5',workOnly:true},
+    {key:'location_shelf',label:'Shelf (1–7)',type:'number',min:1,max:7,placeholder:'1–7',workOnly:true},
+    {key:'__callnum',label:'Call Number',type:'computed-callnum',workOnly:true},
+    {key:'__loctag', label:'Location',     type:'computed-loctag', workOnly:true},
+  ]:[]),
 ];}
 function bookFields(){return[
   {key:'isbn',label:'ISBN',type:'text',isbnField:true},
@@ -1094,27 +1182,42 @@ function bookFields(){return[
   {key:'tags',label:'Tags (comma-separated)',type:'text'},
 ];}
 
-function buildForms(){['work','personal'].forEach(tab=>renderFormFields(tab,entryTypes[tab]));}
+function buildForms(){['work','personal'].forEach(tab=>renderFormFields(tab,entryTypes[tab],null,null,tab));}
 
-function renderFormFields(tab,type,container,prefix){
-  const fields=type==='octavo'?octavoFields():bookFields();
+function renderFormFields(tab,type,container,prefix,srcTab){
+  const resolvedTab=srcTab||tab;
+  const fields=type==='octavo'?octavoFields(resolvedTab):bookFields();
   const el=container||document.getElementById('fields-'+tab), p=prefix||tab;
-  el.innerHTML=fields.map(f=>buildFieldHTML(f,p,'')).join('');
+  el.innerHTML=fields.map(f=>buildFieldHTML(f,p,'',null,resolvedTab)).join('');
   attachDupListeners(p);
   const pb=document.getElementById('pepper-btn-'+tab);
   if(pb) pb.style.display=type==='octavo'?'':'none';
 }
 
-function buildFieldHTML(f,prefix,value){
+function buildFieldHTML(f,prefix,value,entry,tab){
   const id=`${prefix}_${f.key}`, req=f.required?'required':'';
   let val=value;
   if(f.key==='tags'&&Array.isArray(value)) val=value.join(', ');
   val=(val!==undefined&&val!==null)?escAttr(String(val)):'';
   let inner;
-  if (f.type==='datalist'){
+  if(f.type==='season-select'){
+    const opts=SEASON_CODES.map(s=>`<option value="${s.code}"${value===s.code?' selected':''}>${s.code} — ${s.label}</option>`).join('');
+    inner=`<select id="${id}" name="${f.key}" onchange="_updateComputedCatalog('${prefix}')" ${req}><option value="">Select season…</option>${opts}</select>`;
+  }
+  else if(f.type==='computed-callnum'){
+    const cn=entry?computeCallNumber(entry):'';
+    inner=`<div class="computed-field" id="${id}">${cn?`<span class="call-number-badge">${esc(cn)}</span>`:'<span class="text-muted">Set season &amp; voicing above</span>'}</div>`;
+  }
+  else if(f.type==='computed-loctag'){
+    const lt=entry?computeLocationTag(entry):'Unassigned';
+    const cls=lt==='Unassigned'?'text-muted':'loc-tag-badge';
+    inner=`<div class="computed-field" id="${id}"><span class="${cls}">${esc(lt)}</span></div>`;
+  }
+  else if (f.type==='datalist'){
     const listId=f.key==='voicing'?'voicings-dl':'genres-dl';
-    const ph=f.key==='voicing'?'e.g. SATB, SSA, 3-Part Mixed':'e.g. Classical, Sacred, Pop';
-    inner=`<input type="text" id="${id}" name="${f.key}" value="${val}" list="${listId}" placeholder="${ph}" autocomplete="off" ${req}>`;
+    const ph=f.key==='voicing'?'e.g. SATB, SSA, 3-Part':'e.g. Classical, Sacred, Pop';
+    const extra=tab==='work'&&f.key==='voicing'?` onchange="_updateComputedCatalog('${prefix}')"`:''
+    inner=`<input type="text" id="${id}" name="${f.key}" value="${val}" list="${listId}" placeholder="${ph}" autocomplete="off" ${req}${extra}>`;
   }
   else if (f.type==='select'){
     const opts=f.options.map(o=>`<option value="${escAttr(o)}"${value===o?' selected':''}>${esc(o)}</option>`).join('');
@@ -1123,11 +1226,37 @@ function buildFieldHTML(f,prefix,value){
   }
   else if(f.type==='textarea') inner=`<textarea id="${id}" name="${f.key}" ${req}>${esc(String(value??''))}</textarea>`;
   else if(f.isbnField) inner=`<div class="input-row"><input type="text" id="${id}" name="${f.key}" value="${val}" placeholder="e.g. 9780739044148" onblur="autoIsbnLookup('${prefix}',this.value)"><button type="button" class="btn-scan" title="Scan barcode" onclick="openScanner('${prefix}')">${ICO.camera}</button><button type="button" class="btn-secondary btn-sm" onclick="isbnLookup('${prefix}')">Look up</button></div>`;
-  else inner=`<input type="${f.type}" id="${id}" name="${f.key}" value="${val}" ${req} ${f.min!==undefined?'min="'+f.min+'"':''} ${f.placeholder?'placeholder="'+escAttr(f.placeholder)+'"':''}>`;
+  else{
+    const extra2=(tab==='work'&&(f.key==='location_cabinet'||f.key==='location_shelf'))?` onchange="_updateComputedCatalog('${prefix}')"`:''
+    inner=`<input type="${f.type}" id="${id}" name="${f.key}" value="${val}" ${req} ${f.min!==undefined?'min="'+f.min+'"':''} ${f.max!==undefined?'max="'+f.max+'"':''} ${f.placeholder?'placeholder="'+escAttr(f.placeholder)+'"':''}${extra2}>`;
+  }
   return `<div class="form-group${f.full?' full':''}"><label for="${id}">${f.label}</label>${inner}</div>`;
 }
 
-function setEntryType(tab,type,btn){entryTypes[tab]=type;btn.closest('.entry-type-toggle').querySelectorAll('button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderFormFields(tab,type);}
+// Live-update computed call number / location tag in the add or edit form
+function _updateComputedCatalog(prefix){
+  const get=k=>{const el=document.getElementById(`${prefix}_${k}`);return el?el.value.trim():'';}
+  const entry={
+    season:get('season'),
+    voicing:get('voicing'),
+    accession_id:parseInt(get('accession_id'))||0,
+    location_cabinet:parseInt(get('location_cabinet'))||null,
+    location_shelf:parseInt(get('location_shelf'))||null,
+  };
+  const cnEl=document.getElementById(`${prefix}___callnum`);
+  const ltEl=document.getElementById(`${prefix}___loctag`);
+  if(cnEl){
+    const cn=computeCallNumber(entry);
+    cnEl.innerHTML=cn?`<span class="call-number-badge">${esc(cn)}</span>`:'<span class="text-muted">Set season &amp; voicing above</span>';
+  }
+  if(ltEl){
+    const lt=computeLocationTag(entry);
+    const cls=lt==='Unassigned'?'text-muted':'loc-tag-badge';
+    ltEl.innerHTML=`<span class="${cls}">${esc(lt)}</span>`;
+  }
+}
+
+function setEntryType(tab,type,btn){entryTypes[tab]=type;btn.closest('.entry-type-toggle').querySelectorAll('button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderFormFields(tab,type,null,null,tab);}
 
 // ── Duplicate detection ───────────────────────────────────────────────────
 function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim().replace(/^(the|a|an)\s+/,'');}
@@ -1536,18 +1665,22 @@ function openScanner(prefix){
 function closeScanner(){document.getElementById('scanner-modal').classList.remove('open');if(html5QrCode){html5QrCode.stop().catch(()=>{}).finally(()=>{html5QrCode=null;});}}
 
 // ── CRUD ──────────────────────────────────────────────────────────────────
-function readFormEntry(formEl,type){
-  const fields=type==='octavo'?octavoFields():bookFields();
+function readFormEntry(formEl,type,tab){
+  const fields=type==='octavo'?octavoFields(tab):bookFields();
   const entry={_type:type};
-  fields.forEach(f=>{const el=formEl.querySelector(`[name="${f.key}"]`);let v=el?el.value.trim():'';
+  fields.forEach(f=>{
+    if(f.key.startsWith('__')) return; // skip computed display fields
+    const el=formEl.querySelector(`[name="${f.key}"]`);let v=el?el.value.trim():'';
     if(f.key==='tags')v=v?v.split(',').map(s=>s.trim()).filter(Boolean):[];
-    entry[f.key]=v;});
+    if((f.key==='location_cabinet'||f.key==='location_shelf')&&v) v=parseInt(v)||null;
+    entry[f.key]=v||v===0?v:v;
+  });
   return entry;
 }
 
 function submitForm(e,tab){
   e.preventDefault();
-  const entry=readFormEntry(e.target,entryTypes[tab]);
+  const entry=readFormEntry(e.target,entryTypes[tab],tab);
   const doAdd=async()=>{
     // Prompt to add new voicing/genre to lists
     if(entry.voicing&&!VOICINGS.includes(entry.voicing)){
@@ -1557,6 +1690,12 @@ function submitForm(e,tab){
       if(confirm(`"${entry.genre}" isn't in your genre list — add it?`)) addToGenres(entry.genre);
     }
     entry._id=Date.now();
+    // Assign cataloging fields for new work octavos
+    if(tab==='work'&&entry._type==='octavo'){
+      if(!entry.accession_id) entry.accession_id=getNextAccessionId();
+      if(!entry.needs_cataloging) entry.needs_cataloging=(!entry.season)?true:false;
+      entry.call_number=computeCallNumber(entry);
+    }
     const r=await fetch(`/api/entries/${tab}`,adminFetchOpts(entry));
     const j=await r.json();
     if(!r.ok){toast(j.error||'Could not save','error');return;}
@@ -1574,20 +1713,33 @@ function openEdit(tab,id){
   const entry=data[tab].find(e=>e._id===id);
   if(!entry)return;
   editTarget={tab,id,type:entry._type};
-  const fields=entry._type==='octavo'?octavoFields():bookFields();
-  document.getElementById('fields-edit').innerHTML=fields.map(f=>buildFieldHTML(f,'edit',entry[f.key]??'')).join('');
+  const fields=entry._type==='octavo'?octavoFields(tab):bookFields();
+  document.getElementById('fields-edit').innerHTML=fields.map(f=>buildFieldHTML(f,'edit',entry[f.key]??'',entry,tab)).join('');
+  // Populate accession_id as hidden so _updateComputedCatalog can read it
+  if(tab==='work'&&entry._type==='octavo'){
+    const hidden=document.createElement('input');
+    hidden.type='hidden';hidden.id='edit_accession_id';hidden.value=entry.accession_id||'';
+    document.getElementById('fields-edit').appendChild(hidden);
+  }
   document.getElementById('modal-title').textContent=`Edit ${entry._type==='octavo'?'Octavo':'Book'} — ${entry.title||'(untitled)'}`;
   document.getElementById('edit-modal').classList.add('open');
 }
 async function submitEdit(e){
   e.preventDefault();
   const{tab,id,type}=editTarget;
-  const entry={...readFormEntry(document.getElementById('form-edit'),type),_type:type,_id:id};
+  const existing=data[tab].find(e=>e._id===id)||{};
+  const entry={...readFormEntry(document.getElementById('form-edit'),type,tab),_type:type,_id:id};
   if(entry.voicing&&!VOICINGS.includes(entry.voicing)){
     if(confirm(`"${entry.voicing}" isn't in your voicing list — add it?`)) addToVoicings(entry.voicing);
   }
   if(entry.genre&&!GENRES.includes(entry.genre)){
     if(confirm(`"${entry.genre}" isn't in your genre list — add it?`)) addToGenres(entry.genre);
+  }
+  // Preserve cataloging fields and recompute call_number for work octavos
+  if(tab==='work'&&type==='octavo'){
+    if(!entry.accession_id) entry.accession_id=existing.accession_id||getNextAccessionId();
+    entry.needs_cataloging=!entry.season;
+    entry.call_number=computeCallNumber(entry);
   }
   const r=await fetch(`/api/entries/${tab}/${id}`,adminFetchOpts(entry,'PUT'));
   const j=await r.json();
@@ -1660,6 +1812,70 @@ async function confirmBulkTag(){
   toast('Updated '+ids.length+' entries','success');
 }
 function closeBulkTagModal(){document.getElementById('bulk-tag-modal').classList.remove('open');bulkTagTarget=null;}
+
+// ── Bulk location (cataloging) ────────────────────────────────────────────
+let _bulkLocTab=null;
+function openBulkLocation(tab){
+  const ids=[...selected[tab]].filter(id=>{const e=data[tab].find(x=>x._id===id);return e&&e._type==='octavo';});
+  if(!ids.length){toast('Select octavos first','info');return;}
+  _bulkLocTab=tab;
+  document.getElementById('bl-cabinet').value='';
+  document.getElementById('bl-shelf').value='';
+  document.getElementById('bulk-location-modal').classList.add('open');
+}
+async function confirmBulkLocation(){
+  const tab=_bulkLocTab;if(!tab)return;
+  const cab=parseInt(document.getElementById('bl-cabinet').value)||null;
+  const shelf=parseInt(document.getElementById('bl-shelf').value)||null;
+  if(cab&&(cab<1||cab>5)){toast('Cabinet must be 1–5','error');return;}
+  if(shelf&&(shelf<1||shelf>7)){toast('Shelf must be 1–7','error');return;}
+  const ids=[...selected[tab]].filter(id=>{const e=data[tab].find(x=>x._id===id);return e&&e._type==='octavo';});
+  let updated=0;
+  for(const id of ids){
+    const e=data[tab].find(x=>x._id===id);if(!e)continue;
+    const patch={};
+    if(cab!==null)patch.location_cabinet=cab;
+    if(shelf!==null)patch.location_shelf=shelf;
+    if(!Object.keys(patch).length)continue;
+    const merged={...e,...patch};
+    const r=await fetch(`/api/entries/${tab}/${id}`,adminFetchOpts(merged,'PUT'));
+    if(r.ok){const j=await r.json();const i=data[tab].findIndex(x=>x._id===id);if(i>-1)data[tab][i]={...data[tab][i],...j.entry,...merged};updated++;}
+  }
+  closeBulkLocationModal();renderTable(tab);
+  toast(`Location set on ${updated} entr${updated===1?'y':'ies'}`,'success');
+}
+function closeBulkLocationModal(){document.getElementById('bulk-location-modal').classList.remove('open');_bulkLocTab=null;}
+
+// ── Cataloging migration ──────────────────────────────────────────────────
+async function runCatalogMigration(){
+  const octavos=data.work.filter(e=>e._type==='octavo'&&!e.accession_id);
+  if(!octavos.length){toast('All work octavos already have accession IDs','info');return;}
+  const btn=document.getElementById('run-migration-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Running…';}
+  // Sort by _id (timestamp = chronological add order) to get stable assignment
+  const sorted=[...octavos].sort((a,b)=>a._id-b._id);
+  // Find max existing accession_id to continue from
+  const existing=data.work.filter(e=>e._type==='octavo'&&e.accession_id);
+  let counter=existing.length?Math.max(...existing.map(e=>e.accession_id))+1:1;
+  let done=0,flagged=0;
+  for(const e of sorted){
+    const accession_id=counter++;
+    const season=GENRE_TO_SEASON[e.genre]||null;
+    const needs_cataloging=!season;
+    // Rename 3-Part Mixed → 3-Part
+    const voicing=e.voicing==='3-Part Mixed'?'3-Part':e.voicing;
+    const entry={...e,voicing,accession_id,season:season||'',needs_cataloging};
+    entry.call_number=season?computeCallNumber(entry):'';
+    try{
+      const r=await fetch(`/api/entries/work/${e._id}`,adminFetchOpts(entry,'PUT'));
+      if(r.ok){const j=await r.json();const i=data.work.findIndex(x=>x._id===e._id);if(i>-1)data.work[i]={...data.work[i],...j.entry,...entry};}
+      if(needs_cataloging)flagged++;else done++;
+    }catch{}
+  }
+  renderAll();
+  if(btn){btn.disabled=false;btn.innerHTML='Initialize Cataloging';}
+  toast(`Migration complete: ${done} cataloged, ${flagged} flagged as "Needs Cataloging"`,'success',6000);
+}
 
 // ── Merge two entries ─────────────────────────────────────────────────────
 let mergeState=null;
@@ -2026,6 +2242,8 @@ function getFiltered(tab){
     if(f.type&&e._type!==f.type)return false;
     if(f.genre&&e.genre!==f.genre)return false;
     if(f.voicing&&e.voicing!==f.voicing)return false;
+    if(f.season&&e.season!==f.season)return false;
+    if(f.needsCat&&!(e.needs_cataloging||(!e.season&&e._type==='octavo')))return false;
     if(f.search){
       const q=f.search.toLowerCase();
       return Object.entries(e).some(([k,v])=>k!=='_id'&&!k.startsWith('__')&&String(Array.isArray(v)?v.join(' '):(v||'')).toLowerCase().includes(q));
@@ -2049,9 +2267,17 @@ function getSorted(tab,rows){
 
 function setFilter(tab,key,val){filters[tab][key]=val;renderTable(tab);}
 function filterTable(tab,v){filters[tab].search=v;renderTable(tab);}
+function toggleNeedsCat(tab){
+  filters[tab].needsCat=!filters[tab].needsCat;
+  const btn=document.getElementById('needs-cat-btn-'+tab);
+  if(btn)btn.classList.toggle('active-filter',filters[tab].needsCat);
+  renderTable(tab);
+}
 function clearFilters(tab){
-  filters[tab]={search:'',type:'',genre:'',voicing:''};
+  filters[tab]={search:'',type:'',genre:'',voicing:'',season:'',needsCat:false};
   showDupsOnly[tab]=false;
+  const sc=document.getElementById('fseason-'+tab);if(sc)sc.value='';
+  const nb=document.getElementById('needs-cat-btn-'+tab);if(nb)nb.classList.remove('active-filter');
   document.getElementById('search-'+tab).value='';
   const btn=document.getElementById('find-dups-btn-'+tab);
   if(btn)btn.classList.remove('active-filter');
@@ -2072,16 +2298,24 @@ function refreshFilterOptions(tab){
     const el=document.getElementById(`${p}-${tab}`);
     el.classList.toggle('active-filter',!!f[['type','voicing','genre'][i]]);
   });
-  document.getElementById('clearf-'+tab).classList.toggle('visible',!!(f.search||f.type||f.genre||f.voicing));
+  const sSel=document.getElementById('fseason-'+tab);
+  if(sSel){sSel.value=f.season||'';sSel.classList.toggle('active-filter',!!f.season);}
+  document.getElementById('clearf-'+tab).classList.toggle('visible',!!(f.search||f.type||f.genre||f.voicing||f.season||f.needsCat));
 }
 
 // ── Tables ────────────────────────────────────────────────────────────────
 const OCTAVO_COLS=[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Arranger'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'}];
+const OCTAVO_COLS_CAT=[{key:'_type',label:'Type'},{key:'call_number',label:'Call #'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Arranger'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'__loctag',label:'Location'}];
 const BOOK_COLS  =[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'author',label:'Author / Editor'},{key:'isbn',label:'ISBN'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'},{key:'description',label:'Description'}];
 const MIXED_COLS =[{key:'_type',label:'Type'},{key:'title',label:'Title'},{key:'composer',label:'Composer / Author'},{key:'voicing',label:'Voicing'},{key:'genre',label:'Genre'},{key:'copies',label:'Copies'}];
 function getColumns(tab){
   const t=filters[tab].type;
-  let cols=t==='octavo'?OCTAVO_COLS:t==='book'?BOOK_COLS:MIXED_COLS;
+  // Work tab octavo-only view gets cataloging columns
+  let cols;
+  if(tab==='work'&&(t==='octavo'||t==='')) cols=t==='octavo'?OCTAVO_COLS_CAT:MIXED_COLS;
+  else cols=t==='octavo'?OCTAVO_COLS:t==='book'?BOOK_COLS:MIXED_COLS;
+  if(tab==='work'&&t==='') cols=MIXED_COLS; // mixed work view: no cat cols to avoid clutter
+  if(tab==='work'&&t==='octavo') cols=OCTAVO_COLS_CAT;
   if(tab==='all'){
     if(isAdmin){
       // admin all-view: add a Library column showing Work / Personal source
@@ -2129,7 +2363,7 @@ function renderTable(tab){
     :`<th class="${c.key===sc?'sorted':''}" onclick="sortBy('${tab}','${c.key}')">${c.label}<span class="sort-icon">${c.key===sc?(dir===1?ICO.sortAsc:ICO.sortDesc):ICO.sortNone}</span></th>`).join('')}<th style="cursor:default;text-align:right;">Actions</th></tr>`;
 
   if(!sorted.length){
-    const anyFilter=filters[tab].search||filters[tab].type||filters[tab].genre||filters[tab].voicing;
+    const anyFilter=filters[tab].search||filters[tab].type||filters[tab].genre||filters[tab].voicing||filters[tab].season||filters[tab].needsCat;
     const emptyMusicSvg=`<svg width=”36” height=”36” viewBox=”0 0 24 24” fill=”none” stroke=”currentColor” stroke-width=”1.5” stroke-linecap=”round” stroke-linejoin=”round” style=”opacity:.35”><path d=”M9 18V5l12-2v13”/><circle cx=”6” cy=”18” r=”3”/><circle cx=”18” cy=”16” r=”3”/></svg>`;
     const emptyCheckSvg=`<svg width=”36” height=”36” viewBox=”0 0 24 24” fill=”none” stroke=”currentColor” stroke-width=”1.5” stroke-linecap=”round” stroke-linejoin=”round” style=”opacity:.35;color:var(--success)”><polyline points=”20 6 9 17 4 12”/></svg>`;
     const isPublicEmpty=tab==='all'&&!isAdmin&&!anyFilter&&!showDupsOnly[tab];
@@ -2177,6 +2411,8 @@ function renderTable(tab){
         }
         if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-avail'}">${e.unavailable?'In Use':'Available'}</span></td>`;
         if(c.key==='__src') return `<td><span class="source-chip source-${e.__src||'work'}">${cap(e.__src||'work')}</span></td>`;
+        if(c.key==='call_number') return `<td>${e.call_number?`<span class="call-number-badge">${esc(e.call_number)}</span>`:e.needs_cataloging?'<span class="needs-cat-badge">Needs Cat.</span>':'<span class="text-muted">—</span>'}</td>`;
+        if(c.key==='__loctag'){const lt=computeLocationTag(e);return `<td><span class="${lt==='Unassigned'?'text-muted':'loc-tag-badge'}">${esc(lt)}</span></td>`;}
         if(c.key==='voicing') return `<td>${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='genre') return `<td style="white-space:nowrap">${esc(e.genre||'')||'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='composer'){const v=esc(e.composer||e.author||'');return `<td>${v||'<span class="text-muted">—</span>'}</td>`;}
@@ -2791,7 +3027,7 @@ function showCoverPreview(entry){
   } else { img.style.display='none'; }
 }
 
-['edit-modal','delete-modal','scanner-modal','admin-modal','request-modal','csv-tip-modal','dup-modal','pepper-modal','bulk-tag-modal'].forEach(id=>{
+['edit-modal','delete-modal','scanner-modal','admin-modal','request-modal','csv-tip-modal','dup-modal','pepper-modal','bulk-tag-modal','bulk-location-modal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){
     if(e.target!==this)return;
     if(id==='edit-modal')closeModal();
