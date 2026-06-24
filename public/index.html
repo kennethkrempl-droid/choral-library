@@ -1382,6 +1382,22 @@ async function applyPepperToEntry(i,voicing){
   }catch(e){toast('Update failed: '+e.message,'error');}
 }
 
+// Fetch /api/suggest-genres with exponential backoff on 429
+async function _genreFetch(pieces, btnEl, label){
+  const opts=adminFetchOpts({pieces});
+  const waits=[20,40,90]; // seconds between retries
+  for(let attempt=0;attempt<=waits.length;attempt++){
+    const r=await fetch('/api/suggest-genres',opts);
+    if(r.status!==429) return r;
+    if(attempt<waits.length){
+      const s=waits[attempt];
+      if(btnEl) btnEl.innerHTML=`<span class="spinner"></span> Rate limit — retrying in ${s}s (${label})…`;
+      await new Promise(x=>setTimeout(x,s*1000));
+    } else {
+      return r; // final attempt also 429 → let caller handle
+    }
+  }
+}
 async function suggestGenresForLib(tab){
   if(tab==='all'){
     const btn=document.getElementById('suggest-genre-lib-btn-all');
@@ -1398,12 +1414,14 @@ async function suggestGenresForLib(tab){
   const btn=document.getElementById('suggest-genre-lib-btn-'+tab);
   btn.disabled=true;const orig=btn.innerHTML;
   let filled=0,skipped=0;
+  const CHUNK=20;
   try{
-    for(let o=0;o<targets.length;o+=50){
-      const chunk=targets.slice(o,o+50);
-      btn.innerHTML=`<span class="spinner"></span> ${Math.min(o+50,targets.length)}/${targets.length}…`;
-      let r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:chunk.map(e=>({title:e.title,composer:e.composer||e.author||''}))}));
-      if(r.status===429){btn.innerHTML='rate limit — waiting 30s…';await new Promise(x=>setTimeout(x,30000));r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:chunk.map(e=>({title:e.title,composer:e.composer||e.author||''}))}));}
+    for(let o=0;o<targets.length;o+=CHUNK){
+      const chunk=targets.slice(o,o+CHUNK);
+      const prog=`${Math.min(o+CHUNK,targets.length)}/${targets.length}`;
+      btn.innerHTML=`<span class="spinner"></span> ${prog}…`;
+      if(o>0) await new Promise(x=>setTimeout(x,2000)); // brief pause between chunks
+      const r=await _genreFetch(chunk.map(e=>({title:e.title,composer:e.composer||e.author||''})),btn,prog);
       const j=await r.json();
       if(!r.ok)throw new Error(j.error||'failed');
       for(let k=0;k<chunk.length;k++){
@@ -2589,12 +2607,14 @@ async function suggestGenres(){
   if(cfgInfo&&!cfgInfo.geminiKeySet){toast('Set up your free scanning key first (top of this page)','error');return;}
   const btn=document.getElementById('suggest-genre-btn');btn.disabled=true;const orig=btn.innerHTML;
   let filled=0;
+  const CHUNK=20;
   try{
-    for(let o=0;o<targets.length;o+=50){
-      const chunk=targets.slice(o,o+50);
-      btn.innerHTML=`<span class="spinner"></span> ${Math.min(o+50,targets.length)}/${targets.length}…`;
-      let r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:chunk.map(x=>({title:x.r.title,composer:x.r.composer}))}));
-      if(r.status===429){btn.innerHTML='rate limit — waiting 30s…';await new Promise(x=>setTimeout(x,30000));r=await fetch('/api/suggest-genres',adminFetchOpts({pieces:chunk.map(x=>({title:x.r.title,composer:x.r.composer}))}));}
+    for(let o=0;o<targets.length;o+=CHUNK){
+      const chunk=targets.slice(o,o+CHUNK);
+      const prog=`${Math.min(o+CHUNK,targets.length)}/${targets.length}`;
+      btn.innerHTML=`<span class="spinner"></span> ${prog}…`;
+      if(o>0) await new Promise(x=>setTimeout(x,2000));
+      const r=await _genreFetch(chunk.map(x=>({title:x.r.title,composer:x.r.composer})),btn,prog);
       const j=await r.json();
       if(!r.ok)throw new Error(j.error||'failed');
       chunk.forEach((x,k)=>{if(j.genres[k]&&!importRows[x.i].genre){importRows[x.i].genre=j.genres[k];filled++;}});
