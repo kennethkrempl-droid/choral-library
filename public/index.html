@@ -895,6 +895,7 @@ const ICO={
   sortDesc:`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/></svg>`,
   extLink:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
   camera:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
+  print:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
 };
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -959,6 +960,75 @@ function computeCallNumber(entry){
 function computeLocationTag(entry){
   if(!entry.location_cabinet||!entry.location_shelf) return 'Unassigned';
   return `C${entry.location_cabinet}-S${entry.location_shelf}`;
+}
+
+// ── Generate printable box labels for all Work Octavos ────────────────────
+function generateOctavoLabels(){
+  const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const octavos=data.work
+    .filter(e=>e._type==='octavo')
+    .map(e=>({
+      callNumber: computeCallNumber(e)||'Call #: ____________',
+      title:      e.title||'(no title)',
+      composer:   e.composer||'',
+      voicing:    e.voicing||'',
+      genre:      e.genre||'',
+      copies:     e.copies!=null?e.copies:'—',
+    }))
+    .sort((a,b)=>a.title.localeCompare(b.title));
+
+  if(!octavos.length){alert('No Work Octavos found in the library.');return;}
+
+  const labelHtml=octavos.map(item=>`
+    <div class="label">
+      <div class="lbl-call">${esc(item.callNumber)}</div>
+      <div class="lbl-title">${esc(item.title)}</div>
+      <div class="lbl-composer">${esc(item.composer)}</div>
+      <div class="lbl-voicing">${esc([item.voicing,item.genre].filter(Boolean).join('  ·  '))}</div>
+      <div class="lbl-copies">Copies: ${esc(String(item.copies))}</div>
+    </div>`).join('');
+
+  const html=`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Work Octavo Labels</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:white;}
+@media screen{
+  body{background:#f0f2f5;padding:20px;}
+  .print-bar{background:white;border-radius:8px;padding:12px 16px;margin-bottom:20px;
+    display:flex;gap:12px;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+  .print-bar button{padding:8px 18px;border:none;border-radius:5px;
+    background:#2e7d32;color:white;font-size:14px;font-weight:bold;cursor:pointer;}
+  .print-bar button:hover{opacity:.85;}
+  .print-bar p{font-size:12px;color:#555;}
+  .labels-grid{background:white;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);}
+  .label{border-color:#bbb;border-radius:4px;}
+}
+@media print{.print-bar{display:none;}}
+.labels-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0.5in;}
+.label{border:1px solid #999;padding:0.12in 0.18in;min-height:1.75in;
+  display:flex;flex-direction:column;gap:3px;page-break-inside:avoid;}
+.lbl-call{font-size:10pt;font-weight:bold;color:#166534;
+  border-bottom:1px dashed #ccc;padding-bottom:4px;margin-bottom:2px;
+  font-family:monospace;letter-spacing:.5px;}
+.lbl-title{font-size:13pt;font-weight:bold;line-height:1.2;}
+.lbl-composer{font-size:9pt;font-style:italic;color:#333;}
+.lbl-voicing{font-size:8pt;color:#555;}
+.lbl-copies{margin-top:auto;padding-top:4px;font-size:10pt;
+  font-weight:bold;color:#991b1b;text-align:right;}
+</style></head><body>
+<div class="print-bar">
+  <button onclick="window.print()">🖨 Print Labels</button>
+  <p>${octavos.length} Work Octavos &nbsp;·&nbsp; 2-up layout &nbsp;·&nbsp;
+  Print at 100% scale — do <em>not</em> use "fit to page"</p>
+</div>
+<div class="labels-grid">${labelHtml}</div>
+</body></html>`;
+
+  const win=window.open('','_blank','width=950,height=720');
+  if(!win){alert('Pop-up blocked — please allow pop-ups for this site and try again.');return;}
+  win.document.write(html);
+  win.document.close();
 }
 function getNextAccessionId(){
   const all=data.work.filter(e=>e._type==='octavo'&&e.accession_id);
@@ -1227,6 +1297,7 @@ function buildPanel(tab){
       <button class="btn-secondary btn-sm admin-only" onclick="exportCSV('${tab}')" id="export-btn-${tab}">${ICO.download} Export CSV</button>
       <button class="btn-secondary btn-sm btn-icon admin-only" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
       <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncSheets('${tab}')">${ICO.sync} Sync to Sheets</button>
+      ${tab==='work'?`<button class="btn-gold btn-sm admin-only" onclick="generateOctavoLabels()" title="Generate printable box labels for all Work Octavos">${ICO.print} Labels</button>`:''}
     </div>
     <div class="bulk-bar" id="bulk-bar-${tab}">
       <span class="bulk-count" id="bulk-count-${tab}"></span>
@@ -2801,8 +2872,8 @@ async function syncSheets(tab){
   try{
     const allRows=[...data.work.map(e=>({...e,__src:'work'})),...data.personal.map(e=>({...e,__src:'personal'}))];
     if(!allRows.length){toast('Nothing to sync','info');return;}
-    const headers=['Library','Type','Title','Composer / Author','Voicing','Genre','Copies','Last Performed','ISBN','Publisher','Year','Description','Tags','Link'];
-    const toRow=e=>[cap(e.__src||'work'),e._type==='octavo'?'Octavo':'Book',e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||''];
+    const headers=['Library','Type','Call Number','Title','Composer / Author','Voicing','Genre','Copies','Last Performed','ISBN','Publisher','Year','Description','Tags','Link'];
+    const toRow=e=>[cap(e.__src||'work'),e._type==='octavo'?'Octavo':'Book',computeCallNumber(e),e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||''];
     const san=s=>String(s||'').replace(/[\\\/\?\*\[\]:]/g,' ').replace(/\s+/g,' ').trim().slice(0,60);
     const groupBy=(arr,fn)=>{const m={};arr.forEach(e=>{const k=fn(e);(m[k]=m[k]||[]).push(e);});return m;};
     const octavos=allRows.filter(e=>e._type==='octavo'), books=allRows.filter(e=>e._type==='book');
