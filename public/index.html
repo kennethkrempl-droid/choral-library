@@ -674,12 +674,13 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
         <span style="font-size:11px;font-weight:400;color:var(--muted);margin-left:4px;">— map season codes to physical shelf ranges</span>
       </div>
       <div class="settings-section-body">
-        <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Each zone groups related seasons onto a contiguous set of shelves. Season codes are comma-separated. Shelves are stored as explicit C#-S# assignments — edit them in the Shelving tab's per-shelf capacity inputs. Zone names are editable below.</p>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Zones are assigned sequentially across all 35 shelves (C1-S1 → C5-S7). Change the shelf count for any zone and the ranges will redistribute automatically. Counts must add up to 35.</p>
         <div id="zone-editor-wrap">
           <table class="zone-editor-table">
-            <thead><tr><th>Zone Name</th><th>Season Codes (comma-separated)</th><th>Shelf Count</th></tr></thead>
+            <thead><tr><th>Zone Name</th><th>Season Codes</th><th style="text-align:center;">Shelf Count</th><th>Range (auto)</th></tr></thead>
             <tbody id="zone-editor-tbody"></tbody>
           </table>
+          <div style="margin-top:10px;font-size:13px;font-weight:600;" id="zone-shelf-total"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;">
           <button class="btn-primary btn-sm" onclick="saveZoneEditor()">Save Zone Map</button>
@@ -1214,36 +1215,83 @@ function renderOptionChips(){
   if(gta)gta.value=GENRES.join('\n');
   renderZoneEditor();
 }
+function _allShelvesList(){
+  const out=[];
+  for(let c=1;c<=5;c++) for(let s=1;s<=7;s++) out.push({c,s});
+  return out;
+}
+function _redistributeShelves(counts){
+  const all=_allShelvesList();
+  let offset=0;
+  ZONE_MAP.forEach((z,i)=>{
+    z.shelves=all.slice(offset,offset+counts[i]);
+    offset+=counts[i];
+  });
+}
+function _shelfRangeLabel(shelves){
+  if(!shelves.length)return'—';
+  const first=shelves[0],last=shelves[shelves.length-1];
+  if(shelves.length===1)return`C${first.c}-S${first.s}`;
+  return`C${first.c}-S${first.s} → C${last.c}-S${last.s}`;
+}
+function _zoneEditorTotal(){
+  const inputs=[...document.querySelectorAll('#zone-editor-tbody [data-field="count"]')];
+  return inputs.reduce((sum,el)=>sum+(parseInt(el.value)||0),0);
+}
+function _updateZoneEditorTotal(){
+  const total=_zoneEditorTotal();
+  const el=document.getElementById('zone-shelf-total');
+  if(!el)return;
+  el.textContent=total+' / 35 shelves assigned';
+  el.style.color=total===35?'var(--success,#16a34a)':'#dc2626';
+}
 function renderZoneEditor(){
   const tbody=document.getElementById('zone-editor-tbody');
   if(!tbody)return;
+  // Preview redistribution based on current counts so ranges show
+  const all=_allShelvesList();
+  let offset=0;
+  const previews=ZONE_MAP.map(z=>{
+    const range=_shelfRangeLabel(all.slice(offset,offset+z.shelves.length));
+    offset+=z.shelves.length;
+    return range;
+  });
   tbody.innerHTML=ZONE_MAP.map((z,i)=>`<tr>
     <td><input type="text" data-zi="${i}" data-field="name" value="${escAttr(z.name)}" placeholder="Zone name"></td>
-    <td><input type="text" data-zi="${i}" data-field="seasons" value="${escAttr(z.seasons.join(', '))}" placeholder="SAC, EAS, SPR"></td>
-    <td style="font-size:12px;color:var(--muted);text-align:center;">${z.shelves.length}</td>
+    <td><input type="text" data-zi="${i}" data-field="seasons" value="${escAttr(z.seasons.join(', '))}" placeholder="SAC, EAS"></td>
+    <td style="text-align:center;"><input type="number" data-zi="${i}" data-field="count" value="${z.shelves.length}" min="0" max="35" style="width:54px;text-align:center;" oninput="_updateZoneEditorTotal()"></td>
+    <td style="font-size:11px;color:var(--muted);" id="ze-range-${i}">${esc(previews[i])}</td>
   </tr>`).join('');
+  _updateZoneEditorTotal();
 }
 function saveZoneEditor(){
   const tbody=document.getElementById('zone-editor-tbody');
   if(!tbody)return;
   const rows=[...tbody.querySelectorAll('tr')];
   const validCodes=SEASON_CODES.map(s=>s.code);
+  const counts=[];
   for(const row of rows){
     const i=parseInt(row.querySelector('[data-field="name"]').dataset.zi);
     const name=row.querySelector('[data-field="name"]').value.trim();
     const rawSeasons=row.querySelector('[data-field="seasons"]').value;
     const seasons=rawSeasons.split(/[,\s]+/).map(s=>s.trim().toUpperCase()).filter(s=>s);
+    const count=parseInt(row.querySelector('[data-field="count"]').value)||0;
     const invalid=seasons.filter(s=>s&&!validCodes.includes(s));
     if(invalid.length){toast(`Unknown season codes: ${invalid.join(', ')}. Valid: ${validCodes.join(', ')}`,'error',5000);return;}
     if(!name){toast('Zone names cannot be empty','error');return;}
     ZONE_MAP[i].name=name;
     ZONE_MAP[i].seasons=seasons;
+    counts[i]=count;
   }
-  // Check for duplicate season assignments
   const allSeasons=ZONE_MAP.flatMap(z=>z.seasons);
   const dups=allSeasons.filter((s,i)=>allSeasons.indexOf(s)!==i);
-  if(dups.length){toast(`Season code(s) assigned to multiple zones: ${[...new Set(dups)].join(', ')}`,'error',5000);return;}
+  if(dups.length){toast(`Season code(s) in multiple zones: ${[...new Set(dups)].join(', ')}`,'error',5000);return;}
+  const total=counts.reduce((a,b)=>a+b,0);
+  if(total!==35){toast(`Shelf counts must add up to 35 (currently ${total})`,'error',5000);return;}
+  _redistributeShelves(counts);
   _saveZoneMap();
+  renderZoneEditor(); // refresh range preview
+  if(document.getElementById('tab-shelving').classList.contains('active')) renderZoneView();
   toast('Zone map saved','success');
 }
 function initDatalists(){
