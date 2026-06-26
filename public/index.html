@@ -924,16 +924,15 @@ let GENRES   = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater'
 
 // ── Cataloging system ────────────────────────────────────────────────────────
 const SEASON_CODES=[
-  {code:'HLD',label:'Holiday / Christmas / Winter'},
-  {code:'EAS',label:'Easter / Lent / Spring Sacred'},
-  {code:'SAC',label:'Sacred (General)'},
-  {code:'PAT',label:'Patriotic / Civic'},
-  {code:'FOL',label:'Folk / Americana'},
-  {code:'SPR',label:'Spiritual'},
-  {code:'SEA',label:'Seasonal Secular'},
-  {code:'POP',label:'Pop / Jazz / Contemporary'},
   {code:'MT', label:'Musical Theater'},
-  {code:'CLS',label:'Classical / Concert'},
+  {code:'POP',label:'Pop'},
+  {code:'CON',label:'Concert'},
+  {code:'HLD',label:'Holiday/Christmas/Advent/Winter'},
+  {code:'EAS',label:'Easter/Lent/Spring Sacred'},
+  {code:'SAC',label:'Sacred General'},
+  {code:'PAT',label:'Patriotic/Civic'},
+  {code:'FOL',label:'Folk/Americana/Spiritual'},
+  {code:'SEA',label:'Seasonal Secular'},
   {code:'MSC',label:'Miscellaneous'},
 ];
 const VOICING_TO_CODE={
@@ -948,13 +947,16 @@ const VOICING_TO_CODE={
 };
 const GENRE_TO_SEASON={
   'Pop':'POP','Holiday':'HLD','Musical Theater':'MT',
-  'Classical':'CLS','Sacred':'SAC','Spiritual':'SPR','Folk':'FOL','Jazz':'POP',
+  'Classical':'CON','Sacred':'SAC','Spiritual':'FOL','Folk':'FOL','Jazz':'POP',
 };
 function voicingCode(v){return VOICING_TO_CODE[v]||'SPC';}
 function computeCallNumber(entry){
   if(!entry.season||!entry.accession_id) return '';
   const vc=voicingCode(entry.voicing||'');
-  const num=String(entry.accession_id).padStart(4,'0');
+  const allIds=(data&&data.work?data.work:[]).filter(e=>e._type==='octavo'&&e.accession_id).map(e=>e.accession_id);
+  const maxId=allIds.length?Math.max(...allIds):entry.accession_id;
+  const padLen=maxId>=10000?5:4;
+  const num=String(entry.accession_id).padStart(padLen,'0');
   return `${entry.season}-${vc}-${num}`;
 }
 function computeLocationTag(entry){
@@ -1054,11 +1056,11 @@ function getNextAccessionId(){
 
 // ── Zone map ─────────────────────────────────────────────────────────────────
 const DEFAULT_ZONE_MAP=[
-  {key:'sacred',   name:'Sacred',           seasons:['SAC','EAS','SPR'],shelves:[{c:1,s:1},{c:1,s:2},{c:1,s:3},{c:1,s:4},{c:1,s:5},{c:1,s:6},{c:1,s:7},{c:2,s:1}]},
+  {key:'sacred',   name:'Sacred',           seasons:['SAC','EAS'],     shelves:[{c:1,s:1},{c:1,s:2},{c:1,s:3},{c:1,s:4},{c:1,s:5},{c:1,s:6},{c:1,s:7},{c:2,s:1}]},
   {key:'holiday',  name:'Holiday',           seasons:['HLD'],           shelves:[{c:2,s:2},{c:2,s:3},{c:2,s:4},{c:2,s:5},{c:2,s:6},{c:2,s:7}]},
   {key:'secular',  name:'Secular/Seasonal',  seasons:['SEA','FOL'],     shelves:[{c:3,s:1},{c:3,s:2},{c:3,s:3},{c:3,s:4},{c:3,s:5},{c:3,s:6},{c:3,s:7}]},
   {key:'pop',      name:'Pop/Show',          seasons:['POP','MT'],      shelves:[{c:4,s:1},{c:4,s:2},{c:4,s:3},{c:4,s:4},{c:4,s:5}]},
-  {key:'concert',  name:'Concert/Classical', seasons:['CLS'],           shelves:[{c:4,s:6},{c:4,s:7},{c:5,s:1},{c:5,s:2}]},
+  {key:'concert',  name:'Concert/Classical', seasons:['CON'],           shelves:[{c:4,s:6},{c:4,s:7},{c:5,s:1},{c:5,s:2}]},
   {key:'patriotic',name:'Patriotic/Misc',    seasons:['PAT','MSC'],     shelves:[{c:5,s:3},{c:5,s:4},{c:5,s:5}]},
   {key:'growth',   name:'Growth (overflow)', seasons:[],                shelves:[{c:5,s:6},{c:5,s:7}]},
 ];
