@@ -1436,7 +1436,7 @@ function octavoFields(tab){return[
     {key:'season',label:'Season / Occasion',type:'season-select',workOnly:true},
     {key:'location_cabinet',label:'Cabinet (1–5)',type:'number',min:1,max:5,placeholder:'1–5',workOnly:true},
     {key:'location_shelf',label:'Shelf (1–7)',type:'number',min:1,max:7,placeholder:'1–7',workOnly:true},
-    {key:'__callnum',  label:'Call Number',         type:'computed-callnum',  workOnly:true},
+    {key:'call_number',label:'Call Number',           type:'callnum-text',      workOnly:true},
     {key:'__loctag',   label:'Location',             type:'computed-loctag',   workOnly:true},
     {key:'__suggest',  label:'Suggested Location',   type:'computed-suggest',  workOnly:true},
   ]:[]),
@@ -1476,9 +1476,9 @@ function buildFieldHTML(f,prefix,value,entry,tab){
     const opts=SEASON_CODES.map(s=>`<option value="${s.code}"${value===s.code?' selected':''}>${s.code} — ${s.label}</option>`).join('');
     inner=`<select id="${id}" name="${f.key}" onchange="_updateComputedCatalog('${prefix}')" ${req}><option value="">Select season…</option>${opts}</select>`;
   }
-  else if(f.type==='computed-callnum'){
-    const cn=entry?computeCallNumber(entry):'';
-    inner=`<div class="computed-field" id="${id}">${cn?`<span class="call-number-badge">${esc(cn)}</span>`:'<span class="text-muted">Set season &amp; voicing above</span>'}</div>`;
+  else if(f.type==='callnum-text'){
+    const cn=(value!=null&&value!=='')?value:(entry?computeCallNumber(entry):'');
+    inner=`<div style="display:flex;gap:6px;align-items:center;"><input type="text" id="${id}" name="${f.key}" value="${escAttr(cn)}" placeholder="e.g. SAC-SATB-0001" style="font-family:var(--mono,monospace);font-size:13px;" autocomplete="off"><button type="button" class="btn-ghost btn-sm" title="Recompute from season &amp; voicing" onclick="_recomputeCallNum('${prefix}')">↺</button></div>`;
   }
   else if(f.type==='computed-loctag'){
     const lt=entry?computeLocationTag(entry):'Unassigned';
@@ -1513,6 +1513,14 @@ function buildFieldHTML(f,prefix,value,entry,tab){
   return `<div class="form-group${f.full?' full':''}"><label for="${id}">${f.label}</label>${inner}</div>`;
 }
 
+function _recomputeCallNum(prefix){
+  const get=k=>{const el=document.getElementById(`${prefix}_${k}`);return el?el.value.trim():'';}
+  const entry={season:get('season'),voicing:get('voicing'),accession_id:parseInt(get('accession_id'))||0};
+  const cnEl=document.getElementById(`${prefix}_call_number`);
+  if(!cnEl)return;
+  const cn=computeCallNumber(entry);
+  if(cn)cnEl.value=cn;
+}
 // Live-update computed call number / location tag in the add or edit form
 function _updateComputedCatalog(prefix){
   const get=k=>{const el=document.getElementById(`${prefix}_${k}`);return el?el.value.trim():'';}
@@ -1523,12 +1531,13 @@ function _updateComputedCatalog(prefix){
     location_cabinet:parseInt(get('location_cabinet'))||null,
     location_shelf:parseInt(get('location_shelf'))||null,
   };
-  const cnEl=document.getElementById(`${prefix}___callnum`);
+  const cnEl=document.getElementById(`${prefix}_call_number`);
   const ltEl=document.getElementById(`${prefix}___loctag`);
-  if(cnEl){
+  if(cnEl&&!cnEl.value){
     const cn=computeCallNumber(entry);
-    cnEl.innerHTML=cn?`<span class="call-number-badge">${esc(cn)}</span>`:'<span class="text-muted">Set season &amp; voicing above</span>';
+    if(cn) cnEl.value=cn;
   }
+  if(cnEl) cnEl.placeholder=computeCallNumber(entry)||'e.g. SAC-SATB-0001';
   if(ltEl){
     const lt=computeLocationTag(entry);
     const cls=lt==='Unassigned'?'text-muted':'loc-tag-badge';
@@ -1983,7 +1992,7 @@ function submitForm(e,tab){
     if(tab==='work'&&entry._type==='octavo'){
       if(!entry.accession_id) entry.accession_id=getNextAccessionId();
       if(!entry.needs_cataloging) entry.needs_cataloging=(!entry.season)?true:false;
-      entry.call_number=computeCallNumber(entry);
+      if(!entry.call_number) entry.call_number=computeCallNumber(entry);
     }
     const r=await fetch(`/api/entries/${tab}`,adminFetchOpts(entry));
     const j=await r.json();
@@ -2028,7 +2037,7 @@ async function submitEdit(e){
   if(tab==='work'&&type==='octavo'){
     if(!entry.accession_id) entry.accession_id=existing.accession_id||getNextAccessionId();
     entry.needs_cataloging=!entry.season;
-    entry.call_number=computeCallNumber(entry);
+    if(!entry.call_number) entry.call_number=computeCallNumber(entry);
   }
   const r=await fetch(`/api/entries/${tab}/${id}`,adminFetchOpts(entry,'PUT'));
   const j=await r.json();
