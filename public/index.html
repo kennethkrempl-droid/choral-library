@@ -3685,16 +3685,22 @@ async function syncBidirectional(tab){
   const btn=document.getElementById(`sync-${tab}-btn`);
   btn.disabled=true;const orig=btn.innerHTML;
 
+  const norm=s=>s.toLowerCase().trim().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  const vkey=v=>{v=(v||'').toUpperCase().trim();return({'3-PART MIXED':'3PT','3 PART MIXED':'3PT','3-PART':'3PT','3 PART':'3PT','2-PART':'2PT','2 PART':'2PT','TWO-PART':'2PT','TWO PART':'2PT','UNISON':'UNI','SAT(B)':'SATB','OTHER':'OTHER','MASTERWORK':'OTHER'}[v]||v);};
+  const callSuffix=cn=>{const m=(cn||'').match(/(\d+)$/);return m?parseInt(m[1],10):null;};
+
   // ── STEP 1: Pull from sheet → update call numbers / genres / seasons ──────
   btn.innerHTML='<span class="spinner"></span> Pulling from sheet…';
-  let pullCount=0,pullFail=0;
+  let pullCount=0;
+  const sheetMatchedIds=new Set(); // website entry IDs that exist in the sheet
+  let maxSheetNum=0;               // highest numeric call# suffix in sheet
+
   try{
     const csvUrl=`https://docs.google.com/spreadsheets/d/${_SHEET_ID}/export?format=csv&id=${_SHEET_ID}&gid=${_SHEET_GID}`;
     const resp=await fetch(csvUrl);
     if(!resp.ok)throw new Error(`Sheet download failed (${resp.status}) — is the sheet shared?`);
     const rows=_parseCSV(await resp.text());
 
-    // Find header row
     let header=null,start=0;
     for(let i=0;i<rows.length;i++){
       const j=rows[i].join(' ').toLowerCase();
@@ -3705,15 +3711,11 @@ async function syncBidirectional(tab){
     if(!header)throw new Error('Could not find header row in sheet');
 
     const ci=(...ns)=>{for(const n of ns){const i=header.indexOf(n);if(i>=0)return i;}return -1;};
-    const IDX_CALL=ci('call number','call #'), IDX_TITLE=ci('title'),
-          IDX_COMP=ci('composer / author','composer','author'),
-          IDX_VOICE=ci('voicing'), IDX_GENRE=ci('genre');
+    const IDX_CALL=ci('call number','call #'),IDX_TITLE=ci('title'),
+          IDX_VOICE=ci('voicing'),IDX_GENRE=ci('genre');
     const g=(row,i)=>i>=0&&i<row.length?row[i].trim():'';
 
-    const norm=s=>s.toLowerCase().trim().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
-    const vkey=v=>{v=v.toUpperCase().trim();return({'3-PART MIXED':'3PT','3 PART MIXED':'3PT','3-PART':'3PT','3 PART':'3PT','2-PART':'2PT','2 PART':'2PT','TWO-PART':'2PT','TWO PART':'2PT','UNISON':'UNI','SAT(B)':'SATB','OTHER':'OTHER','MASTERWORK':'OTHER'}[v]||v);};
-
-    // Build lookup: "normTitle|voicingKey" → {entry, section}
+    // Build website lookup
     const lk={};
     for(const sec of ['work','personal'])
       for(const e of data[sec]||[])
@@ -3722,40 +3724,72 @@ async function syncBidirectional(tab){
     for(let i=start;i<rows.length;i++){
       const row=rows[i];
       if(!row.some(c=>c))continue;
-      const title=g(row,IDX_TITLE), callNum=g(row,IDX_CALL),
-            voicing=g(row,IDX_VOICE), genre=g(row,IDX_GENRE);
-      if(!title||!callNum)continue;
+      const title=g(row,IDX_TITLE),callNum=g(row,IDX_CALL),
+            voicing=g(row,IDX_VOICE),genre=g(row,IDX_GENRE);
+      if(!title)continue;
 
-      const hit=lk[`${norm(title)}|${vkey(voicing)}`]
-             || lk[`${norm(title)}|`]  // title-only fallback
-             || null;
+      // Track max call number in sheet regardless of match
+      const n=callSuffix(callNum);
+      if(n&&n>maxSheetNum)maxSheetNum=n;
+
+      const hit=lk[`${norm(title)}|${vkey(voicing)}`]||lk[`${norm(title)}|`]||null;
       if(!hit)continue;
 
       const {entry,sec}=hit;
+      sheetMatchedIds.add(entry._id); // mark as existing in sheet
+
+      if(!callNum)continue; // sheet has no call# yet — nothing to pull
+
       const season=callNum.split('-')[0].toUpperCase();
       const patch={};
-      if(entry.call_number!==callNum) patch.call_number=callNum;
-      if(genre&&entry.genre!==genre)  patch.genre=genre;
+      if(entry.call_number!==callNum)patch.call_number=callNum;
+      if(genre&&entry.genre!==genre)patch.genre=genre;
       if(season&&entry.season!==season)patch.season=season;
       if(!Object.keys(patch).length)continue;
 
       try{
         const r=await fetch(`/api/entries/${sec}/${entry._id}`,adminFetchOpts({...entry,...patch},'PUT'));
-        if(r.ok){Object.assign(entry,patch);pullCount++;}else pullFail++;
-      }catch{pullFail++;}
+        if(r.ok){Object.assign(entry,patch);pullCount++;}
+      }catch{}
     }
   }catch(e){
     toast(`Pull failed: ${e.message}`,'error',5000);
     btn.disabled=false;btn.innerHTML=orig;return;
   }
 
+  // Work out which NEW call numbers are sequential from maxSheetNum+1 (no gaps allowed)
+  const newWithNum=[];
+  for(const sec of ['work','personal'])
+    for(const e of data[sec]||[]){
+      if(sheetMatchedIds.has(e._id)||!e.call_number)continue;
+      const n=callSuffix(e.call_number);
+      if(n)newWithNum.push({entry:e,n});
+    }
+  newWithNum.sort((a,b)=>a.n-b.n);
+  const allowedNewNums=new Set();
+  let nextExpected=maxSheetNum+1;
+  for(const {n} of newWithNum){
+    if(n===nextExpected){allowedNewNums.add(n);nextExpected++;}
+    else break; // gap — stop here
+  }
+
   // ── STEP 2: Push website → sheet ─────────────────────────────────────────
+  // Call# push rules:
+  //   • Entry already in sheet → push whatever call# it has (bidirectional)
+  //   • New entry (not in sheet) → only push call# if it's the next sequential number(s)
   btn.innerHTML='<span class="spinner"></span> Pushing to sheet…';
   try{
     const allRows=[...data.work.map(e=>({...e,__src:'work'})),...data.personal.map(e=>({...e,__src:'personal'}))];
     if(allRows.length){
       const headers=['Library','Type','Call Number','Title','Composer / Author','Voicing','Genre','Copies','Last Performed','ISBN','Publisher','Year','Description','Tags','Link'];
-      const toRow=e=>[cap(e.__src||'work'),e._type==='octavo'?'Octavo':'Book',computeCallNumber(e),e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||''];
+      const getCallNum=e=>{
+        const cn=computeCallNumber(e);
+        if(!cn)return '';
+        if(sheetMatchedIds.has(e._id))return cn; // existing entry — always push
+        const n=callSuffix(cn);
+        return(n&&allowedNewNums.has(n))?cn:'';  // new entry — sequential only
+      };
+      const toRow=e=>[cap(e.__src||'work'),e._type==='octavo'?'Octavo':'Book',getCallNum(e),e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||''];
       const san=s=>String(s||'').replace(/[\\\/\?\*\[\]:]/g,' ').replace(/\s+/g,' ').trim().slice(0,60);
       const groupBy=(arr,fn)=>{const m={};arr.forEach(e=>{const k=fn(e);(m[k]=m[k]||[]).push(e);});return m;};
       const octavos=allRows.filter(e=>e._type==='octavo'),books=allRows.filter(e=>e._type==='book');
@@ -3778,7 +3812,11 @@ async function syncBidirectional(tab){
 
   btn.disabled=false;btn.innerHTML=orig;
   if(pullCount>0){renderGrid('work',data.work);renderGrid('personal',data.personal);}
-  const msg=pullCount>0?`↓ ${pullCount} pulled from sheet · pushed all back up`:'Pushed to sheet (nothing new to pull)';
+  const newPushed=allowedNewNums.size;
+  const parts=[];
+  if(pullCount>0)parts.push(`↓ ${pullCount} pulled from sheet`);
+  if(newPushed>0)parts.push(`↑ ${newPushed} new call# pushed`);
+  const msg=parts.length?parts.join(' · '):'Already in sync';
   toast(msg+` <a href="https://docs.google.com/spreadsheets/d/${authStatus.spreadsheetId||_SHEET_ID}" target="_blank">Open ↗</a>`,'success',6000);
 }
 
