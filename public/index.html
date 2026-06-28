@@ -1902,7 +1902,7 @@ function buildPanel(tab){
       <span style="flex:1"></span>
       <button class="btn-secondary btn-sm admin-only" onclick="exportCSV('${tab}')" id="export-btn-${tab}">${ICO.download} Export CSV</button>
       <button class="btn-secondary btn-sm btn-icon admin-only" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
-      <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncSheets('${tab}')">${ICO.sync} Sync to Sheets</button>
+      <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncBidirectional('${tab}')">${ICO.sync} Sync Sheets</button>
       ${tab==='work'?`<button class="btn-gold btn-sm admin-only" onclick="generateOctavoLabels()" title="Generate printable box labels for all Work Octavos">${ICO.print} Labels</button>`:''}
       <button class="btn-secondary btn-sm btn-view-toggle" id="view-toggle-${tab}" onclick="toggleViewMode('${tab}')" title="Toggle grid / table view">${ICO.grid}</button>
     </div>
@@ -3658,7 +3658,130 @@ function exportCSV(tab,selectedOnly=false){
 }
 function showCSVImportTip(){document.getElementById('csv-tip-modal').classList.add('open');}
 
-// ── Google Sync ───────────────────────────────────────────────────────────
+// ── Google Sync (bidirectional) ───────────────────────────────────────────
+
+// The sheet is "Anyone with the link can view" so the browser can fetch CSV directly.
+const _SHEET_ID  = '1LipZ8SiTWwhZl8UdIG56OgLw2oOtnxrPZme3xYn8Ijo';
+const _SHEET_GID = '2139739534'; // "All Music" tab
+
+function _parseCSV(text){
+  const rows=[];let row=[],cur='',inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(c==='"'){if(inQ&&text[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(c===','&&!inQ){row.push(cur);cur='';}
+    else if((c==='\n'||c==='\r')&&!inQ){
+      if(c==='\r'&&text[i+1]==='\n')i++;
+      row.push(cur);cur='';
+      if(row.some(x=>x))rows.push(row);row=[];
+    }else cur+=c;
+  }
+  if(cur||row.length){row.push(cur);if(row.some(x=>x))rows.push(row);}
+  return rows;
+}
+
+async function syncBidirectional(tab){
+  if(!authStatus.authenticated){toast('Connect Google in Settings first','error');return;}
+  const btn=document.getElementById(`sync-${tab}-btn`);
+  btn.disabled=true;const orig=btn.innerHTML;
+
+  // ── STEP 1: Pull from sheet → update call numbers / genres / seasons ──────
+  btn.innerHTML='<span class="spinner"></span> Pulling from sheet…';
+  let pullCount=0,pullFail=0;
+  try{
+    const csvUrl=`https://docs.google.com/spreadsheets/d/${_SHEET_ID}/export?format=csv&id=${_SHEET_ID}&gid=${_SHEET_GID}`;
+    const resp=await fetch(csvUrl);
+    if(!resp.ok)throw new Error(`Sheet download failed (${resp.status}) — is the sheet shared?`);
+    const rows=_parseCSV(await resp.text());
+
+    // Find header row
+    let header=null,start=0;
+    for(let i=0;i<rows.length;i++){
+      const j=rows[i].join(' ').toLowerCase();
+      if(j.includes('call number')||(j.includes('library')&&j.includes('title'))){
+        header=rows[i].map(c=>c.trim().toLowerCase());start=i+1;break;
+      }
+    }
+    if(!header)throw new Error('Could not find header row in sheet');
+
+    const ci=(...ns)=>{for(const n of ns){const i=header.indexOf(n);if(i>=0)return i;}return -1;};
+    const IDX_CALL=ci('call number','call #'), IDX_TITLE=ci('title'),
+          IDX_COMP=ci('composer / author','composer','author'),
+          IDX_VOICE=ci('voicing'), IDX_GENRE=ci('genre');
+    const g=(row,i)=>i>=0&&i<row.length?row[i].trim():'';
+
+    const norm=s=>s.toLowerCase().trim().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+    const vkey=v=>{v=v.toUpperCase().trim();return({'3-PART MIXED':'3PT','3 PART MIXED':'3PT','3-PART':'3PT','3 PART':'3PT','2-PART':'2PT','2 PART':'2PT','TWO-PART':'2PT','TWO PART':'2PT','UNISON':'UNI','SAT(B)':'SATB','OTHER':'OTHER','MASTERWORK':'OTHER'}[v]||v);};
+
+    // Build lookup: "normTitle|voicingKey" → {entry, section}
+    const lk={};
+    for(const sec of ['work','personal'])
+      for(const e of data[sec]||[])
+        lk[`${norm(e.title||'')}|${vkey(e.voicing||'')}`]={entry:e,sec};
+
+    for(let i=start;i<rows.length;i++){
+      const row=rows[i];
+      if(!row.some(c=>c))continue;
+      const title=g(row,IDX_TITLE), callNum=g(row,IDX_CALL),
+            voicing=g(row,IDX_VOICE), genre=g(row,IDX_GENRE);
+      if(!title||!callNum)continue;
+
+      const hit=lk[`${norm(title)}|${vkey(voicing)}`]
+             || lk[`${norm(title)}|`]  // title-only fallback
+             || null;
+      if(!hit)continue;
+
+      const {entry,sec}=hit;
+      const season=callNum.split('-')[0].toUpperCase();
+      const patch={};
+      if(entry.call_number!==callNum) patch.call_number=callNum;
+      if(genre&&entry.genre!==genre)  patch.genre=genre;
+      if(season&&entry.season!==season)patch.season=season;
+      if(!Object.keys(patch).length)continue;
+
+      try{
+        const r=await fetch(`/api/entries/${sec}/${entry._id}`,adminFetchOpts({...entry,...patch},'PUT'));
+        if(r.ok){Object.assign(entry,patch);pullCount++;}else pullFail++;
+      }catch{pullFail++;}
+    }
+  }catch(e){
+    toast(`Pull failed: ${e.message}`,'error',5000);
+    btn.disabled=false;btn.innerHTML=orig;return;
+  }
+
+  // ── STEP 2: Push website → sheet ─────────────────────────────────────────
+  btn.innerHTML='<span class="spinner"></span> Pushing to sheet…';
+  try{
+    const allRows=[...data.work.map(e=>({...e,__src:'work'})),...data.personal.map(e=>({...e,__src:'personal'}))];
+    if(allRows.length){
+      const headers=['Library','Type','Call Number','Title','Composer / Author','Voicing','Genre','Copies','Last Performed','ISBN','Publisher','Year','Description','Tags','Link'];
+      const toRow=e=>[cap(e.__src||'work'),e._type==='octavo'?'Octavo':'Book',computeCallNumber(e),e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||''];
+      const san=s=>String(s||'').replace(/[\\\/\?\*\[\]:]/g,' ').replace(/\s+/g,' ').trim().slice(0,60);
+      const groupBy=(arr,fn)=>{const m={};arr.forEach(e=>{const k=fn(e);(m[k]=m[k]||[]).push(e);});return m;};
+      const octavos=allRows.filter(e=>e._type==='octavo'),books=allRows.filter(e=>e._type==='book');
+      const sheets=[{title:'All Music',headers,rows:allRows.map(toRow)}];
+      const vGroups=groupBy(octavos,e=>san(e.voicing)||'(none)');
+      Object.keys(vGroups).sort().forEach(v=>sheets.push({title:`Voicing – ${v}`,headers,rows:vGroups[v].map(toRow)}));
+      const ogGroups=groupBy(octavos,e=>san(e.genre)||'(none)');
+      Object.keys(ogGroups).sort().forEach(g=>sheets.push({title:`Octavos – ${g}`,headers,rows:ogGroups[g].map(toRow)}));
+      const bgGroups=groupBy(books,e=>san(e.genre)||'(none)');
+      Object.keys(bgGroups).sort().forEach(g=>sheets.push({title:`Books – ${g}`,headers,rows:bgGroups[g].map(toRow)}));
+      const r1=await fetch('/api/sync-sheets',adminFetchOpts({tab:'work',sheets}));
+      const j1=await r1.json();
+      if(!r1.ok){if(j1.reauth){authStatus.authenticated=false;updateGoogleUI();toast('Google session expired — reconnect in Settings','error');}else toast('Push failed: '+j1.error,'error');btn.disabled=false;btn.innerHTML=orig;return;}
+      await fetch('/api/sync-sheets',adminFetchOpts({tab:'personal',sheets}));
+      authStatus.spreadsheetId=j1.spreadsheetId;
+    }
+  }catch(e){
+    toast('Push failed: '+e.message,'error');btn.disabled=false;btn.innerHTML=orig;return;
+  }
+
+  btn.disabled=false;btn.innerHTML=orig;
+  if(pullCount>0){renderGrid('work',data.work);renderGrid('personal',data.personal);}
+  const msg=pullCount>0?`↓ ${pullCount} pulled from sheet · pushed all back up`:'Pushed to sheet (nothing new to pull)';
+  toast(msg+` <a href="https://docs.google.com/spreadsheets/d/${authStatus.spreadsheetId||_SHEET_ID}" target="_blank">Open ↗</a>`,'success',6000);
+}
+
 async function syncSheets(tab){
   if(!authStatus.authenticated){toast('Connect Google in Settings first','error');return;}
   // Always sync both libraries combined — a Library column distinguishes Work vs Personal
