@@ -459,6 +459,19 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
 .mc-composer { font-size:11px; color:var(--muted); margin-bottom:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mc-tags { display:flex; flex-wrap:wrap; gap:3px; margin-top:auto; }
 .btn-view-toggle { padding:5px 8px; line-height:1; }
+.sb-footer { margin-top:auto; padding-top:8px; border-top:1px solid var(--line); }
+/* Sidebar editor modal */
+.sbe-row { display:flex; align-items:center; gap:7px; padding:8px 0; border-bottom:1px solid var(--line); }
+.sbe-row:last-child { border-bottom:none; }
+.sbe-arrows { display:flex; flex-direction:column; gap:1px; flex-shrink:0; }
+.sbe-arrows button { background:none; border:1px solid var(--line); border-radius:3px; padding:1px 6px; font-size:9px; cursor:pointer; color:var(--muted); line-height:1.3; }
+.sbe-arrows button:hover { background:var(--bg); color:var(--ink); }
+.sbe-input { flex:1; min-width:0; padding:4px 8px; font-size:13px; border:1px solid var(--line); border-radius:5px; background:var(--bg); color:var(--ink); }
+.sbe-url { font-family:var(--mono,monospace); font-size:11px; }
+.sbe-tag { font-size:10px; color:var(--faint); white-space:nowrap; font-weight:700; text-transform:uppercase; letter-spacing:.6px; flex-shrink:0; }
+.sbe-divider-row { display:flex; align-items:center; gap:8px; padding:4px 0; color:var(--faint); font-size:11px; }
+.sbe-divider-line { flex:1; border-top:1px dashed var(--line); }
+.sbe-check { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--muted); white-space:nowrap; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -494,41 +507,13 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
 </nav>
 
 <div class="app-layout">
-<!-- ── Sidebar ── -->
+<!-- ── Sidebar (content rendered dynamically by renderSidebar()) ── -->
 <aside id="app-sidebar">
-  <div class="sb-section">
-    <div class="sb-label">Browse</div>
-    <button class="sb-item viewer-only" data-tab="all">
-      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-      Library
-    </button>
-    <button class="sb-item admin-only active" data-tab="work">
-      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-      Work <span class="sb-count" id="count-work">0</span>
-    </button>
-    <button class="sb-item admin-only" data-tab="all">
-      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-      All Music <span class="sb-count" id="count-all">0</span>
-    </button>
-    <button class="sb-item admin-only" data-tab="personal">
-      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      Personal <span class="sb-count" id="count-personal">0</span>
-    </button>
-  </div>
-  <hr class="sb-divider admin-only">
-  <div class="sb-section admin-only">
-    <div class="sb-label">Library Tools</div>
-    <button class="sb-item" data-tab="shelving">
-      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg>
-      Shelving
-    </button>
-    <button class="sb-item" data-tab="import">
-      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      Import
-    </button>
-    <button class="sb-item" data-tab="settings">
-      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Settings
+  <div id="sidebar-content"></div>
+  <div class="sb-footer admin-only">
+    <button class="sb-item" onclick="openSidebarEditor()">
+      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Edit Navigation
     </button>
   </div>
 </aside>
@@ -813,6 +798,31 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
 </div><!-- /app-layout -->
 
 <!-- ═══ MODALS ═══ -->
+
+<!-- Sidebar editor modal -->
+<div class="modal-overlay" id="sidebar-editor-modal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header">
+      <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Customize Navigation</h2>
+      <button class="btn-ghost btn-icon" onclick="closeSidebarEditor()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Rename items, add external links, or reorder the sidebar. Use ▲▼ to move rows. Built-in tabs (admin/viewer) can be renamed or hidden but not deleted.</p>
+      <div id="sbe-list"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn-secondary btn-sm" onclick="_sbeAddLink()">+ Add Link</button>
+        <button class="btn-secondary btn-sm" onclick="_sbeAddDivider()">+ Add Divider</button>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;align-items:center;">
+      <button class="btn-ghost btn-sm" onclick="resetSidebarConfig()">Reset to Defaults</button>
+      <span style="flex:1"></span>
+      <button class="btn-ghost" onclick="closeSidebarEditor()">Cancel</button>
+      <button class="btn-primary" onclick="saveSidebarConfig()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="request-modal">
   <div class="modal" style="max-width:500px;">
     <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Request This Item</h2><button class="btn-ghost btn-icon" onclick="closeRequestModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -1021,6 +1031,37 @@ const ICO={
   rows:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`,
 };
 
+// ── Sidebar icon SVGs ─────────────────────────────────────────────────────
+const SIDEBAR_ICONS={
+  music:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`,
+  book:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+  user:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  shelves:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg>`,
+  camera:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
+  gear:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  link:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
+  star:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+  folder:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+  home:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+  calendar:`<svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  none:'',
+};
+const SIDEBAR_ICON_LABELS={music:'♪ Music',book:'📚 Book/Library',user:'👤 Person',shelves:'📦 Shelves',camera:'📷 Camera',gear:'⚙ Gear',link:'🔗 Link',star:'⭐ Star',folder:'📁 Folder',home:'🏠 Home',calendar:'📅 Calendar',none:'(no icon)'};
+
+// ── Sidebar config ─────────────────────────────────────────────────────────
+const DEFAULT_SIDEBAR_CONFIG=[
+  {id:'_sl1',  type:'section', label:'Browse',        adminOnly:true},
+  {id:'work',  type:'tab',     label:'Work',           tab:'work',     icon:'music',   adminOnly:true,  countId:'count-work'},
+  {id:'all',   type:'tab',     label:'All Music',      tab:'all',      icon:'book',    adminOnly:true,  countId:'count-all'},
+  {id:'personal',type:'tab',  label:'Personal',        tab:'personal', icon:'user',    adminOnly:true,  countId:'count-personal'},
+  {id:'viewer',type:'tab',     label:'Library',        tab:'all',      icon:'book',    viewerOnly:true},
+  {id:'_div1', type:'divider', adminOnly:true},
+  {id:'_sl2',  type:'section', label:'Library Tools',  adminOnly:true},
+  {id:'shelving',type:'tab',   label:'Shelving',       tab:'shelving', icon:'shelves', adminOnly:true},
+  {id:'import',type:'tab',     label:'Import',         tab:'import',   icon:'camera',  adminOnly:true},
+  {id:'settings',type:'tab',   label:'Settings',       tab:'settings', icon:'gear',    adminOnly:true},
+];
+
 // ── Season card colors ─────────────────────────────────────────────────────
 const SEASON_COLORS={
   MT:'#0d9488', POP:'#db2777', CON:'#4338ca', HLD:'#b91c1c',
@@ -1032,6 +1073,7 @@ const SEASON_COLORS={
 let data        = { work:[], personal:[] };
 let entryTypes  = { work:'octavo', personal:'octavo' };
 let viewMode    = (()=>{try{return JSON.parse(localStorage.getItem('viewMode')||'{}')||{};}catch{return{}}})();
+let sidebarConfig=(()=>{try{const s=JSON.parse(localStorage.getItem('sidebarConfig')||'null');return(s&&Array.isArray(s))?s:JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_CONFIG));}catch{return JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_CONFIG));}})();
 let filters     = { work:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false}, personal:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false}, all:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false} };
 let showDupsOnly = { work:false, personal:false, all:false };
 let sortState   = { work:{col:null,dir:1}, personal:{col:null,dir:1}, all:{col:null,dir:1} };
@@ -1524,7 +1566,7 @@ async function init() {
   if (p.get('error')) toast('Error: '+decodeURIComponent(p.get('error')),'error');
   history.replaceState(null,'',location.pathname);
   buildPanel('work'); buildPanel('personal'); buildPanel('all'); buildForms();
-  initDatalists();
+  initDatalists(); renderSidebar();
   await Promise.all([loadData(), loadAuthStatus(), checkAdminStatus()]);
   renderAll(); loadShareInfo();
 }
@@ -1593,13 +1635,13 @@ async function saveAdminPassword() {
 // ── Tabs ──────────────────────────────────────────────────────────────────
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
-  document.querySelectorAll('.sb-item').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+  renderSidebar(); // re-renders with correct active state
   if(name==='all') renderTable('all');
   if(name==='settings') renderOptionChips();
   if(name==='shelving') renderZoneView();
 }
-document.querySelectorAll('.tab-btn, .sb-item').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
+document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
 
 // ── Fields ────────────────────────────────────────────────────────────────
 function octavoFields(tab){return[
@@ -2973,6 +3015,119 @@ function toggleViewMode(tab){
   _setViewMode(tab,_getViewMode(tab)==='grid'?'table':'grid');
   const rows=getSorted(tab,getFiltered(tab));
   _applyViewMode(tab,rows);
+}
+
+// ── Sidebar render & editor ───────────────────────────────────────────────
+function renderSidebar(){
+  const el=document.getElementById('sidebar-content');
+  if(!el)return;
+  const activePanel=document.querySelector('.tab-panel.active');
+  const activeTab=activePanel?activePanel.id.replace('tab-',''):'work';
+  el.innerHTML=sidebarConfig.map(item=>{
+    if(item.hidden)return'';
+    const ao=item.adminOnly?'admin-only':'';
+    const vo=item.viewerOnly?'viewer-only':'';
+    const cls=[ao,vo].filter(Boolean).join(' ');
+    if(item.type==='section')return`<div class="sb-label${cls?' '+cls:''}">${esc(item.label)}</div>`;
+    if(item.type==='divider')return`<hr class="sb-divider${cls?' '+cls:''}">`;
+    const ico=SIDEBAR_ICONS[item.icon||'none']||'';
+    const isActive=item.type==='tab'&&item.tab===activeTab;
+    const count=item.countId?`<span class="sb-count" id="${item.countId}">0</span>`:'';
+    const extIco=item.type==='link'?`<svg class="sb-icon" style="margin-left:auto;opacity:.35;" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`:'';
+    if(item.type==='tab'){
+      return`<button class="sb-item${isActive?' active':''}${cls?' '+cls:''}" data-tab="${item.tab}" onclick="switchTab('${item.tab}')">${ico}${esc(item.label)}${count}</button>`;
+    }else if(item.type==='link'){
+      return`<a class="sb-item${cls?' '+cls:''}" href="${escAttr(item.url||'#')}" target="_blank" rel="noopener noreferrer">${ico}${esc(item.label)}${extIco}</a>`;
+    }
+    return'';
+  }).join('');
+}
+
+let _sbeWorking=[];
+function openSidebarEditor(){
+  _sbeWorking=JSON.parse(JSON.stringify(sidebarConfig));
+  _sbeRender();
+  document.getElementById('sidebar-editor-modal').classList.add('open');
+}
+function closeSidebarEditor(){document.getElementById('sidebar-editor-modal').classList.remove('open');}
+
+function _sbeRender(){
+  const list=document.getElementById('sbe-list');
+  if(!list)return;
+  list.innerHTML=_sbeWorking.map((item,i)=>{
+    if(item.type==='divider'){
+      return`<div class="sbe-divider-row" data-i="${i}">
+        <div class="sbe-divider-line"></div>
+        <span class="sbe-tag">divider</span>
+        <div class="sbe-divider-line"></div>
+        <button class="btn-danger btn-sm btn-icon" style="padding:2px 7px;font-size:11px;" onclick="_sbeDel(${i})" title="Remove divider">✕</button>
+      </div>`;
+    }
+    const isBuiltin=item.type==='section'||item.type==='tab';
+    const hideCb=`<label class="sbe-check"><input type="checkbox" ${item.hidden?'':'checked'} onchange="_sbeSetHidden(${i},!this.checked)"> Show</label>`;
+    if(item.type==='section'){
+      return`<div class="sbe-row" data-i="${i}">
+        <div class="sbe-arrows"><button onclick="_sbeMove(${i},-1)">▲</button><button onclick="_sbeMove(${i},1)">▼</button></div>
+        <span class="sbe-tag">header</span>
+        <input class="sbe-input" value="${escAttr(item.label)}" oninput="_sbeSet(${i},'label',this.value)" placeholder="Section label">
+        ${hideCb}
+      </div>`;
+    }
+    if(item.type==='tab'){
+      const iconOpts=Object.keys(SIDEBAR_ICON_LABELS).map(k=>`<option value="${k}"${item.icon===k?' selected':''}>${SIDEBAR_ICON_LABELS[k]}</option>`).join('');
+      return`<div class="sbe-row" data-i="${i}">
+        <div class="sbe-arrows"><button onclick="_sbeMove(${i},-1)">▲</button><button onclick="_sbeMove(${i},1)">▼</button></div>
+        <select class="sbe-input" style="flex:0 0 auto;width:130px;font-size:12px;" onchange="_sbeSet(${i},'icon',this.value)">${iconOpts}</select>
+        <input class="sbe-input" value="${escAttr(item.label)}" oninput="_sbeSet(${i},'label',this.value)" placeholder="Label">
+        <span class="sbe-tag">${item.adminOnly?'admin':'viewer'}</span>
+        ${hideCb}
+      </div>`;
+    }
+    if(item.type==='link'){
+      const iconOpts=Object.keys(SIDEBAR_ICON_LABELS).map(k=>`<option value="${k}"${item.icon===k?' selected':''}>${SIDEBAR_ICON_LABELS[k]}</option>`).join('');
+      return`<div class="sbe-row" data-i="${i}">
+        <div class="sbe-arrows"><button onclick="_sbeMove(${i},-1)">▲</button><button onclick="_sbeMove(${i},1)">▼</button></div>
+        <select class="sbe-input" style="flex:0 0 auto;width:130px;font-size:12px;" onchange="_sbeSet(${i},'icon',this.value)">${iconOpts}</select>
+        <input class="sbe-input" value="${escAttr(item.label)}" oninput="_sbeSet(${i},'label',this.value)" placeholder="Label">
+        <input class="sbe-input sbe-url" value="${escAttr(item.url||'')}" oninput="_sbeSet(${i},'url',this.value)" placeholder="https://...">
+        ${hideCb}
+        <button class="btn-danger btn-sm btn-icon" style="padding:2px 7px;font-size:11px;" onclick="_sbeDel(${i})" title="Delete">✕</button>
+      </div>`;
+    }
+    return'';
+  }).join('');
+}
+function _sbeSet(i,key,val){_sbeWorking[i][key]=val;}
+function _sbeSetHidden(i,hidden){_sbeWorking[i].hidden=hidden;_sbeRender();}
+function _sbeMove(i,dir){
+  const j=i+dir;
+  if(j<0||j>=_sbeWorking.length)return;
+  [_sbeWorking[i],_sbeWorking[j]]=[_sbeWorking[j],_sbeWorking[i]];
+  _sbeRender();
+}
+function _sbeDel(i){_sbeWorking.splice(i,1);_sbeRender();}
+function _sbeAddLink(){
+  _sbeWorking.push({id:'link-'+Date.now(),type:'link',label:'New Link',url:'',icon:'link'});
+  _sbeRender();
+}
+function _sbeAddDivider(){
+  _sbeWorking.push({id:'div-'+Date.now(),type:'divider'});
+  _sbeRender();
+}
+function saveSidebarConfig(){
+  sidebarConfig=JSON.parse(JSON.stringify(_sbeWorking));
+  try{localStorage.setItem('sidebarConfig',JSON.stringify(sidebarConfig));}catch{}
+  renderSidebar();
+  closeSidebarEditor();
+  toast('Navigation saved','success');
+}
+function resetSidebarConfig(){
+  if(!confirm('Reset navigation to defaults?'))return;
+  sidebarConfig=JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_CONFIG));
+  try{localStorage.removeItem('sidebarConfig');}catch{}
+  renderSidebar();
+  closeSidebarEditor();
+  toast('Navigation reset','success');
 }
 
 function renderGrid(tab,rows){
