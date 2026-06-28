@@ -6,33 +6,34 @@
 <title>Choral Catalog</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 :root {
-  /* Surface & background */
-  --bg:#f1f5f9; --surface:#ffffff; --line:#e2e8f0; --line-soft:#f1f5f9;
+  /* Surface & background — Harmonia palette */
+  --bg:#F0F3F8; --surface:#FFFFFF; --line:#DDE3ED; --line-soft:#EBF0F7;
   /* Text */
-  --ink:#0f172a; --muted:#64748b; --faint:#94a3b8;
-  /* Header */
-  --header-bg-a:#0f172a; --header-bg-b:#1e293b; --header-fg:#f8fafc;
-  /* Indigo accent */
-  --navy:#3730a3; --navy-deep:#312e81; --navy-soft:#eef2ff;
-  --accent:#4f46e5; --accent-hover:#4338ca; --accent-light:#eef2ff; --accent-line:#c7d2fe;
-  /* Teal/cyan utility (replaces gold) */
-  --gold:#0891b2; --gold-bright:#06b6d4; --gold-light:#ecfeff; --gold-line:#a5f3fc;
+  --ink:#1A2B3C; --muted:#6B7A8D; --faint:#9BAABB;
+  /* Header — deep navy */
+  --header-bg-a:#1B365D; --header-bg-b:#1E3F6B; --header-fg:#FFFFFF;
+  /* Navy accent (replaces indigo) */
+  --navy:#1B365D; --navy-deep:#14264A; --navy-soft:#EDF2F9;
+  --accent:#1B365D; --accent-hover:#14264A; --accent-light:#EDF2F9; --accent-line:#BFD0E8;
+  /* Forest teal utility */
+  --gold:#1A6B5B; --gold-bright:#218A74; --gold-light:#EAF5F2; --gold-line:#9ECFC7;
   /* Semantic */
-  --danger:#dc2626; --danger-light:#fef2f2; --danger-line:#fecaca;
-  --success:#16a34a; --success-light:#f0fdf4; --success-line:#bbf7d0;
-  --warning:#d97706; --warning-light:#fffbeb; --warning-line:#fed7aa;
+  --danger:#B91C1C; --danger-light:#FEF2F2; --danger-line:#FCA5A5;
+  --success:#166534; --success-light:#F0FDF4; --success-line:#A7F3D0;
+  --warning:#B45309; --warning-light:#FFFBEB; --warning-line:#FDE68A;
   /* Geometry */
-  --r:12px; --r-sm:8px;
-  --shadow:0 1px 3px rgba(15,23,42,.06),0 1px 2px rgba(15,23,42,.04);
-  --shadow-md:0 20px 40px rgba(15,23,42,.15),0 4px 12px rgba(15,23,42,.06);
+  --r:10px; --r-sm:6px;
+  --shadow:0 1px 4px rgba(26,43,60,.06),0 1px 2px rgba(26,43,60,.03);
+  --shadow-md:0 8px 32px rgba(26,43,60,.11),0 2px 8px rgba(26,43,60,.05);
   /* Typography */
-  --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
-  --display:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --display:'Playfair Display',Georgia,'Times New Roman',serif;
+  --mono:'JetBrains Mono','Fira Code',ui-monospace,SFMono-Regular,monospace;
 }
 html { scrollbar-gutter:stable; }
 body { font-family:var(--font); background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5; min-height:100vh; }
@@ -472,6 +473,269 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
 .sbe-divider-row { display:flex; align-items:center; gap:8px; padding:4px 0; color:var(--faint); font-size:11px; }
 .sbe-divider-line { flex:1; border-top:1px dashed var(--line); }
 .sbe-check { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--muted); white-space:nowrap; cursor:pointer; }
+
+/* ═══════════════════════════════════════════════════════════════
+   HARMONIA PRESENTATION LAYER — visual overrides only
+   All layout, functionality and state logic remains untouched.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Body & base ── */
+body { font-size:14px; line-height:1.6; background:var(--bg); }
+
+/* ── Header — solid deep navy, refined ── */
+header {
+  background:var(--header-bg-a);
+  box-shadow:0 1px 0 rgba(255,255,255,.07), 0 2px 16px rgba(27,54,93,.35);
+}
+.brand-mark {
+  background:rgba(255,255,255,.13);
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:9px;
+}
+.brand-title {
+  font-family:var(--display);
+  font-size:18px; font-weight:700;
+  letter-spacing:-.4px;
+  color:var(--header-fg);
+}
+.brand-sub {
+  font-size:9.5px; letter-spacing:2px;
+  color:rgba(255,255,255,.45);
+}
+.btn-header {
+  background:rgba(255,255,255,.09);
+  border:1px solid rgba(255,255,255,.14);
+  font-size:12.5px;
+}
+.btn-header:hover:not(:disabled) { background:rgba(255,255,255,.17); }
+.btn-header.active {
+  background:rgba(255,255,255,.18);
+  color:#fff; border-color:rgba(255,255,255,.3);
+}
+.auth-pill.disconnected { background:rgba(255,255,255,.08); color:rgba(255,255,255,.4); }
+
+/* ── Sidebar — cool slate-white ── */
+#app-sidebar {
+  background:#F5F7FB;
+  border-right:1px solid #DDE3ED;
+}
+.sb-label {
+  font-size:9.5px; font-weight:700; letter-spacing:1.3px;
+  color:#9BAABB; padding:10px 12px 4px;
+}
+.sb-item {
+  font-size:13px; font-weight:500;
+  padding:8px 11px; border-radius:7px; color:#6B7A8D;
+}
+.sb-item:hover { background:#EAEFF7; color:var(--ink); }
+.sb-item.active { background:#DDE9F5; color:var(--accent); font-weight:600; }
+.sb-item.active .sb-icon { opacity:1; }
+.sb-count {
+  font-size:10px; font-weight:700;
+  background:#EAEDF3; border:1px solid #D2DAE8;
+  color:#6B7A8D; border-radius:20px; padding:0 7px; line-height:18px;
+}
+.sb-item.active .sb-count { background:var(--accent); border-color:var(--accent); color:#fff; }
+.sb-divider { border-top:1px solid #DDE3ED; margin:8px 6px 12px; }
+.sb-footer { border-top:1px solid #DDE3ED; }
+
+/* ── Buttons — navy-anchored ── */
+button { border-radius:var(--r-sm); font-size:13px; }
+.btn-primary {
+  background:var(--accent);
+  box-shadow:0 1px 3px rgba(27,54,93,.2);
+  border-radius:var(--r-sm);
+}
+.btn-primary:hover:not(:disabled) {
+  background:var(--accent-hover);
+  box-shadow:0 3px 10px rgba(27,54,93,.28);
+}
+.btn-secondary {
+  background:var(--surface);
+  border:1px solid #D4DBE8;
+  color:var(--ink);
+  box-shadow:0 1px 2px rgba(26,43,60,.04);
+}
+.btn-secondary:hover:not(:disabled) { background:#F6F9FF; border-color:#BFC9DA; }
+.btn-success {
+  background:#EAF5F0; color:#1A6B5B;
+  border:1px solid #9ECFC7;
+}
+.btn-success:hover:not(:disabled) { background:#D8EFEA; }
+.btn-gold {
+  background:var(--gold-light); color:var(--gold);
+  border:1px solid var(--gold-line);
+}
+.btn-gold:hover:not(:disabled) { background:#DCF0EC; }
+.btn-ghost { color:var(--muted); }
+.btn-ghost:hover:not(:disabled) { background:#EAEDF3; color:var(--ink); }
+
+/* ── Table controls & toolbar — airy ── */
+.table-controls {
+  background:#FAFBFE;
+  border-bottom:1px solid var(--line);
+  padding:10px 16px;
+  gap:7px;
+}
+.search-input {
+  border:1px solid #D4DBE8; border-radius:var(--r-sm);
+  font-size:13px;
+}
+.search-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(27,54,93,.09); }
+.filter-select {
+  border:1px solid #D4DBE8; border-radius:var(--r-sm);
+  font-size:13px;
+}
+.filter-select:focus { border-color:var(--accent); }
+.filter-select.active-filter { border-color:#9BB8D8; background:#EDF2F9; color:var(--accent); }
+button.active-filter { background:var(--accent); border-color:var(--accent); }
+
+/* ── Table rows ── */
+thead th {
+  background:#FAFBFE;
+  font-size:10px; letter-spacing:.8px; color:var(--muted);
+  border-bottom:1px solid var(--line);
+}
+thead th:hover { color:var(--ink); }
+thead th.sorted { color:var(--accent); }
+tbody tr:hover { background:#F4F7FF; }
+tbody tr.selected { background:#EDF2F9; }
+
+/* ── Stat cards ── */
+.stat-value { font-family:var(--display); font-size:30px; font-weight:700; letter-spacing:-1px; }
+.stat-card.stat-primary .stat-value { font-size:36px; }
+.stat-card:hover { border-color:#BFD0E8; box-shadow:0 4px 16px rgba(27,54,93,.09); }
+.stat-card.active-filter { border-color:var(--accent); background:var(--accent-light); }
+.stat-card.active-filter .stat-label { color:var(--accent); }
+.stat-label { font-size:10px; letter-spacing:1px; }
+
+/* ── Cards ── */
+.card { border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); }
+.settings-section { border:1px solid var(--line); border-radius:var(--r); }
+.settings-section-header { background:#FAFBFE; }
+
+/* ── Badges & chips — muted, professional ── */
+.badge { background:#F3F5F9; border:1px solid #D8DFE9; color:var(--muted); }
+.badge.octavo { background:#EEF2F9; color:#3B4D6B; border-color:#C5D3E8; }
+.badge.book { background:#F3F5F9; color:var(--muted); border-color:#D8DFE9; }
+.voicing-chip {
+  background:#F3F5F9; border:1px solid #D8DFE9;
+  color:#3B4D6B; font-weight:600; border-radius:5px;
+}
+.call-number-badge {
+  background:#F3F5F9; border:1px solid #D8DFE9;
+  color:#3B5070; font-family:var(--mono);
+  font-weight:600; letter-spacing:.4px; border-radius:5px;
+}
+.loc-tag-badge {
+  background:#F3F5F9; border:1px solid #D8DFE9;
+  color:#3B5070; font-family:var(--mono); border-radius:5px;
+}
+.needs-cat-badge { background:#FFFBEB; border-color:#FDE68A; color:#92400E; }
+.tag-chip { background:#EEF2F9; color:#3B4D6B; border-color:#C5D3E8; }
+.source-work { background:#EEF2F9; color:#2C4070; border-color:#C5D3E8; }
+.source-personal { background:#F9EEF5; color:#6B2C52; border-color:#DDB8CF; }
+.status-badge { font-weight:600; }
+
+/* ── Viewer banner ── */
+.viewer-banner { background:#EDF2F9; border-bottom:1px solid #BFD0E8; color:var(--accent); }
+
+/* ── Modals ── */
+.modal { border-radius:12px; border:1px solid var(--line); box-shadow:0 8px 32px rgba(26,43,60,.12); }
+.modal-header { border-radius:12px 12px 0 0; }
+.modal-footer { border-radius:0 0 12px 12px; }
+
+/* ── Toast ── */
+.toast { border-radius:8px; }
+
+/* ── Footer ── */
+footer { background:#F5F7FB; border-top:1px solid var(--line); }
+.footer-brand { font-family:var(--display); font-size:13px; color:var(--muted); }
+
+/* ══ Music Grid — Harmonia sheet music cover aesthetic ══════════════════════ */
+.music-grid {
+  gap:16px; padding:20px 24px;
+  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+}
+
+/* Card shell */
+.mc {
+  border:1px solid #DDE3ED;
+  border-radius:10px;
+  box-shadow:0 2px 8px rgba(26,43,60,.06), 0 0 0 1px rgba(26,43,60,.04);
+}
+.mc:hover {
+  box-shadow:0 10px 30px rgba(26,43,60,.12), 0 0 0 1px rgba(26,43,60,.07);
+  transform:translateY(-3px);
+}
+
+/* Spine — refined cover thumbnail */
+.mc-spine {
+  height:140px;
+  background:#F8F9FA;
+  border-top:3px solid var(--mc-accent,#1B365D);
+  position:relative; overflow:hidden; flex-shrink:0;
+}
+/* Subtle hue tint */
+.mc-spine::before {
+  content:''; position:absolute; inset:0;
+  background:var(--mc-accent,#1B365D);
+  opacity:.05; pointer-events:none;
+}
+/* Staff lines */
+.mc-spine::after {
+  content:''; position:absolute; inset:0;
+  background:repeating-linear-gradient(
+    to bottom,
+    transparent 0px, transparent 14px,
+    rgba(0,0,0,.033) 14px, rgba(0,0,0,.033) 15px
+  );
+  pointer-events:none;
+}
+/* Ghosted display initial */
+.mc-initial {
+  position:absolute; bottom:4px; left:8px;
+  font-family:var(--display);
+  font-size:60px; font-weight:800; line-height:1;
+  color:var(--mc-accent,#1B365D);
+  opacity:.09; letter-spacing:-4px;
+  z-index:1; pointer-events:none;
+}
+/* Season chip — top right */
+.mc-season-chip {
+  position:absolute; top:7px; right:7px;
+  font-size:8.5px; font-weight:700; letter-spacing:.8px; text-transform:uppercase;
+  background:rgba(255,255,255,.88); border:1px solid rgba(0,0,0,.07);
+  color:var(--mc-accent,#1B365D); border-radius:4px; padding:2px 6px;
+  z-index:2;
+}
+/* Call number — bottom strip */
+.mc-call {
+  left:6px; right:6px; bottom:6px;
+  font-size:9px; font-weight:600;
+  background:rgba(255,255,255,.82); color:#3B5070;
+  border:1px solid rgba(0,0,0,.07); border-radius:4px;
+  letter-spacing:.3px; z-index:2;
+}
+
+/* Card body */
+.mc-body { padding:11px 12px 12px; }
+.mc-title {
+  font-size:12px; font-weight:700; line-height:1.38;
+  letter-spacing:-.1px; color:var(--ink); margin-bottom:2px;
+}
+.mc-composer { font-size:10.5px; color:var(--muted); margin-bottom:8px; }
+.mc-tags { gap:4px; }
+
+/* Card chip badges — muted & clean */
+.mc-chip {
+  display:inline-block; font-size:9.5px; font-weight:600;
+  background:#F3F5F9; color:#4A5870;
+  border:1px solid #D4DBE8; border-radius:4px;
+  padding:1px 6px; letter-spacing:.1px; white-space:nowrap;
+}
+.mc-chip-book { background:#EEF2F9; color:#2C4070; border-color:#C5D3E8; }
+.mc-chip-unavail { background:#FEF2F2; color:#B91C1C; border-color:#FCA5A5; }
 </style>
 </head>
 <body>
@@ -3135,30 +3399,27 @@ function renderGrid(tab,rows){
   if(!el)return;
   if(!rows)rows=getSorted(tab,getFiltered(tab));
   if(!rows.length){
-    el.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:64px 24px;color:var(--faint);"><div style="font-size:48px;margin-bottom:10px;">♪</div><div style="font-size:14px;">No pieces found</div></div>`;
+    el.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:64px 24px;color:var(--faint);"><div style="font-size:40px;margin-bottom:10px;opacity:.35;">♪</div><div style="font-size:13px;letter-spacing:.3px;">No pieces found</div></div>`;
     return;
   }
   el.innerHTML=rows.map(e=>{
     const srcTab=tab==='all'?(data.work.find(x=>x._id===e._id)?'work':'personal'):tab;
-    const color=SEASON_COLORS[e.season]||'#334155';
+    const color=SEASON_COLORS[e.season]||'#2B4060';
     const initial=esc((e.title||'?')[0].toUpperCase());
     const isBook=e._type==='book';
-    const bookIcon=`<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
-    const noteIcon=`<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
-    const unavailBadge=e.unavailable?`<span class="badge" style="background:#fee2e2;color:#991b1b;border-color:#fecaca;">In Use</span>`:'';
+    const unavailBadge=e.unavailable?`<span class="mc-chip mc-chip-unavail">In Use</span>`:'';
     return `<div class="mc" onclick="openEdit('${srcTab}',${e._id})" title="${escAttr(e.title||'')}">
-      <div class="mc-spine" style="background:${color};">
+      <div class="mc-spine" style="--mc-accent:${color};">
         <span class="mc-initial">${initial}</span>
-        ${isBook?bookIcon:noteIcon}
+        ${e.season?`<span class="mc-season-chip">${esc(e.season)}</span>`:''}
         ${e.call_number?`<span class="mc-call">${esc(e.call_number)}</span>`:''}
       </div>
       <div class="mc-body">
         <div class="mc-title">${esc(e.title||'Untitled')}</div>
         <div class="mc-composer">${esc(e.composer||e.author||'—')}</div>
         <div class="mc-tags">
-          ${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:''}
-          ${isBook?`<span class="badge book">Book</span>`:''}
-          ${e.season?`<span class="call-number-badge">${esc(e.season)}</span>`:''}
+          ${e.voicing?`<span class="mc-chip">${esc(e.voicing)}</span>`:''}
+          ${isBook?`<span class="mc-chip mc-chip-book">Book</span>`:''}
           ${unavailBadge}
         </div>
       </div>
