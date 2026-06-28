@@ -736,6 +736,82 @@ footer { background:#F5F7FB; border-top:1px solid var(--line); }
 }
 .mc-chip-book { background:#EEF2F9; color:#2C4070; border-color:#C5D3E8; }
 .mc-chip-unavail { background:#FEF2F2; color:#B91C1C; border-color:#FCA5A5; }
+
+/* ═══════════════════════════════════════════════════════════════
+   REFINEMENT PASS — card polish, stat typography, shadows
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Stat numbers: back to crisp sans-serif, not serif ── */
+.stat-value {
+  font-family:var(--font);
+  font-size:26px; font-weight:800;
+  color:#18232F; letter-spacing:-1.2px; line-height:1.05;
+}
+.stat-card.stat-primary .stat-value { font-size:30px; }
+.stat-label { font-size:10px; font-weight:600; letter-spacing:.9px; color:var(--faint); }
+
+/* ── Grid layout ── */
+.music-grid {
+  grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:18px; padding:22px 26px;
+}
+
+/* ── Card shell — elevated editorial ── */
+.mc {
+  border:1px solid #DDE3EE; border-radius:10px;
+  box-shadow:0 2px 10px rgba(26,43,60,.07),0 1px 3px rgba(26,43,60,.04);
+  overflow:hidden; cursor:pointer;
+  transition:box-shadow .18s,transform .16s;
+  background:#fff; display:flex; flex-direction:column;
+}
+.mc:hover {
+  box-shadow:0 10px 32px rgba(26,43,60,.12),0 2px 6px rgba(26,43,60,.05);
+  transform:translateY(-3px);
+}
+
+/* ── Suppress ALL previous mc-spine rules cleanly ── */
+.mc-spine,.mc-spine::before,.mc-spine::after { display:none !important; }
+.mc-initial,.mc-season-chip { display:none !important; }
+
+/* ── New cover — portrait book-cover ratio, no lines/noise ── */
+.mc-cover {
+  height:200px;
+  background:linear-gradient(160deg,#F9F9FB 0%,#F1F2F5 100%);
+  border-bottom:1px solid #E4E6EB;
+  position:relative; flex-shrink:0; overflow:hidden;
+  box-shadow:inset 3px 0 0 var(--mc-accent,#2B4060);
+}
+.mc-cover-foot {
+  position:absolute; bottom:13px; left:15px; right:10px;
+}
+.mc-cat-label {
+  display:block; font-family:var(--font);
+  font-size:9px; font-weight:800; letter-spacing:2.4px; text-transform:uppercase;
+  color:var(--mc-accent,#2B4060); opacity:.5; margin-bottom:4px;
+}
+.mc-cn-label {
+  display:block; font-family:var(--mono);
+  font-size:9px; font-weight:500; letter-spacing:.35px; color:#8D99A8;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ── Card body — strong title, quiet composer ── */
+.mc-body { padding:11px 13px 12px; flex:1; display:flex; flex-direction:column; }
+.mc-title {
+  font-size:12.5px; font-weight:700; line-height:1.38;
+  color:#18232F; letter-spacing:-.15px; margin-bottom:2px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.mc-composer { font-size:11px; color:#8D99A8; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mc-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:auto; }
+.mc-chip {
+  display:inline-block; font-size:9.5px; font-weight:600;
+  background:#F3F5F8; color:#5A6478;
+  border:1px solid #D8DFE9; border-radius:4px;
+  padding:1px 6px; letter-spacing:.1px; white-space:nowrap;
+}
+.mc-chip-book { background:#EEF2F9; color:#2C4070; border-color:#C5D3E8; }
+.mc-chip-unavail { background:#FEF2F2; color:#B91C1C; border-color:#FCA5A5; }
 </style>
 </head>
 <body>
@@ -3405,14 +3481,14 @@ function renderGrid(tab,rows){
   el.innerHTML=rows.map(e=>{
     const srcTab=tab==='all'?(data.work.find(x=>x._id===e._id)?'work':'personal'):tab;
     const color=SEASON_COLORS[e.season]||'#2B4060';
-    const initial=esc((e.title||'?')[0].toUpperCase());
     const isBook=e._type==='book';
     const unavailBadge=e.unavailable?`<span class="mc-chip mc-chip-unavail">In Use</span>`:'';
     return `<div class="mc" onclick="openEdit('${srcTab}',${e._id})" title="${escAttr(e.title||'')}">
-      <div class="mc-spine" style="--mc-accent:${color};">
-        <span class="mc-initial">${initial}</span>
-        ${e.season?`<span class="mc-season-chip">${esc(e.season)}</span>`:''}
-        ${e.call_number?`<span class="mc-call">${esc(e.call_number)}</span>`:''}
+      <div class="mc-cover" style="--mc-accent:${color};">
+        <div class="mc-cover-foot">
+          ${e.season?`<span class="mc-cat-label">${esc(e.season)}</span>`:''}
+          ${e.call_number?`<span class="mc-cn-label">${esc(e.call_number)}</span>`:''}
+        </div>
       </div>
       <div class="mc-body">
         <div class="mc-title">${esc(e.title||'Untitled')}</div>
