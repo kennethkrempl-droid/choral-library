@@ -383,7 +383,82 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
   .form-grid{grid-template-columns:1fr}
   .settings-grid{grid-template-columns:1fr}
   .stats-row{grid-template-columns:repeat(2,1fr)}
+  #app-sidebar{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;gap:4px;border-right:none;border-bottom:1px solid var(--line);padding:8px 12px;}
+  .app-layout{flex-direction:column;}
+  .panels-wrap{width:100%;}
+  .sb-section,.sb-label,.sb-divider{display:none;}
+  #app-sidebar .sb-item{width:auto;padding:6px 10px;font-size:12px;}
+  .sb-section:first-child{display:contents;}
 }
+
+/* ── Sidebar layout ── */
+.tabs-nav { display:none !important; }
+.app-layout { display:flex; align-items:flex-start; }
+#app-sidebar {
+  width:210px; flex-shrink:0;
+  background:var(--surface); border-right:1px solid var(--line);
+  position:sticky; top:64px;
+  height:calc(100vh - 64px); overflow-y:auto;
+  padding:10px 8px; z-index:89;
+  display:flex; flex-direction:column;
+}
+.panels-wrap { flex:1; min-width:0; }
+.tab-panel { display:none; padding:20px 24px 80px; }
+.tab-panel.active { display:block; }
+.sb-section { padding:2px 0 8px; }
+.sb-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.1px; color:var(--faint); padding:8px 10px 4px; }
+.sb-item {
+  display:flex; align-items:center; gap:9px;
+  padding:8px 10px; border-radius:8px;
+  font-size:13px; font-weight:500; color:var(--muted);
+  cursor:pointer; background:none; border:none; width:100%; text-align:left;
+  transition:background .1s, color .1s;
+}
+.sb-item:hover { background:var(--bg); color:var(--ink); }
+.sb-item.active { background:var(--accent-light); color:var(--accent); font-weight:600; }
+.sb-icon { flex-shrink:0; opacity:.65; }
+.sb-item.active .sb-icon { opacity:1; }
+.sb-count {
+  margin-left:auto; font-size:11px; font-weight:600;
+  background:var(--bg); border:1px solid var(--line); color:var(--muted);
+  border-radius:20px; padding:0 7px; line-height:18px; white-space:nowrap;
+}
+.sb-item.active .sb-count { background:var(--accent); border-color:var(--accent); color:#fff; }
+.sb-divider { border:none; border-top:1px solid var(--line); margin:6px 4px 10px; }
+/* ── Music grid cards ── */
+.music-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(172px,1fr)); gap:14px; padding:16px 20px; }
+.mc {
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r);
+  box-shadow:var(--shadow); overflow:hidden; cursor:pointer;
+  transition:box-shadow .15s, transform .12s;
+  display:flex; flex-direction:column;
+}
+.mc:hover { box-shadow:0 8px 28px rgba(15,23,42,.14); transform:translateY(-2px); }
+.mc-spine {
+  height:115px; display:flex; align-items:center; justify-content:center;
+  position:relative; overflow:hidden; flex-shrink:0;
+}
+.mc-initial {
+  position:absolute; top:8px; left:10px;
+  font-size:28px; font-weight:900; color:rgba(255,255,255,.18); line-height:1;
+  font-family:var(--display);
+}
+.mc-call {
+  position:absolute; bottom:6px; left:6px; right:6px;
+  font-size:9px; font-weight:700; font-family:var(--mono,monospace);
+  background:rgba(0,0,0,.45); color:#fff; border-radius:4px;
+  padding:2px 6px; letter-spacing:.3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.mc-body { padding:10px 11px 10px; flex:1; display:flex; flex-direction:column; }
+.mc-title {
+  font-weight:700; font-size:12.5px; line-height:1.35; color:var(--ink);
+  margin-bottom:3px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.mc-composer { font-size:11px; color:var(--muted); margin-bottom:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mc-tags { display:flex; flex-wrap:wrap; gap:3px; margin-top:auto; }
+.btn-view-toggle { padding:5px 8px; line-height:1; }
 </style>
 </head>
 <body>
@@ -407,15 +482,57 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
   <button class="btn-sm btn-primary" onclick="toggleAdmin()">Librarian Login</button>
 </div>
 
-<nav class="tabs-nav">
+<!-- hidden nav kept for JS compat; sidebar replaces it visually -->
+<nav class="tabs-nav" aria-hidden="true">
   <button class="tab-btn viewer-only" data-tab="all">Library</button>
-  <button class="tab-btn admin-only" data-tab="all">All Music <span class="tab-count" id="count-all">0</span></button>
-  <button class="tab-btn active admin-only" data-tab="work">Work <span class="tab-count" id="count-work">0</span></button>
-  <button class="tab-btn admin-only" data-tab="personal">Personal <span class="tab-count" id="count-personal">0</span></button>
-  <button class="tab-btn admin-only" data-tab="shelving"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg> Shelving</button>
-  <button class="tab-btn admin-only" data-tab="import"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Import</button>
-  <button class="tab-btn admin-only" data-tab="settings"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
+  <button class="tab-btn admin-only" data-tab="all">All Music</button>
+  <button class="tab-btn active admin-only" data-tab="work">Work</button>
+  <button class="tab-btn admin-only" data-tab="personal">Personal</button>
+  <button class="tab-btn admin-only" data-tab="shelving">Shelving</button>
+  <button class="tab-btn admin-only" data-tab="import">Import</button>
+  <button class="tab-btn admin-only" data-tab="settings">Settings</button>
 </nav>
+
+<div class="app-layout">
+<!-- ── Sidebar ── -->
+<aside id="app-sidebar">
+  <div class="sb-section">
+    <div class="sb-label">Browse</div>
+    <button class="sb-item viewer-only" data-tab="all">
+      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Library
+    </button>
+    <button class="sb-item admin-only active" data-tab="work">
+      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      Work <span class="sb-count" id="count-work">0</span>
+    </button>
+    <button class="sb-item admin-only" data-tab="all">
+      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      All Music <span class="sb-count" id="count-all">0</span>
+    </button>
+    <button class="sb-item admin-only" data-tab="personal">
+      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Personal <span class="sb-count" id="count-personal">0</span>
+    </button>
+  </div>
+  <hr class="sb-divider admin-only">
+  <div class="sb-section admin-only">
+    <div class="sb-label">Library Tools</div>
+    <button class="sb-item" data-tab="shelving">
+      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg>
+      Shelving
+    </button>
+    <button class="sb-item" data-tab="import">
+      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Import
+    </button>
+    <button class="sb-item" data-tab="settings">
+      <svg class="sb-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+  </div>
+</aside>
+<div class="panels-wrap">
 
 <!-- ═══ LIBRARY TABS (work + personal share markup, generated) ═══ -->
 <div class="tab-panel" id="tab-all"></div>
@@ -692,6 +809,9 @@ footer { padding:24px 28px 20px; border-top:1px solid var(--line); text-align:ce
   </div>
 </div>
 
+</div><!-- /panels-wrap -->
+</div><!-- /app-layout -->
+
 <!-- ═══ MODALS ═══ -->
 <div class="modal-overlay" id="request-modal">
   <div class="modal" style="max-width:500px;">
@@ -897,11 +1017,21 @@ const ICO={
   extLink:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
   camera:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
   print:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
+  grid:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+  rows:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`,
+};
+
+// ── Season card colors ─────────────────────────────────────────────────────
+const SEASON_COLORS={
+  MT:'#0d9488', POP:'#db2777', CON:'#4338ca', HLD:'#b91c1c',
+  EAS:'#15803d', SAC:'#7c3aed', PAT:'#1d4ed8', FOL:'#92400e',
+  SEA:'#0369a1', MSC:'#475569',
 };
 
 // ── State ─────────────────────────────────────────────────────────────────
 let data        = { work:[], personal:[] };
 let entryTypes  = { work:'octavo', personal:'octavo' };
+let viewMode    = (()=>{try{return JSON.parse(localStorage.getItem('viewMode')||'{}')||{};}catch{return{}}})();
 let filters     = { work:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false}, personal:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false}, all:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false} };
 let showDupsOnly = { work:false, personal:false, all:false };
 let sortState   = { work:{col:null,dir:1}, personal:{col:null,dir:1}, all:{col:null,dir:1} };
@@ -1364,6 +1494,7 @@ function buildPanel(tab){
       <button class="btn-secondary btn-sm btn-icon admin-only" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
       <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncSheets('${tab}')">${ICO.sync} Sync to Sheets</button>
       ${tab==='work'?`<button class="btn-gold btn-sm admin-only" onclick="generateOctavoLabels()" title="Generate printable box labels for all Work Octavos">${ICO.print} Labels</button>`:''}
+      <button class="btn-secondary btn-sm btn-view-toggle" id="view-toggle-${tab}" onclick="toggleViewMode('${tab}')" title="Toggle grid / table view">${ICO.grid}</button>
     </div>
     <div class="bulk-bar" id="bulk-bar-${tab}">
       <span class="bulk-count" id="bulk-count-${tab}"></span>
@@ -1378,7 +1509,8 @@ function buildPanel(tab){
       <span style="flex:1"></span>
       <button class="btn-ghost btn-sm" onclick="clearSelection('${tab}')">Deselect All</button>
     </div>
-    <div class="table-wrap"><table id="table-${tab}"><thead></thead><tbody><tr><td colspan="10" style="text-align:center;padding:48px 24px;color:var(--faint);font-size:13px;">Loading catalog…</td></tr></tbody></table></div>
+    <div class="table-wrap" id="table-wrap-${tab}"><table id="table-${tab}"><thead></thead><tbody><tr><td colspan="10" style="text-align:center;padding:48px 24px;color:var(--faint);font-size:13px;">Loading catalog…</td></tr></tbody></table></div>
+    <div class="music-grid" id="grid-${tab}" style="display:none;"></div>
     <div class="table-footer" id="footer-${tab}"></div>
   </div>`;
 }
@@ -1461,12 +1593,13 @@ async function saveAdminPassword() {
 // ── Tabs ──────────────────────────────────────────────────────────────────
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+  document.querySelectorAll('.sb-item').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
   if(name==='all') renderTable('all');
   if(name==='settings') renderOptionChips();
   if(name==='shelving') renderZoneView();
 }
-document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
+document.querySelectorAll('.tab-btn, .sb-item').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
 
 // ── Fields ────────────────────────────────────────────────────────────────
 function octavoFields(tab){return[
@@ -2810,6 +2943,74 @@ function getColumns(tab){
 
 function renderAll(){renderTable('work');renderTable('personal');renderTable('all');}
 
+// ── Grid / Card view ──────────────────────────────────────────────────────
+function _getViewMode(tab){return viewMode[tab]||'grid';}
+function _setViewMode(tab,mode){
+  viewMode[tab]=mode;
+  try{localStorage.setItem('viewMode',JSON.stringify(viewMode));}catch{}
+  const btn=document.getElementById('view-toggle-'+tab);
+  if(btn){btn.innerHTML=mode==='grid'?ICO.rows:ICO.grid;btn.title=mode==='grid'?'Switch to table view':'Switch to grid view';}
+}
+
+function _applyViewMode(tab,rows){
+  const mode=_getViewMode(tab);
+  const tw=document.getElementById('table-wrap-'+tab);
+  const gw=document.getElementById('grid-'+tab);
+  if(!tw||!gw)return;
+  if(mode==='grid'){
+    tw.style.display='none';
+    gw.style.display='';
+    renderGrid(tab,rows);
+  } else {
+    tw.style.display='';
+    gw.style.display='none';
+  }
+  const btn=document.getElementById('view-toggle-'+tab);
+  if(btn){btn.innerHTML=mode==='grid'?ICO.rows:ICO.grid;btn.title=mode==='grid'?'Switch to table view':'Switch to grid view';}
+}
+
+function toggleViewMode(tab){
+  _setViewMode(tab,_getViewMode(tab)==='grid'?'table':'grid');
+  const rows=getSorted(tab,getFiltered(tab));
+  _applyViewMode(tab,rows);
+}
+
+function renderGrid(tab,rows){
+  const el=document.getElementById('grid-'+tab);
+  if(!el)return;
+  if(!rows)rows=getSorted(tab,getFiltered(tab));
+  if(!rows.length){
+    el.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:64px 24px;color:var(--faint);"><div style="font-size:48px;margin-bottom:10px;">♪</div><div style="font-size:14px;">No pieces found</div></div>`;
+    return;
+  }
+  el.innerHTML=rows.map(e=>{
+    const srcTab=tab==='all'?(data.work.find(x=>x._id===e._id)?'work':'personal'):tab;
+    const color=SEASON_COLORS[e.season]||'#334155';
+    const initial=esc((e.title||'?')[0].toUpperCase());
+    const isBook=e._type==='book';
+    const bookIcon=`<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
+    const noteIcon=`<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+    const unavailBadge=e.unavailable?`<span class="badge" style="background:#fee2e2;color:#991b1b;border-color:#fecaca;">In Use</span>`:'';
+    return `<div class="mc" onclick="openEdit('${srcTab}',${e._id})" title="${escAttr(e.title||'')}">
+      <div class="mc-spine" style="background:${color};">
+        <span class="mc-initial">${initial}</span>
+        ${isBook?bookIcon:noteIcon}
+        ${e.call_number?`<span class="mc-call">${esc(e.call_number)}</span>`:''}
+      </div>
+      <div class="mc-body">
+        <div class="mc-title">${esc(e.title||'Untitled')}</div>
+        <div class="mc-composer">${esc(e.composer||e.author||'—')}</div>
+        <div class="mc-tags">
+          ${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:''}
+          ${isBook?`<span class="badge book">Book</span>`:''}
+          ${e.season?`<span class="call-number-badge">${esc(e.season)}</span>`:''}
+          ${unavailBadge}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderStats(tab){
   const rows=rowsFor(tab);
   const octavos=rows.filter(e=>e._type==='octavo').length;
@@ -2912,6 +3113,7 @@ function renderTable(tab){
   const visCopies=sorted.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
   document.getElementById('footer-'+tab).innerHTML=`<span>Showing ${sorted.length} of ${rowsFor(tab).length} titles · ${visCopies.toLocaleString()} copies</span><span>${sc?`Sorted by ${sc==='_type'?'type':sc}`:''}</span>`;
   updateBulkBar(tab);
+  _applyViewMode(tab,sorted);
 }
 
 function sortBy(tab,col){const s=sortState[tab];s.dir=s.col===col?s.dir*-1:1;s.col=col;renderTable(tab);}
