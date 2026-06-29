@@ -2,17 +2,13 @@
 """
 sync_to_drive.py — Website → Sheet
 
-Pushes data.json into the Google Sheet:
-  • NEW entries on the website that aren't in the sheet → added as new rows
-  • Existing entries → copies and lastPerformed updated from website
+Uses the OAuth credentials already stored in config.json + .tokens.json
+(same credentials the web server uses). No gcloud or extra setup needed.
 
-(Call numbers and genres flow the OTHER direction: sheet → website.
- This script won't overwrite a call number that already exists in the sheet.)
-
-FIRST-TIME SETUP (one time only):
-  pip3 install gspread google-auth --break-system-packages
-  gcloud auth application-default login \
-    --scopes=https://www.googleapis.com/auth/spreadsheets
+What it pushes:
+  • New entries on the website not yet in the sheet → appended as new rows
+  • copies / lastPerformed from website → updated in sheet cells
+  (call numbers and genres flow the OTHER direction — sheet wins for those)
 
 Exit codes: 0 = no changes, 2 = sheet updated, 1 = error
 """
@@ -20,9 +16,68 @@ Exit codes: 0 = no changes, 2 = sheet updated, 1 = error
 import json, os, re, sys
 from datetime import datetime
 
-SHEET_ID  = '1LipZ8SiTWwhZl8UdIG56OgLw2oOtnxrPZme3xYn8Ijo'
+PROJ      = os.path.dirname(os.path.abspath(__file__))
+DATA_JSON = os.path.join(PROJ, 'data.json')
+CFG_PATH  = os.path.join(PROJ, 'config.json')
+TOK_PATH  = os.path.join(PROJ, '.tokens.json')
 TAB_NAME  = 'All Music'
-DATA_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.json')
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+try:
+    import gspread
+    import google.oauth2.credentials
+    from google.auth.transport.requests import Request
+except ImportError:
+    print("ERROR: pip3 install gspread google-auth --break-system-packages")
+    sys.exit(1)
+
+try:
+    with open(CFG_PATH) as f: cfg = json.load(f)
+    with open(TOK_PATH) as f: tok = json.load(f)
+except FileNotFoundError as e:
+    print(f"ERROR: {e}")
+    print("config.json and .tokens.json must be present in the project folder.")
+    sys.exit(1)
+
+creds = google.oauth2.credentials.Credentials(
+    token=tok.get('access_token'),
+    refresh_token=tok.get('refresh_token'),
+    client_id=cfg['clientId'],
+    client_secret=cfg['clientSecret'],
+    token_uri='https://oauth2.googleapis.com/token',
+    scopes=['https://www.googleapis.com/auth/spreadsheets',
+            'https://www.googleapis.com/auth/drive.file'],
+)
+
+# Refresh if expired
+if creds.expired or not creds.valid:
+    try:
+        creds.refresh(Request())
+        tok['access_token'] = creds.token
+        with open(TOK_PATH, 'w') as f:
+            json.dump(tok, f, indent=2)
+        print("Token refreshed.")
+    except Exception as e:
+        print(f"ERROR refreshing token: {e}")
+        print("Try re-authorizing via the website's /api/auth/google endpoint.")
+        sys.exit(1)
+
+try:
+    gc = gspread.Client(auth=creds)
+    spreadsheet = gc.open_by_key(cfg['spreadsheetId'])
+    try:
+        ws = spreadsheet.worksheet(TAB_NAME)
+    except gspread.WorksheetNotFound:
+        ws = spreadsheet.get_worksheet(0)
+        print(f"Note: tab '{TAB_NAME}' not found, using '{ws.title}'")
+    all_rows = ws.get_all_values()
+    print(f"Sheet loaded: {len(all_rows)} rows")
+except Exception as e:
+    print(f"ERROR connecting to sheet: {e}")
+    sys.exit(1)
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def normalise(s):
     s = s.lower().strip()
@@ -31,62 +86,22 @@ def normalise(s):
 
 def voicing_key(v):
     v = v.upper().strip()
-    aliases = {
-        '3-PART MIXED':'3PT','3 PART MIXED':'3PT','3-PART':'3PT','3 PART':'3PT',
-        '2-PART':'2PT','2 PART':'2PT','TWO-PART':'2PT','TWO PART':'2PT',
-        'UNISON':'UNI','UNISON/TWO PART':'UNI',
-        'MASTERWORK':'OTHER','OTHER':'OTHER','SAT(B)':'SATB',
-    }
-    return aliases.get(v, v)
+    return {'3-PART MIXED':'3PT','3 PART MIXED':'3PT','3-PART':'3PT','3 PART':'3PT',
+            '2-PART':'2PT','2 PART':'2PT','TWO-PART':'2PT','TWO PART':'2PT',
+            'UNISON':'UNI','UNISON/TWO PART':'UNI','MASTERWORK':'OTHER',
+            'OTHER':'OTHER','SAT(B)':'SATB'}.get(v, v)
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
+# ── Find header row ───────────────────────────────────────────────────────────
 
-try:
-    import gspread
-    from google.auth import default
-except ImportError:
-    print("ERROR: pip3 install gspread google-auth --break-system-packages")
-    sys.exit(1)
-
-try:
-    creds, _ = default(scopes=[
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive',
-    ])
-except Exception as e:
-    print(f"ERROR: Auth failed: {e}")
-    print("\nRun once to set up write access:")
-    print("  gcloud auth application-default login \\")
-    print("    --scopes=https://www.googleapis.com/auth/spreadsheets")
-    sys.exit(1)
-
-try:
-    gc = gspread.authorize(creds)
-    spreadsheet = gc.open_by_key(SHEET_ID)
-    try:
-        ws = spreadsheet.worksheet(TAB_NAME)
-    except gspread.WorksheetNotFound:
-        ws = spreadsheet.get_worksheet(0)
-        print(f"Note: using sheet '{ws.title}'")
-    all_rows = ws.get_all_values()
-    print(f"Sheet loaded: {len(all_rows)} rows")
-except Exception as e:
-    print(f"ERROR: {e}")
-    sys.exit(1)
-
-# ── Find header ───────────────────────────────────────────────────────────────
-
-header = None
-data_start = 0
+header, data_start = None, 0
 for i, row in enumerate(all_rows):
     joined = ' '.join(row).lower()
     if 'call number' in joined or ('library' in joined and 'type' in joined):
         header = [c.strip().lower() for c in row]
         data_start = i + 1
         break
-
 if not header:
-    print("ERROR: Could not find header row in sheet.")
+    print("ERROR: could not find header row in sheet.")
     sys.exit(1)
 
 def colidx(*names):
@@ -114,17 +129,13 @@ def get(row, idx, default=''):
 
 # ── Build sheet lookup ────────────────────────────────────────────────────────
 
-sheet_lookup  = {}  # (title_n, vk) → (1-based row #, row data)
-sheet_lookup3 = {}  # (title_n, vk, comp_n) → (1-based row #, row data)
-
+sheet_lookup, sheet_lookup3 = {}, {}
 for i, row in enumerate(all_rows[data_start:], start=data_start + 1):
     title = get(row, IDX_TITLE)
-    voice = get(row, IDX_VOICE)
-    comp  = get(row, IDX_COMP)
     if not title: continue
-    key  = (normalise(title), voicing_key(voice))
-    key3 = (normalise(title), voicing_key(voice), normalise(comp))
-    sheet_lookup[key]  = (i, row)
+    key  = (normalise(title), voicing_key(get(row, IDX_VOICE)))
+    key3 = (normalise(title), voicing_key(get(row, IDX_VOICE)), normalise(get(row, IDX_COMP)))
+    sheet_lookup[key]   = (i, row)
     sheet_lookup3[key3] = (i, row)
 
 # ── Load data.json ────────────────────────────────────────────────────────────
@@ -134,40 +145,25 @@ with open(DATA_JSON) as f:
 
 # ── Compare ───────────────────────────────────────────────────────────────────
 
-cell_updates = []   # (row, col_1based, value, label)
-new_rows     = []   # list of row arrays to append
-no_match     = []
+cell_updates = []   # (sheet_row, col_1based, value, label)
+new_rows     = []   # (row_array, label)
 
 def make_sheet_row(entry, section):
-    """Build a full row array matching the sheet's column layout."""
-    _type    = entry.get('_type','octavo')
-    title    = entry.get('title','')
-    composer = entry.get('composer', entry.get('author',''))
-    voicing  = entry.get('voicing','')
-    genre    = entry.get('genre','')
-    copies   = str(entry.get('copies',''))
-    last     = entry.get('lastPerformed','')
-    call_num = entry.get('call_number','')
-    link     = entry.get('link','')
-    isbn     = entry.get('isbn','')
-
-    # Build row as long as the header
     row = [''] * len(header)
-    def setcol(idx, val):
-        if idx is not None and idx < len(row):
-            row[idx] = val
-
-    setcol(IDX_LIB,   'Work' if section == 'work' else 'Personal')
-    setcol(IDX_TYPE,  'Book' if _type == 'book' else 'Octavo')
-    setcol(IDX_CALL,  call_num)
-    setcol(IDX_TITLE, title)
-    setcol(IDX_COMP,  composer)
-    setcol(IDX_VOICE, voicing)
-    setcol(IDX_GENRE, genre)
-    setcol(IDX_COPY,  copies)
-    setcol(IDX_LAST,  last)
-    setcol(IDX_LINK,  link)
-    setcol(IDX_ISBN,  isbn)
+    def s(idx, val):
+        if idx is not None and idx < len(row): row[idx] = val
+    _type = entry.get('_type','octavo')
+    s(IDX_LIB,   'Work' if section == 'work' else 'Personal')
+    s(IDX_TYPE,  'Book' if _type == 'book' else 'Octavo')
+    s(IDX_CALL,  entry.get('call_number',''))
+    s(IDX_TITLE, entry.get('title',''))
+    s(IDX_COMP,  entry.get('composer', entry.get('author','')))
+    s(IDX_VOICE, entry.get('voicing',''))
+    s(IDX_GENRE, entry.get('genre',''))
+    s(IDX_COPY,  str(entry.get('copies','')))
+    s(IDX_LAST,  entry.get('lastPerformed',''))
+    s(IDX_LINK,  entry.get('link',''))
+    s(IDX_ISBN,  entry.get('isbn',''))
     return row
 
 for section in ('work', 'personal'):
@@ -179,67 +175,56 @@ for section in ('work', 'personal'):
         last     = entry.get('lastPerformed','')
         call_num = entry.get('call_number','')
         genre    = entry.get('genre','')
+        if not title: continue
 
-        tn  = normalise(title)
-        vk  = voicing_key(voice)
-        cn  = normalise(composer)
-        key  = (tn, vk)
-        key3 = (tn, vk, cn)
+        tn, vk, cn = normalise(title), voicing_key(voice), normalise(composer)
+        key, key3  = (tn, vk), (tn, vk, cn)
 
-        # Find in sheet
         match = sheet_lookup.get(key) or sheet_lookup3.get(key3)
         if not match:
-            # Title-only fallback
-            title_only = [(rn, rd) for (t,v),(rn,rd) in sheet_lookup.items() if t == tn]
-            if len(title_only) == 1:
-                match = title_only[0]
+            title_only = [(rn,rd) for (t,v),(rn,rd) in sheet_lookup.items() if t == tn]
+            if len(title_only) == 1: match = title_only[0]
 
         if not match:
-            # NEW entry: add as new sheet row
-            new_rows.append((make_sheet_row(entry, section),
-                             f"+ {title} ({voice})"))
+            new_rows.append((make_sheet_row(entry, section), f"+ {title} ({voice})"))
             continue
 
-        sheet_row_num, sheet_row = match
+        rn, sheet_row = match
 
-        # Push copies if website differs from sheet
+        # copies: website → sheet
         if IDX_COPY is not None and copies:
             sc = get(sheet_row, IDX_COPY)
             if sc != copies:
-                cell_updates.append((sheet_row_num, IDX_COPY + 1, copies,
-                                     f"[r{sheet_row_num}] {title}: copies {sc!r}→{copies!r}"))
+                cell_updates.append((rn, IDX_COPY+1, copies,
+                                     f"[r{rn}] {title}: copies {sc!r}→{copies!r}"))
 
-        # Push lastPerformed
+        # lastPerformed: website → sheet
         if IDX_LAST is not None and last:
             sl = get(sheet_row, IDX_LAST)
             if sl != last:
-                cell_updates.append((sheet_row_num, IDX_LAST + 1, last,
-                                     f"[r{sheet_row_num}] {title}: lastPerformed {sl!r}→{last!r}"))
+                cell_updates.append((rn, IDX_LAST+1, last,
+                                     f"[r{rn}] {title}: lastPerformed {sl!r}→{last!r}"))
 
-        # Push call_number ONLY if sheet cell is blank (sheet wins if it has one)
-        if IDX_CALL is not None and call_num:
-            sc = get(sheet_row, IDX_CALL)
-            if not sc:
-                cell_updates.append((sheet_row_num, IDX_CALL + 1, call_num,
-                                     f"[r{sheet_row_num}] {title}: call# (blank)→{call_num!r}"))
+        # call_number: push only if sheet is blank (sheet wins)
+        if IDX_CALL is not None and call_num and not get(sheet_row, IDX_CALL):
+            cell_updates.append((rn, IDX_CALL+1, call_num,
+                                 f"[r{rn}] {title}: call# (blank)→{call_num!r}"))
 
-        # Push genre ONLY if sheet cell is blank
-        if IDX_GENRE is not None and genre:
-            sg = get(sheet_row, IDX_GENRE)
-            if not sg:
-                cell_updates.append((sheet_row_num, IDX_GENRE + 1, genre,
-                                     f"[r{sheet_row_num}] {title}: genre (blank)→{genre!r}"))
+        # genre: push only if sheet is blank
+        if IDX_GENRE is not None and genre and not get(sheet_row, IDX_GENRE):
+            cell_updates.append((rn, IDX_GENRE+1, genre,
+                                 f"[r{rn}] {title}: genre (blank)→{genre!r}"))
 
 # ── Report ────────────────────────────────────────────────────────────────────
 
 print(f"\n{'─'*55}")
 print(f"  {len(new_rows)} new rows  |  {len(cell_updates)} cell updates")
 if new_rows:
-    print("\nNEW entries to add to sheet:")
-    for _, label in new_rows: print(f"  {label}")
+    print("\nNew entries to add:")
+    for _, lbl in new_rows: print(f"  {lbl}")
 if cell_updates:
-    print("\nUpdates:")
-    for _,_,_,label in cell_updates[:20]: print(f"  ✓ {label}")
+    print("\nCell updates:")
+    for _,_,_,lbl in cell_updates[:20]: print(f"  ✓ {lbl}")
     if len(cell_updates) > 20: print(f"  … and {len(cell_updates)-20} more")
 print(f"{'─'*55}")
 
@@ -256,8 +241,7 @@ if cell_updates:
 
 if new_rows:
     print(f"\nAppending {len(new_rows)} new rows…")
-    rows_to_append = [r for r, _ in new_rows]
-    ws.append_rows(rows_to_append, value_input_option='USER_ENTERED')
+    ws.append_rows([r for r,_ in new_rows], value_input_option='USER_ENTERED')
 
-print(f"\nDone — Google Sheet updated.")
+print("\nDone — Google Sheet updated.")
 sys.exit(2)

@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """
-sync_from_drive.py — Sheet → Website
+sync_from_drive.py — Sheet → Website (no auth needed)
 
-Pulls the Google Sheet into data.json:
-  • NEW rows in the sheet that aren't on the website → added to data.json
-  • Existing entries → call_number, genre, season updated from sheet
+The Google Sheet is set to "Anyone with the link can view," so this script
+downloads it as a CSV with zero authentication and zero extra packages.
 
-FIRST-TIME SETUP (one time only):
-  pip3 install gspread google-auth --break-system-packages
-  gcloud auth application-default login \
-    --scopes=https://www.googleapis.com/auth/spreadsheets.readonly
+Just run it:  python3 sync_from_drive.py
 
-Exit codes: 0 = no changes, 2 = data.json updated (caller should git commit), 1 = error
+Exit codes: 0 = no changes, 2 = data.json was updated, 1 = error
 """
 
-import json, os, re, shutil, sys, time
+import csv, io, json, os, re, shutil, sys, time, urllib.request
 from datetime import datetime
 
 SHEET_ID  = '1LipZ8SiTWwhZl8UdIG56OgLw2oOtnxrPZme3xYn8Ijo'
-TAB_NAME  = 'All Music'
+# GID of the "All Music" tab (from the URL when that tab is active)
+SHEET_GID = '2139739534'
 DATA_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.json')
 
 VOICING_MAP = {
@@ -26,21 +23,17 @@ VOICING_MAP = {
     '3-part':'3-Part','3 part':'3-Part',
     '2-part':'2-Part','2 part':'2-Part','two-part':'2-Part','two part':'2-Part',
     'unison':'Unison','unison/two part':'Unison',
-    'sat(b)':'SATB',
-    'masterwork':'Other','other':'Other','various':'Other','any':'Other',
+    'sat(b)':'SATB','masterwork':'Other','other':'Other','various':'Other','any':'Other',
 }
-VALID_VOICINGS = {
-    'SATB','SSAATTBB','SSAA','SATTBB','SSATB','TTBB','TTBBB',
-    'SSA','TTB','SAB','SA','TBB','3-Part Mixed','3-Part','2-Part','Unison','Other'
-}
+VALID = {'SATB','SSAATTBB','SSAA','SATTBB','SSATB','TTBB','SSA','TTB',
+         'SAB','SA','TBB','3-Part Mixed','3-Part','2-Part','Unison','Other'}
 
 def norm_voicing(v):
     if not v: return 'Other'
     lo = v.lower().strip()
     if lo in VOICING_MAP: return VOICING_MAP[lo]
-    up = v.upper().strip()
-    for x in VALID_VOICINGS:
-        if x.upper() == up: return x
+    for x in VALID:
+        if x.upper() == v.upper().strip(): return x
     return 'Other'
 
 def normalise(s):
@@ -50,61 +43,35 @@ def normalise(s):
 
 def voicing_key(v):
     v = v.upper().strip()
-    aliases = {
-        '3-PART MIXED':'3PT','3 PART MIXED':'3PT','3-PART':'3PT','3 PART':'3PT',
-        '2-PART':'2PT','2 PART':'2PT','TWO-PART':'2PT','TWO PART':'2PT',
-        'UNISON':'UNI','UNISON/TWO PART':'UNI',
-        'MASTERWORK':'OTHER','OTHER':'OTHER','SAT(B)':'SATB',
-    }
-    return aliases.get(v, v)
+    return {'3-PART MIXED':'3PT','3 PART MIXED':'3PT','3-PART':'3PT','3 PART':'3PT',
+            '2-PART':'2PT','2 PART':'2PT','TWO-PART':'2PT','TWO PART':'2PT',
+            'UNISON':'UNI','MASTERWORK':'OTHER','OTHER':'OTHER','SAT(B)':'SATB'}.get(v,v)
 
 def season_from_call(cn):
-    if not cn: return ''
-    return cn.split('-')[0].upper()
+    return cn.split('-')[0].upper() if cn else ''
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
+# ── Download sheet as CSV ─────────────────────────────────────────────────────
 
+url = f'https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&id={SHEET_ID}&gid={SHEET_GID}'
+print(f"Downloading sheet…")
 try:
-    import gspread
-    from google.auth import default
-except ImportError:
-    print("ERROR: pip3 install gspread google-auth --break-system-packages")
-    sys.exit(1)
-
-try:
-    creds, _ = default(scopes=[
-        'https://www.googleapis.com/auth/spreadsheets.readonly',
-        'https://www.googleapis.com/auth/drive.readonly',
-    ])
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        raw = resp.read().decode('utf-8-sig')
 except Exception as e:
-    print(f"ERROR: Auth failed: {e}")
-    print("\nRun once to authenticate:")
-    print("  gcloud auth application-default login \\")
-    print("    --scopes=https://www.googleapis.com/auth/spreadsheets.readonly")
-    print("\n(brew install --cask google-cloud-sdk  if gcloud isn't installed)")
+    print(f"ERROR downloading sheet: {e}")
+    print("Check your internet connection and that the sheet is still 'Anyone with the link can view'.")
     sys.exit(1)
 
-try:
-    gc = gspread.authorize(creds)
-    spreadsheet = gc.open_by_key(SHEET_ID)
-    try:
-        ws = spreadsheet.worksheet(TAB_NAME)
-    except gspread.WorksheetNotFound:
-        ws = spreadsheet.get_worksheet(0)
-        print(f"Note: tab '{TAB_NAME}' not found — using '{ws.title}'")
-    all_rows = ws.get_all_values()
-    print(f"Fetched {len(all_rows)} rows from '{ws.title}'")
-except Exception as e:
-    print(f"ERROR: {e}")
-    sys.exit(1)
+rows = list(csv.reader(io.StringIO(raw)))
+print(f"Got {len(rows)} rows from sheet")
 
-# ── Find header ───────────────────────────────────────────────────────────────
-
+# Find header
 header = None
 data_start = 0
-for i, row in enumerate(all_rows):
+for i, row in enumerate(rows):
     joined = ' '.join(row).lower()
-    if 'call number' in joined or ('library' in joined and 'type' in joined):
+    if 'call number' in joined or ('library' in joined and 'title' in joined):
         header = [c.strip().lower() for c in row]
         data_start = i + 1
         break
@@ -142,30 +109,23 @@ def get(row, idx, default=''):
 with open(DATA_JSON) as f:
     data = json.load(f)
 
-all_entries = [e for s in ('work','personal') for e in data.get(s, [])]
-
-lookup  = {}   # (title_n, vk) → [entries]
-lookup3 = {}   # (title_n, vk, comp_n) → [entries]
+all_entries = [e for s in ('work','personal') for e in data.get(s,[])]
+lookup  = {}
+lookup3 = {}
 for entry in all_entries:
     tn = normalise(entry.get('title',''))
     vk = voicing_key(entry.get('voicing',''))
     cn = normalise(entry.get('composer', entry.get('author','')))
-    lookup.setdefault((tn,vk), []).append(entry)
-    lookup3.setdefault((tn,vk,cn), []).append(entry)
+    lookup.setdefault((tn,vk),[]).append(entry)
+    lookup3.setdefault((tn,vk,cn),[]).append(entry)
 
-# ── Process sheet rows ────────────────────────────────────────────────────────
+# ── Process ───────────────────────────────────────────────────────────────────
 
-updated   = []
-added     = []
-no_match  = []
-ambiguous = []
-same      = 0
+updated, added, no_call, no_match, same = [], [], 0, [], 0
+_id = int(time.time()*1000)
 
-_id_counter = int(time.time() * 1000)
-
-for row in all_rows[data_start:]:
+for row in rows[data_start:]:
     if not any(c.strip() for c in row): continue
-
     title    = get(row, IDX_TITLE)
     composer = get(row, IDX_COMP)
     voicing  = get(row, IDX_VOICE)
@@ -177,115 +137,72 @@ for row in all_rows[data_start:]:
     typ      = get(row, IDX_TYPE, 'octavo').lower()
     link     = get(row, IDX_LINK)
     isbn     = get(row, IDX_ISBN)
-
     if not title: continue
 
-    tn = normalise(title)
-    vk = voicing_key(voicing)
-    cn = normalise(composer)
-    key  = (tn, vk)
-    key3 = (tn, vk, cn)
+    tn, vk = normalise(title), voicing_key(voicing)
+    cn      = normalise(composer)
+    key, key3 = (tn,vk), (tn,vk,cn)
 
-    # ── Find match in data.json ──
-    matches = lookup.get(key, [])
+    matches = lookup.get(key,[])
     if not matches:
-        title_only = [e for (t,v),es in lookup.items() if t == tn for e in es]
-        if len(title_only) == 1:
-            matches = title_only
-        elif len(title_only) > 1:
-            matches = lookup3.get(key3, [])
-            if not matches:
-                ambiguous.append(f"{title} ({voicing})")
-                continue
+        title_only = [e for (t,v),es in lookup.items() if t==tn for e in es]
+        if len(title_only)==1: matches = title_only
+        elif len(title_only)>1:
+            matches = lookup3.get(key3,[])
+            if not matches: continue  # ambiguous
         else:
-            # ── NEW entry: add to data.json ──
+            # New entry — only add if it has a call number
             if not call_num:
-                # Skip if no call number yet — not ready
-                no_match.append(f"{title} [{voicing}] (no call# — not added yet)")
+                no_call += 1
                 continue
-
             section = 'personal' if 'personal' in library else 'work'
             _type   = 'book' if 'book' in typ else 'octavo'
-            _id_counter += 1
-
-            new_entry = {
-                '_type': _type,
-                '_id': _id_counter,
-                'title': title,
-                'call_number': call_num,
-                'season': season_from_call(call_num),
-                'genre': genre,
-                'voicing': norm_voicing(voicing),
-                'copies': copies,
-                'lastPerformed': last,
-                'link': link,
-            }
-            if _type == 'book':
-                new_entry['author']      = composer
-                new_entry['isbn']        = isbn
-                new_entry['description'] = ''
+            _id += 1
+            entry = {'_type':_type,'_id':_id,'title':title,'call_number':call_num,
+                     'season':season_from_call(call_num),'genre':genre,
+                     'voicing':norm_voicing(voicing),'copies':copies,
+                     'lastPerformed':last,'link':link}
+            if _type=='book':
+                entry.update({'author':composer,'isbn':isbn,'description':''})
             else:
-                new_entry['composer'] = composer
-
-            data[section].insert(0, new_entry)
-            # Update lookup so duplicates in sheet don't re-add
-            ntn = normalise(title)
-            nvk = voicing_key(norm_voicing(voicing))
-            lookup.setdefault((ntn, nvk), []).append(new_entry)
-            lookup3.setdefault((ntn, nvk, normalise(composer)), []).append(new_entry)
-            added.append(f"  + [{call_num}] {title} ({voicing}) → {section}")
+                entry['composer'] = composer
+            data[section].insert(0, entry)
+            lookup.setdefault((tn,voicing_key(norm_voicing(voicing))),[]).append(entry)
+            added.append(f"  + [{call_num}] {title} ({voicing})")
             continue
 
-    if len(matches) > 1:
-        m3 = lookup3.get(key3, [])
+    if len(matches)>1:
+        m3 = lookup3.get(key3,[])
         matches = m3[:1] if m3 else matches[:1]
 
-    entry  = matches[0]
+    entry = matches[0]
     season = season_from_call(call_num)
     changed = []
-
     if call_num and entry.get('call_number','') != call_num:
-        changed.append(f"call# →{call_num!r}")
-        entry['call_number'] = call_num
+        changed.append(f"call# →{call_num!r}"); entry['call_number'] = call_num
     if genre and entry.get('genre','') != genre:
-        changed.append(f"genre →{genre!r}")
-        entry['genre'] = genre
+        changed.append(f"genre →{genre!r}"); entry['genre'] = genre
     if season and entry.get('season','') != season:
-        changed.append(f"season →{season!r}")
-        entry['season'] = season
+        changed.append(f"season →{season!r}"); entry['season'] = season
+    if changed: updated.append(f"  ✓ {title}: {', '.join(changed)}")
+    else: same += 1
 
-    if changed:
-        updated.append(f"  ✓ {title} ({voicing}): {', '.join(changed)}")
-    else:
-        same += 1
+# ── Report + write ────────────────────────────────────────────────────────────
 
-# ── Report ────────────────────────────────────────────────────────────────────
-
-print(f"\n{'─'*55}")
+print(f"\n{'─'*50}")
 print(f"  {len(added)} new  |  {len(updated)} updated  |  {same} already current")
-if added:
-    print("\nNEW entries added to data.json:")
-    for l in added: print(l)
-if updated:
-    print("\nUPDATED entries:")
-    for l in updated: print(l)
-if no_match:
-    print(f"\nSkipped {len(no_match)} sheet rows (no call# yet or unresolvable):")
-    for l in no_match[:10]: print(f"  - {l}")
-if ambiguous:
-    print(f"\nAmbiguous (skipped): {len(ambiguous)}")
-print(f"{'─'*55}")
+for l in added: print(l)
+for l in updated: print(l)
+if no_match: print(f"  {len(no_match)} not found in data.json")
+print(f"{'─'*50}")
 
 if not added and not updated:
     print("data.json is already up to date.")
     sys.exit(0)
 
 ts = datetime.now().strftime('%Y%m%d-%H%M%S')
-backup = DATA_JSON.replace('data.json', f'data.backup.{ts}.json')
-shutil.copy2(DATA_JSON, backup)
-print(f"Backed up → {os.path.basename(backup)}")
-
+shutil.copy2(DATA_JSON, DATA_JSON.replace('data.json', f'data.backup.{ts}.json'))
 with open(DATA_JSON, 'w') as f:
     json.dump(data, f, indent=2)
-print(f"Wrote {os.path.basename(DATA_JSON)}")
+print(f"Saved. Run push-now.command to deploy.")
 sys.exit(2)
