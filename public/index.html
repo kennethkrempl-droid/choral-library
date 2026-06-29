@@ -792,11 +792,17 @@ footer { background:#F5F7FB; border-top:1px solid var(--line); }
   position:relative; overflow:hidden;
   flex-shrink:0;
 }
-/* Very faint season-color tint washes the thumbnail */
+/* Cover image — fills the entire thumb, sits at z-index 0 */
+.mc-thumb-img {
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:cover; object-position:center top;
+  z-index:0; border-radius:7px;
+}
+/* Very faint season-color tint washes the thumbnail (over image) */
 .mc-thumb::after {
   content:''; position:absolute; inset:0;
   background:var(--mc-accent,#2B4060); opacity:.05;
-  pointer-events:none;
+  pointer-events:none; z-index:1;
 }
 /* Season code — centered, uppercase, muted caps */
 .mc-cat-label {
@@ -804,15 +810,20 @@ footer { background:#F5F7FB; border-top:1px solid var(--line); }
   font-size:9px; font-weight:800; letter-spacing:2.8px;
   text-transform:uppercase; text-align:center;
   color:var(--mc-accent,#2B4060); opacity:.5;
-  position:relative; z-index:1;
+  position:relative; z-index:2;
 }
-/* Call number — mono, centered, softest gray */
-.mc-cn-label {
-  font-family:var(--mono);
-  font-size:8.5px; font-weight:500; letter-spacing:.2px;
-  color:#A0AABB; text-align:center;
-  position:relative; z-index:1;
-  max-width:88%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+/* When a cover image is present, make the season badge readable */
+.mc-thumb.has-cover .mc-cat-label {
+  position:absolute; bottom:6px; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,.52); color:#fff; opacity:1;
+  padding:2px 7px; border-radius:4px; letter-spacing:2px;
+  white-space:nowrap;
+}
+/* Call number in info section */
+.mc-callnum {
+  font-size:9.5px; font-family:var(--mono); color:#A0AABB;
+  margin:2px 0 0; letter-spacing:.2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 
 /* ── Info section: sits below the thumbnail, not separate zone ── */
@@ -2388,6 +2399,7 @@ async function applyPepperToEntry(i,voicing){
   if(p.composer)updated.composer=p.composer;
   if(voicing)updated.voicing=VOICINGS.find(x=>x.toUpperCase()===voicing.toUpperCase())||voicing;
   if(p.url)updated.link=p.url;
+  if(p.image)updated.coverUrl=p.image;
   closePepperModal();pepperLibTarget=null;
   try{
     const r=await fetch(`/api/entries/${tab}/${id}`,adminFetchOpts(updated,'PUT'));
@@ -2482,8 +2494,9 @@ async function findAllLinks(tab){
   const octavos=targets.filter(e=>e._type==='octavo');
   let filled=0,notFound=0,total=targets.length;
 
-  async function saveLink(entry,url){
+  async function saveLink(entry,url,coverUrl=''){
     const updated={...entry,link:url};
+    if(coverUrl)updated.coverUrl=coverUrl;
     const r=await fetch(`/api/entries/${tab}/${entry._id}`,adminFetchOpts(updated,'PUT'));
     if(r.ok){const j=await r.json();const idx=data[tab].findIndex(e=>e._id===entry._id);if(idx>-1)data[tab][idx]=j.entry;filled++;}
     else notFound++;
@@ -2507,15 +2520,16 @@ async function findAllLinks(tab){
         // Use first source that has results; for Pepper pick closest title match
         for(const sg of (j.results||[])){
           if(sg.items&&sg.items.length){
-            let url;
+            let url,coverUrl='';
             if(sg.source==='JW Pepper'){
               const nt=norm(entry.title);
               const best=sg.items.reduce((a,b)=>editDist(norm(a.title),nt)<=editDist(norm(b.title),nt)?a:b);
               url=best.url;
+              coverUrl=best.image||'';
             }else{
               url=sg.items[0].url;
             }
-            await saveLink(entry,url);
+            await saveLink(entry,url,coverUrl);
             linkFound=true;
             break;
           }
@@ -3511,14 +3525,17 @@ function renderGrid(tab,rows){
     const color=SEASON_COLORS[e.season]||'#2B4060';
     const isBook=e._type==='book';
     const unavailBadge=e.unavailable?`<span class="mc-chip mc-chip-unavail">In Use</span>`:'';
+    const hasCover=!isBook&&!!e.coverUrl;
+    const coverImg=hasCover?`<img class="mc-thumb-img" src="${escAttr(e.coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">`:'';
     return `<div class="mc" onclick="openEdit('${srcTab}',${e._id})" title="${escAttr(e.title||'')}">
-      <div class="mc-thumb" style="--mc-accent:${color};">
+      <div class="mc-thumb${hasCover?' has-cover':''}" style="--mc-accent:${color};">
+        ${coverImg}
         <span class="mc-cat-label">${e.season?esc(e.season):''}</span>
-        <span class="mc-cn-label">${e.call_number?esc(e.call_number):''}</span>
       </div>
       <div class="mc-info">
         <p class="mc-title">${esc(e.title||'Untitled')}</p>
         <p class="mc-composer">${esc(e.composer||e.author||'—')}</p>
+        ${e.call_number?`<p class="mc-callnum">${esc(e.call_number)}</p>`:''}
         <div class="mc-tags">
           ${e.voicing?`<span class="mc-chip">${esc(e.voicing)}</span>`:''}
           ${isBook?`<span class="mc-chip mc-chip-book">Book</span>`:''}
@@ -3725,6 +3742,9 @@ async function syncBidirectional(tab){
       for(const e of data[sec]||[])
         lk[`${norm(e.title||'')}|${vkey(e.voicing||'')}`]={entry:e,sec};
 
+    const assignedCallNums=new Set(); // prevent same call# going to two entries
+    const processedEntryIds=new Set(); // prevent same entry matched by two sheet rows
+
     for(let i=start;i<csvRows.length;i++){
       const row=csvRows[i];
       if(!row.some(c=>c))continue;
@@ -3739,10 +3759,18 @@ async function syncBidirectional(tab){
       if(!hit)continue;
 
       const {entry,sec}=hit;
+      // Each website entry is matched by at most one sheet row (first match wins)
+      if(processedEntryIds.has(entry._id))continue;
+      processedEntryIds.add(entry._id);
+
       sheetMatchedIds.add(entry._id);
       if(sortNum)sheetSortNums.set(entry._id,parseInt(sortNum,10)||0);
 
       if(!callNum)continue;
+      // Don't assign a call number already claimed by a different entry this session
+      if(assignedCallNums.has(callNum))continue;
+      assignedCallNums.add(callNum);
+
       const season=callNum.split('-')[0].toUpperCase();
       const patch={};
       if(entry.call_number!==callNum)patch.call_number=callNum;
@@ -3811,7 +3839,7 @@ async function syncBidirectional(tab){
         const n=callSuffix(cn);
         return(n&&allowedNewNums.has(n))?cn:'';
       };
-      s(IDX_SORT,idx+1);
+      // IDX_SORT intentionally skipped — the sheet drives Sort # via its own formula
       s(IDX_LIB,sec==='work'?'Work':'Personal');
       s(IDX_TYPE,e._type==='book'?'Book':'Octavo');
       s(IDX_CALL,getCallNum());
