@@ -1902,7 +1902,7 @@ function buildPanel(tab){
       <span style="flex:1"></span>
       <button class="btn-secondary btn-sm admin-only" onclick="exportCSV('${tab}')" id="export-btn-${tab}">${ICO.download} Export CSV</button>
       <button class="btn-secondary btn-sm btn-icon admin-only" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
-      <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncBidirectional('${tab}')">${ICO.sync} Sync Sheets</button>
+      <button class="btn-success btn-sm admin-only" id="sync-${tab}-btn" onclick="syncBidirectional('${tab}')">${ICO.sync} Sync Sheet</button>
       ${tab==='work'?`<button class="btn-gold btn-sm admin-only" onclick="generateOctavoLabels()" title="Generate printable box labels for all Work Octavos">${ICO.print} Labels</button>`:''}
       <button class="btn-secondary btn-sm btn-view-toggle" id="view-toggle-${tab}" onclick="toggleViewMode('${tab}')" title="Toggle grid / table view">${ICO.grid}</button>
     </div>
@@ -3689,46 +3689,49 @@ async function syncBidirectional(tab){
   const vkey=v=>{v=(v||'').toUpperCase().trim();return({'3-PART MIXED':'3PT','3 PART MIXED':'3PT','3-PART':'3PT','3 PART':'3PT','2-PART':'2PT','2 PART':'2PT','TWO-PART':'2PT','TWO PART':'2PT','UNISON':'UNI','SAT(B)':'SATB','OTHER':'OTHER','MASTERWORK':'OTHER'}[v]||v);};
   const callSuffix=cn=>{const m=(cn||'').match(/(\d+)$/);return m?parseInt(m[1],10):null;};
 
-  // ── STEP 1: Pull from sheet → update call numbers / genres / seasons ──────
+  // ── STEP 1: Pull from sheet ───────────────────────────────────────────────
   btn.innerHTML='<span class="spinner"></span> Pulling from sheet…';
   let pullCount=0;
-  const sheetMatchedIds=new Set(); // website entry IDs that exist in the sheet
-  let maxSheetNum=0;               // highest numeric call# suffix in sheet
+  const sheetMatchedIds=new Set();
+  const sheetSortNums=new Map();   // entry._id → Sort # they had in the sheet
+  let maxSheetNum=0;
+  let sheetHeaderRaw=null;         // exact header row from sheet (for push)
+  let sheetHeaderLower=null;
 
   try{
     const csvUrl=`https://docs.google.com/spreadsheets/d/${_SHEET_ID}/export?format=csv&id=${_SHEET_ID}&gid=${_SHEET_GID}`;
     const resp=await fetch(csvUrl);
     if(!resp.ok)throw new Error(`Sheet download failed (${resp.status}) — is the sheet shared?`);
-    const rows=_parseCSV(await resp.text());
+    const csvRows=_parseCSV(await resp.text());
 
-    let header=null,start=0;
-    for(let i=0;i<rows.length;i++){
-      const j=rows[i].join(' ').toLowerCase();
+    let start=0;
+    for(let i=0;i<csvRows.length;i++){
+      const j=csvRows[i].join(' ').toLowerCase();
       if(j.includes('call number')||(j.includes('library')&&j.includes('title'))){
-        header=rows[i].map(c=>c.trim().toLowerCase());start=i+1;break;
+        sheetHeaderRaw=csvRows[i].map(c=>c.trim());
+        sheetHeaderLower=sheetHeaderRaw.map(c=>c.toLowerCase());
+        start=i+1;break;
       }
     }
-    if(!header)throw new Error('Could not find header row in sheet');
+    if(!sheetHeaderLower)throw new Error('Could not find header row in sheet');
 
-    const ci=(...ns)=>{for(const n of ns){const i=header.indexOf(n);if(i>=0)return i;}return -1;};
+    const ci=(...ns)=>{for(const n of ns){const i=sheetHeaderLower.indexOf(n);if(i>=0)return i;}return -1;};
     const IDX_CALL=ci('call number','call #'),IDX_TITLE=ci('title'),
-          IDX_VOICE=ci('voicing'),IDX_GENRE=ci('genre');
+          IDX_VOICE=ci('voicing'),IDX_GENRE=ci('genre'),IDX_SORT=ci('sort #','sort#');
     const g=(row,i)=>i>=0&&i<row.length?row[i].trim():'';
 
-    // Build website lookup
     const lk={};
     for(const sec of ['work','personal'])
       for(const e of data[sec]||[])
         lk[`${norm(e.title||'')}|${vkey(e.voicing||'')}`]={entry:e,sec};
 
-    for(let i=start;i<rows.length;i++){
-      const row=rows[i];
+    for(let i=start;i<csvRows.length;i++){
+      const row=csvRows[i];
       if(!row.some(c=>c))continue;
       const title=g(row,IDX_TITLE),callNum=g(row,IDX_CALL),
-            voicing=g(row,IDX_VOICE),genre=g(row,IDX_GENRE);
-      if(!title)continue;
+            voicing=g(row,IDX_VOICE),genre=g(row,IDX_GENRE),
+            sortNum=g(row,IDX_SORT);
 
-      // Track max call number in sheet regardless of match
       const n=callSuffix(callNum);
       if(n&&n>maxSheetNum)maxSheetNum=n;
 
@@ -3736,17 +3739,16 @@ async function syncBidirectional(tab){
       if(!hit)continue;
 
       const {entry,sec}=hit;
-      sheetMatchedIds.add(entry._id); // mark as existing in sheet
+      sheetMatchedIds.add(entry._id);
+      if(sortNum)sheetSortNums.set(entry._id,parseInt(sortNum,10)||0);
 
-      if(!callNum)continue; // sheet has no call# yet — nothing to pull
-
+      if(!callNum)continue;
       const season=callNum.split('-')[0].toUpperCase();
       const patch={};
       if(entry.call_number!==callNum)patch.call_number=callNum;
       if(genre&&entry.genre!==genre)patch.genre=genre;
       if(season&&entry.season!==season)patch.season=season;
       if(!Object.keys(patch).length)continue;
-
       try{
         const r=await fetch(`/api/entries/${sec}/${entry._id}`,adminFetchOpts({...entry,...patch},'PUT'));
         if(r.ok){Object.assign(entry,patch);pullCount++;}
@@ -3757,7 +3759,7 @@ async function syncBidirectional(tab){
     btn.disabled=false;btn.innerHTML=orig;return;
   }
 
-  // Work out which NEW call numbers are sequential from maxSheetNum+1 (no gaps allowed)
+  // Sequential call# rule for new entries
   const newWithNum=[];
   for(const sec of ['work','personal'])
     for(const e of data[sec]||[]){
@@ -3770,54 +3772,85 @@ async function syncBidirectional(tab){
   let nextExpected=maxSheetNum+1;
   for(const {n} of newWithNum){
     if(n===nextExpected){allowedNewNums.add(n);nextExpected++;}
-    else break; // gap — stop here
+    else break;
   }
 
-  // ── STEP 2: Push website → sheet ─────────────────────────────────────────
-  // Call# push rules:
-  //   • Entry already in sheet → push whatever call# it has (bidirectional)
-  //   • New entry (not in sheet) → only push call# if it's the next sequential number(s)
+  // ── STEP 2: Push back to sheet in the sheet's own column format ───────────
   btn.innerHTML='<span class="spinner"></span> Pushing to sheet…';
+  let pushCount=0;
   try{
-    const allRows=[...data.work.map(e=>({...e,__src:'work'})),...data.personal.map(e=>({...e,__src:'personal'}))];
-    if(allRows.length){
-      const headers=['Library','Type','Call Number','Title','Composer / Author','Voicing','Genre','Copies','Last Performed','ISBN','Publisher','Year','Description','Tags','Link'];
-      const getCallNum=e=>{
-        const cn=computeCallNumber(e);
-        if(!cn)return '';
-        if(sheetMatchedIds.has(e._id))return cn; // existing entry — always push
+    if(!sheetHeaderRaw)throw new Error('No sheet header captured — cannot push');
+
+    const ci=(...ns)=>{for(const n of ns){const i=sheetHeaderLower.indexOf(n);if(i>=0)return i;}return -1;};
+    const IDX_SORT=ci('sort #','sort#'),IDX_LIB=ci('library'),IDX_TYPE=ci('type'),
+          IDX_CALL=ci('call number','call #'),IDX_TITLE=ci('title'),
+          IDX_COMP=ci('composer / author','composer','author'),IDX_VOICE=ci('voicing'),
+          IDX_GENRE=ci('genre'),IDX_COPY=ci('copies','# of copies'),
+          IDX_LAST=ci('last performed','last year performed'),IDX_ISBN=ci('isbn'),
+          IDX_PUB=ci('publisher'),IDX_YEAR=ci('year'),IDX_DESC=ci('description'),
+          IDX_TAGS=ci('tags'),IDX_LINK=ci('link');
+
+    // Gather all entries, sorted by their sheet Sort # then new ones after
+    const allEntries=[];
+    for(const sec of ['work','personal'])
+      for(const e of data[sec]||[])
+        allEntries.push({e,sec,sortNum:sheetSortNums.get(e._id)||null});
+    allEntries.sort((a,b)=>{
+      if(a.sortNum&&b.sortNum)return a.sortNum-b.sortNum;
+      if(a.sortNum)return -1;
+      if(b.sortNum)return 1;
+      return 0;
+    });
+
+    const rows=allEntries.map(({e,sec},idx)=>{
+      const row=new Array(sheetHeaderRaw.length).fill('');
+      const s=(i,v)=>{if(i>=0&&i<row.length)row[i]=String(v||'');};
+      const getCallNum=()=>{
+        const cn=e.call_number||'';if(!cn)return '';
+        if(sheetMatchedIds.has(e._id))return cn;
         const n=callSuffix(cn);
-        return(n&&allowedNewNums.has(n))?cn:'';  // new entry — sequential only
+        return(n&&allowedNewNums.has(n))?cn:'';
       };
-      const toRow=e=>[cap(e.__src||'work'),e._type==='octavo'?'Octavo':'Book',getCallNum(e),e.title||'',e.composer||e.author||'',e.voicing||'',e.genre||'',e.copies||'',e.lastPerformed||'',e.isbn||'',e.publisher||'',e.year||'',e.description||'',Array.isArray(e.tags)?e.tags.join('; '):'',e.link||''];
-      const san=s=>String(s||'').replace(/[\\\/\?\*\[\]:]/g,' ').replace(/\s+/g,' ').trim().slice(0,60);
-      const groupBy=(arr,fn)=>{const m={};arr.forEach(e=>{const k=fn(e);(m[k]=m[k]||[]).push(e);});return m;};
-      const octavos=allRows.filter(e=>e._type==='octavo'),books=allRows.filter(e=>e._type==='book');
-      const sheets=[{title:'All Music',headers,rows:allRows.map(toRow)}];
-      const vGroups=groupBy(octavos,e=>san(e.voicing)||'(none)');
-      Object.keys(vGroups).sort().forEach(v=>sheets.push({title:`Voicing – ${v}`,headers,rows:vGroups[v].map(toRow)}));
-      const ogGroups=groupBy(octavos,e=>san(e.genre)||'(none)');
-      Object.keys(ogGroups).sort().forEach(g=>sheets.push({title:`Octavos – ${g}`,headers,rows:ogGroups[g].map(toRow)}));
-      const bgGroups=groupBy(books,e=>san(e.genre)||'(none)');
-      Object.keys(bgGroups).sort().forEach(g=>sheets.push({title:`Books – ${g}`,headers,rows:bgGroups[g].map(toRow)}));
-      const r1=await fetch('/api/sync-sheets',adminFetchOpts({tab:'work',sheets}));
-      const j1=await r1.json();
-      if(!r1.ok){if(j1.reauth){authStatus.authenticated=false;updateGoogleUI();toast('Google session expired — reconnect in Settings','error');}else toast('Push failed: '+j1.error,'error');btn.disabled=false;btn.innerHTML=orig;return;}
-      await fetch('/api/sync-sheets',adminFetchOpts({tab:'personal',sheets}));
-      authStatus.spreadsheetId=j1.spreadsheetId;
+      s(IDX_SORT,idx+1);
+      s(IDX_LIB,sec==='work'?'Work':'Personal');
+      s(IDX_TYPE,e._type==='book'?'Book':'Octavo');
+      s(IDX_CALL,getCallNum());
+      s(IDX_TITLE,e.title||'');
+      s(IDX_COMP,e.composer||e.author||'');
+      s(IDX_VOICE,e.voicing||'');
+      s(IDX_GENRE,e.genre||'');
+      s(IDX_COPY,e.copies||'');
+      s(IDX_LAST,e.lastPerformed||'');
+      s(IDX_ISBN,e.isbn||'');
+      s(IDX_PUB,e.publisher||'');
+      s(IDX_YEAR,e.year||'');
+      s(IDX_DESC,e.description||'');
+      s(IDX_TAGS,Array.isArray(e.tags)?e.tags.join('; '):'');
+      s(IDX_LINK,e.link||'');
+      return row;
+    });
+    pushCount=rows.length;
+
+    // Send as a single "All Music" sheet in the user's column format
+    const sheets=[{title:'All Music',headers:sheetHeaderRaw,rows}];
+    const r1=await fetch('/api/sync-sheets',adminFetchOpts({tab:'work',sheets}));
+    const j1=await r1.json();
+    if(!r1.ok){
+      if(j1.reauth){authStatus.authenticated=false;updateGoogleUI();toast('Google session expired — reconnect in Settings','error');}
+      else toast('Push failed: '+j1.error,'error');
+      btn.disabled=false;btn.innerHTML=orig;return;
     }
+    authStatus.spreadsheetId=j1.spreadsheetId;
   }catch(e){
     toast('Push failed: '+e.message,'error');btn.disabled=false;btn.innerHTML=orig;return;
   }
 
   btn.disabled=false;btn.innerHTML=orig;
   if(pullCount>0){renderGrid('work',data.work);renderGrid('personal',data.personal);}
-  const newPushed=allowedNewNums.size;
   const parts=[];
-  if(pullCount>0)parts.push(`↓ ${pullCount} pulled from sheet`);
-  if(newPushed>0)parts.push(`↑ ${newPushed} new call# pushed`);
-  const msg=parts.length?parts.join(' · '):'Already in sync';
-  toast(msg+` <a href="https://docs.google.com/spreadsheets/d/${authStatus.spreadsheetId||_SHEET_ID}" target="_blank">Open ↗</a>`,'success',6000);
+  if(pullCount>0)parts.push(`↓ ${pullCount} pulled`);
+  if(pushCount>0)parts.push(`↑ ${pushCount} pushed`);
+  toast((parts.join(' · ')||'Already in sync')+` <a href="https://docs.google.com/spreadsheets/d/${authStatus.spreadsheetId||_SHEET_ID}" target="_blank">Open ↗</a>`,'success',6000);
 }
 
 async function syncSheets(tab){
