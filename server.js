@@ -248,6 +248,39 @@ app.get('/api/isbn-lookup', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Lookup failed: ' + e.message }); }
 });
 
+// ── Book lookup by title/author (Google Books) — used for book links & covers ──
+app.get('/api/book-lookup', async (req, res) => {
+  const title  = (req.query.title  || '').trim();
+  const author = (req.query.author || '').trim();
+  if (!title) return res.status(400).json({ error: 'Title required' });
+  const q = encodeURIComponent(`intitle:"${title}"${author ? ` inauthor:${author}` : ''}`);
+  try {
+    let items = [];
+    try {
+      const { body } = await httpsGet(`https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=5`);
+      items = JSON.parse(body).items || [];
+    } catch (e) { /* fall through */ }
+    if (!items.length) {
+      // Looser retry without quotes/inauthor
+      const q2 = encodeURIComponent([title, author].filter(Boolean).join(' '));
+      const { body } = await httpsGet(`https://www.googleapis.com/books/v1/volumes?q=${q2}&maxResults=5`);
+      items = JSON.parse(body).items || [];
+    }
+    const results = items.map(it => {
+      const v = it.volumeInfo || {};
+      return {
+        title: [v.title, v.subtitle].filter(Boolean).join(': '),
+        author: (v.authors || []).join(', '),
+        publisher: v.publisher || '',
+        link: v.infoLink || v.canonicalVolumeLink || '',
+        thumbnail: (v.imageLinks?.thumbnail || '').replace(/^http:/, 'https:'),
+      };
+    }).filter(r => r.title);
+    if (!results.length) return res.status(404).json({ error: 'No book found' });
+    res.json({ results });
+  } catch (e) { res.status(500).json({ error: 'Book lookup failed: ' + e.message }); }
+});
+
 // ── JW Pepper Lookup (title + composer) ───────────────────────────────────────
 
 const VOICING_RE = /\b(SSAATTBB|SSATB|SATTBB|SSAA|SATB|SSAB|SSA|SAB|SA|TTBB|TTB|TBB|TB|Unison|2-Part|3-Part Mixed|3-Part|Two-Part)\b/i;

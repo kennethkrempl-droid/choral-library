@@ -1604,7 +1604,7 @@ function buildPanel(tab){
     <button class="btn-secondary btn-sm" id="find-dups-btn-${tab}" onclick="toggleFindDuplicates('${tab}')" title="Show only entries with similar titles">${ICO.search} Find Duplicates</button>
     <button class="btn-secondary btn-sm" onclick="openMergeQueue('${tab}')" title="Scan for duplicates and merge them one by one">${ICO.merge} Merge Duplicates</button>
     <button class="btn-gold btn-sm" id="suggest-genre-lib-btn-${tab}" onclick="suggestGenresForLib('${tab}')" title="AI-suggest genres for entries that don't have one">${ICO.sparkles} Suggest Genres</button>
-    <button class="btn-gold btn-sm" id="find-links-btn-${tab}" onclick="findAllLinks('${tab}')" title="Auto-find links for all entries that don't have one (JW Pepper for octavos, Amazon for books)">${ICO.link} Find Links</button>
+    <button class="btn-gold btn-sm" id="find-links-btn-${tab}" onclick="findAllLinks('${tab}')" title="Check every entry: verify its link matches the piece, fix wrong ones, fill missing ones, and grab cover art (JW Pepper for octavos, Google Books for books)">${ICO.link} Fix Links &amp; Covers</button>
     <span class="tools-sep"></span>
     <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}')" id="export-btn-${tab}">${ICO.download} Export CSV</button>
     <button class="btn-secondary btn-sm btn-icon" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
@@ -2394,79 +2394,132 @@ async function suggestGenresForLib(tab){
   finally{btn.disabled=false;btn.innerHTML=orig;}
 }
 
+// How confident are we that a search result IS this piece? 0..1+
+function _linkMatchScore(entry,item){
+  const t1=norm(entry.title||''),t2=norm(item.title||'');
+  if(!t1||!t2)return 0;
+  let score;
+  if(t1===t2)score=1;
+  else if(t2.includes(t1)||t1.includes(t2))score=.85;
+  else{const d=editDist(t1,t2);score=Math.max(0,1-d/Math.max(t1.length,t2.length));}
+  // composer/arranger corroboration — last name match
+  const c1=norm(entry.composer||entry.author||''),c2=norm((item.composer||'')+' '+(item.author||''));
+  if(c1&&c2.trim()){
+    const parts=c1.split(' ').filter(w=>w.length>2);
+    const ln=parts[parts.length-1];
+    if(ln&&c2.includes(ln))score+=.15;else score-=.12;
+  }
+  return score;
+}
+
+// Verify EVERY entry's link points at the right piece; fix wrong ones, fill
+// missing ones, and capture cover art along the way.
 async function findAllLinks(tab){
   if(tab==='all'){
     const btn=document.getElementById('find-links-btn-all');
     const orig=btn?btn.innerHTML:'';
-    if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Searching…';}
+    if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Working…';}
     await findAllLinks('work');
     await findAllLinks('personal');
     if(btn){btn.disabled=false;btn.innerHTML=orig;}
     return;
   }
-  const targets=data[tab].filter(e=>!e.link&&e.title);
-  if(!targets.length){toast('All entries already have links','info');return;}
+  const targets=data[tab].filter(e=>e.title);
+  if(!targets.length){toast('Nothing to check','info');return;}
   const btn=document.getElementById('find-links-btn-'+tab);
   btn.disabled=true;const orig=btn.innerHTML;
-  const books=targets.filter(e=>e._type==='book');
-  const octavos=targets.filter(e=>e._type==='octavo');
-  let filled=0,notFound=0,total=targets.length;
+  let fixed=0,filled=0,covers=0,kept=0,unsure=0,done=0;
+  const report=[];
+  const THRESH=0.72;
 
-  async function saveLink(entry,url,coverUrl=''){
-    const updated={...entry,link:url};
-    if(coverUrl)updated.coverUrl=coverUrl;
+  async function saveEntry(entry,patch,why){
+    const updated={...entry,...patch};
     const r=await fetch(`/api/entries/${tab}/${entry._id}`,adminFetchOpts(updated,'PUT'));
-    if(r.ok){const j=await r.json();const idx=data[tab].findIndex(e=>e._id===entry._id);if(idx>-1)data[tab][idx]=j.entry;filled++;}
-    else notFound++;
+    if(r.ok){
+      const j=await r.json();
+      const idx=data[tab].findIndex(e=>e._id===entry._id);
+      if(idx>-1)data[tab][idx]=j.entry;
+      report.push({title:entry.title,action:why,link:patch.link||entry.link||''});
+      return true;
+    }
+    return false;
   }
 
-  // Books: Amazon search URL — instant, no API call needed
-  for(const entry of books){
-    btn.innerHTML=`<span class="spinner"></span> ${filled+notFound+1}/${total}…`;
-    const q=encodeURIComponent([entry.title,entry.author].filter(Boolean).join(' '));
-    await saveLink(entry,`https://www.amazon.com/s?k=${q}`);
-  }
-
-  // Octavos: Pepper first, then CPDL, then Sheet Music Plus search URL
-  for(const entry of octavos){
-    btn.innerHTML=`<span class="spinner"></span> ${filled+notFound+1}/${total}…`;
-    let linkFound=false;
+  for(const entry of targets){
+    done++;
+    btn.innerHTML=`<span class="spinner"></span> ${done}/${targets.length}…`;
     try{
-      const r=await fetch(`/api/find-links?title=${encodeURIComponent(entry.title)}&composer=${encodeURIComponent(entry.composer||'')}`);
-      if(r.ok){
-        const j=await r.json();
-        // Use first source that has results; for Pepper pick closest title match
-        for(const sg of (j.results||[])){
-          if(sg.items&&sg.items.length){
-            let url,coverUrl='';
-            if(sg.source==='JW Pepper'){
-              const nt=norm(entry.title);
-              const best=sg.items.reduce((a,b)=>editDist(norm(a.title),nt)<=editDist(norm(b.title),nt)?a:b);
-              url=best.url;
-              coverUrl=best.image||'';
-            }else{
-              url=sg.items[0].url;
+      if(entry._type==='book'){
+        // Books → Google Books for a verified link + cover
+        const q=`/api/book-lookup?title=${encodeURIComponent(entry.title)}&author=${encodeURIComponent(entry.author||entry.composer||'')}`;
+        let best=null,bestScore=0;
+        try{
+          const r=await fetch(q);
+          if(r.ok){
+            const j=await r.json();
+            for(const it of (j.results||[])){
+              const s=_linkMatchScore(entry,it);
+              if(s>bestScore){best=it;bestScore=s;}
             }
-            await saveLink(entry,url,coverUrl);
-            linkFound=true;
-            break;
           }
+        }catch{}
+        if(best&&bestScore>=THRESH){
+          const patch={};
+          if(!entry.link)patch.link=best.link||`https://www.amazon.com/s?k=${encodeURIComponent([entry.title,entry.author].filter(Boolean).join(' '))}`;
+          if(best.thumbnail&&!entry.coverUrl)patch.coverUrl=best.thumbnail;
+          if(Object.keys(patch).length){
+            if(await saveEntry(entry,patch,patch.link?'book link + cover':'book cover')){if(patch.link)filled++;if(patch.coverUrl)covers++;}
+          }else kept++;
+        }else if(!entry.link){
+          // Unverified — honest fallback: an Amazon search for exactly this book
+          const q2=encodeURIComponent([entry.title,entry.author].filter(Boolean).join(' '));
+          if(await saveEntry(entry,{link:`https://www.amazon.com/s?k=${q2}`},'book search link'))filled++;
+        }else{kept++;unsure++;}
+      }else{
+        // Octavos → JW Pepper with title+composer verification
+        const r=await fetch(`/api/find-links?title=${encodeURIComponent(entry.title)}&composer=${encodeURIComponent(entry.composer||'')}`);
+        let best=null,bestScore=0,cpdl=null,smp='';
+        if(r.ok){
+          const j=await r.json();
+          for(const sg of (j.results||[])){
+            if(sg.source==='JW Pepper'){
+              for(const it of (sg.items||[])){
+                const s=_linkMatchScore(entry,it);
+                if(s>bestScore){best=it;bestScore=s;}
+              }
+            }else if(!cpdl&&sg.items&&sg.items.length){
+              // CPDL: only trust an exact-ish title match
+              const it=sg.items.find(x=>{const s=_linkMatchScore(entry,x);return s>=.8;});
+              if(it)cpdl=it;
+            }
+          }
+          smp=(j.searchUrls&&j.searchUrls['Sheet Music Plus'])||'';
         }
-        // Last resort: Sheet Music Plus search URL
-        if(!linkFound&&j.searchUrls&&j.searchUrls['Sheet Music Plus']){
-          await saveLink(entry,j.searchUrls['Sheet Music Plus']);
-          linkFound=true;
-        }
+        if(best&&bestScore>=THRESH){
+          const patch={};
+          if(entry.link!==best.url){patch.link=best.url;}
+          if(best.image&&entry.coverUrl!==best.image&&(patch.link||!entry.coverUrl))patch.coverUrl=best.image;
+          if(Object.keys(patch).length){
+            const had=!!entry.link;
+            if(await saveEntry(entry,patch,had?(patch.link?'replaced wrong link':'added cover'):'new Pepper link')){
+              if(patch.link)had?fixed++:filled++;
+              if(patch.coverUrl)covers++;
+            }
+          }else kept++;
+        }else if(cpdl&&!entry.link){
+          if(await saveEntry(entry,{link:cpdl.url},'CPDL link'))filled++;
+        }else if(!entry.link&&smp){
+          if(await saveEntry(entry,{link:smp},'search link (unverified)'))filled++;
+        }else{kept++;unsure++;}
+        await new Promise(x=>setTimeout(x,350));
       }
-    }catch{}
-    if(!linkFound)notFound++;
-    await new Promise(x=>setTimeout(x,400));
+    }catch{unsure++;}
   }
 
   renderTable(tab);
   btn.disabled=false;btn.innerHTML=orig;
-  const msg=`Found links for ${filled} entr${filled===1?'y':'ies'}${notFound?` · ${notFound} not found`:''}`;
-  toast(msg,'success',6000);
+  try{window._linkReport=(window._linkReport||[]).concat(report);console.table(report);}catch{}
+  toast(`Checked ${done}: ${fixed} wrong links fixed · ${filled} added · ${covers} covers · ${kept} already right${unsure?` · ${unsure} couldn't verify`:''}`,'success',9000);
 }
 
 // ── Scanner ───────────────────────────────────────────────────────────────
@@ -3459,7 +3512,7 @@ function _cardHTML(tab,e){
   const color=_toneFor(e);
   const isBook=e._type==='book';
   const unavailBadge=e.unavailable?`<span class="mc-chip mc-chip-unavail">In Use</span>`:'';
-  const hasCover=!isBook&&!!e.coverUrl;
+  const hasCover=!!e.coverUrl;
   const coverImg=hasCover?`<img class="mc-thumb-img" src="${escAttr(e.coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">`:'';
   const footBits=[e.voicing||'',(parseFloat(e.copies)>0?`${e.copies} ${parseFloat(e.copies)==1?'copy':'copies'}`:'')].filter(Boolean).join(' · ');
   const placeholder=hasCover?'':`<span class="mc-ph">
