@@ -36,7 +36,9 @@
   --mono:'JetBrains Mono','SF Mono',ui-monospace,SFMono-Regular,monospace;
 }
 html { scrollbar-gutter:stable; }
-body { font-family:var(--font); background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5; min-height:100vh; -webkit-font-smoothing:antialiased; }
+body { font-family:var(--font); background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.028'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E") repeat; color:var(--ink); font-size:14px; line-height:1.5; min-height:100vh; -webkit-font-smoothing:antialiased; }
+.orn-rule { display:flex; align-items:center; gap:14px; color:var(--gold); font-size:11px; opacity:.85; }
+.orn-rule::before, .orn-rule::after { content:''; flex:1; border-top:1px solid var(--line); }
 a { color:var(--accent); text-decoration:none; }
 a:hover { text-decoration:underline; text-underline-offset:2px; }
 .text-muted { color:var(--muted); }
@@ -55,9 +57,10 @@ header {
   border-bottom:1px solid var(--line);
 }
 .brand { display:flex; align-items:center; gap:10px; min-width:0; }
-.brand-mark { width:30px; height:30px; border-radius:7px; background:var(--ink); color:var(--gold-light); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+header { box-shadow:0 4px 0 -3px var(--line); }
+.brand-mark { width:32px; height:32px; border-radius:50%; background:transparent; border:1px solid var(--gold-line); color:var(--gold); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .brand-text { line-height:1.1; white-space:nowrap; overflow:hidden; display:flex; align-items:baseline; gap:10px; }
-.brand-title { font-family:var(--display); font-size:20px; font-weight:600; letter-spacing:-.2px; color:var(--ink); }
+.brand-title { font-family:var(--display); font-size:21px; font-weight:500; letter-spacing:-.1px; color:var(--ink); }
 .brand-sub { font-size:10px; font-weight:500; letter-spacing:1.8px; text-transform:uppercase; color:var(--faint); }
 .header-actions { display:flex; gap:8px; align-items:center; flex-shrink:0; }
 .cmdk-btn { background:var(--surface); border:1px solid var(--line); color:var(--muted); font-size:12.5px; padding:6px 10px 6px 12px; border-radius:var(--r); display:inline-flex; gap:10px; align-items:center; box-shadow:var(--shadow); }
@@ -122,12 +125,14 @@ a.sb-item:hover { text-decoration:none; }
 .panels-wrap { flex:1; min-width:0; }
 
 /* ── Library hero ── */
-.lib-hero { margin:8px 0 28px; }
-.lib-hero-title { font-family:var(--display); font-size:34px; font-weight:500; letter-spacing:-.4px; line-height:1.1; }
-.lib-hero-title em { font-style:italic; color:var(--gold); }
-.lib-statline { display:flex; flex-wrap:wrap; gap:4px 18px; margin-top:10px; font-size:13px; color:var(--muted); }
-.lib-stat { background:none; border:none; padding:0; font-size:13px; color:var(--muted); cursor:pointer; border-radius:2px; display:inline-flex; gap:5px; align-items:baseline; }
-.lib-stat b { font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+.lib-hero { margin:16px 0 28px; }
+.lib-hero-kicker { font-size:10.5px; font-weight:600; letter-spacing:2.6px; text-transform:uppercase; color:var(--gold); margin-bottom:12px; }
+.lib-hero-title { font-family:var(--display); font-size:46px; font-weight:450; letter-spacing:-.4px; line-height:1.05; }
+.lib-hero-title em { font-style:italic; color:var(--gold); font-weight:400; }
+.lib-hero .orn-rule { margin-top:22px; }
+.lib-statline { display:flex; flex-wrap:wrap; gap:4px 22px; margin-top:12px; font-size:13px; color:var(--muted); }
+.lib-stat { background:none; border:none; padding:0; font-size:13px; color:var(--muted); cursor:pointer; border-radius:2px; display:inline-flex; gap:6px; align-items:baseline; }
+.lib-stat b { font-family:var(--display); font-size:17px; font-weight:600; color:var(--ink); font-feature-settings:"onum"; }
 .lib-stat:hover b { color:var(--accent); }
 .lib-stat.active-filter { color:var(--accent); }
 .lib-stat.active-filter b { color:var(--accent); }
@@ -173,9 +178,10 @@ button.active-filter { background:var(--navy-soft); border-color:var(--accent-li
 /* ── Shelves (curated rows) ── */
 .shelves { margin:28px 0 8px; }
 .shelf-section { margin-bottom:28px; }
-.shelf-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px; }
-.shelf-title { font-family:var(--display); font-size:19px; font-weight:550; letter-spacing:-.2px; }
-.shelf-sub { font-size:12px; color:var(--faint); }
+.shelf-head { display:flex; align-items:center; gap:16px; margin-bottom:14px; }
+.shelf-title { font-family:var(--display); font-style:italic; font-size:21px; font-weight:500; letter-spacing:-.2px; flex-shrink:0; }
+.shelf-rule { flex:1; border-top:1px solid var(--line); margin-top:3px; }
+.shelf-sub { font-size:11px; letter-spacing:.6px; text-transform:uppercase; color:var(--faint); flex-shrink:0; }
 .shelf-scroll { display:grid; grid-auto-flow:column; grid-auto-columns:132px; gap:16px; overflow-x:auto; padding:4px 4px 12px; margin:0 -4px; scrollbar-width:thin; scroll-snap-type:x proximity; }
 .shelf-scroll > * { scroll-snap-align:start; }
 .composer-chips { display:flex; flex-wrap:wrap; gap:8px; }
@@ -183,44 +189,56 @@ button.active-filter { background:var(--navy-soft); border-color:var(--accent-li
 .composer-chip:hover { border-color:var(--gold-line); color:var(--gold); transform:translateY(-1px); }
 .composer-chip b { color:var(--ink); font-weight:550; margin-right:5px; }
 .composer-chip:hover b { color:var(--gold); }
-.browse-all-label { font-family:var(--display); font-size:19px; font-weight:550; letter-spacing:-.2px; margin:4px 0 14px; }
+.browse-all-label { font-family:var(--display); font-style:italic; font-size:21px; font-weight:500; letter-spacing:-.2px; margin:4px 0 14px; display:flex; align-items:center; gap:16px; }
+.browse-all-label::after { content:''; flex:1; border-top:1px solid var(--line); margin-top:3px; }
 
 /* ── Music grid & cards ── */
-.music-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:24px 20px; padding:4px 0; }
+.music-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(172px,1fr)); gap:30px 22px; padding:4px 0; }
 .mc { cursor:pointer; border-radius:var(--r); }
 .mc:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
-.mc-thumb { position:relative; aspect-ratio:3/4; border-radius:var(--r); overflow:hidden; background:
-  linear-gradient(160deg, color-mix(in srgb, var(--mc-accent,#2E4156) 7%, #FDFCFA) 0%, color-mix(in srgb, var(--mc-accent,#2E4156) 14%, #F6F4EF) 100%);
-  border:1px solid rgba(35,32,25,.07);
-  box-shadow:var(--shadow);
+.mc-thumb { position:relative; aspect-ratio:3/4; border-radius:3px; overflow:hidden;
+  background:color-mix(in srgb, var(--mc-accent,#2E4156) 6%, #FCFBF7) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E") repeat;
+  border:1px solid rgba(35,32,25,.12);
+  box-shadow:var(--shadow), inset 0 0 24px rgba(35,32,25,.03);
   transition:box-shadow .25s ease, transform .25s ease;
-  display:flex; flex-direction:column; justify-content:space-between; padding:14px;
+  display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center; padding:22px 12px 14px;
 }
-.mc:hover .mc-thumb { transform:translateY(-3px); box-shadow:var(--shadow-md); }
-.mc-thumb::before { content:''; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--mc-accent,#2E4156); opacity:.55; }
-.mc-thumb::after { content:'♪'; position:absolute; right:12px; bottom:8px; font-size:15px; color:var(--mc-accent,#2E4156); opacity:.3; }
-.mc-thumb-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .35s ease; }
+.mc:hover .mc-thumb { transform:translateY(-3px); box-shadow:var(--shadow-md), inset 0 0 24px rgba(35,32,25,.03); }
+.mc-thumb::before { content:''; position:absolute; inset:6px; border:1px solid color-mix(in srgb, var(--mc-accent,#2E4156) 38%, transparent); border-radius:1px; pointer-events:none; }
+.mc-thumb::after { content:''; position:absolute; inset:9px; border:1px solid color-mix(in srgb, var(--mc-accent,#2E4156) 16%, transparent); border-radius:1px; pointer-events:none; }
+.mc-thumb-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .35s ease; z-index:1; }
 .mc:hover .mc-thumb-img { transform:scale(1.035); }
 .mc-thumb.has-cover { padding:0; }
-.mc-thumb.has-cover::before, .mc-thumb.has-cover::after { display:none; }
-.mc-ph-title { position:relative; font-family:var(--display); font-style:italic; font-size:15px; line-height:1.25; font-weight:500; color:color-mix(in srgb, var(--mc-accent,#2E4156) 72%, #232019); padding-left:8px; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
-.mc-cat-label { position:relative; align-self:flex-start; font-size:9px; font-weight:600; letter-spacing:1.6px; text-transform:uppercase; color:var(--mc-accent,#2E4156); opacity:.75; padding-left:8px; }
-.mc-thumb.has-cover .mc-cat-label { position:absolute; left:10px; top:10px; background:rgba(253,252,250,.92); border-radius:4px; padding:3px 7px; opacity:1; z-index:2; }
+.mc-thumb.has-cover::before { inset:0; border:1px solid rgba(35,32,25,.14); z-index:2; }
+.mc-thumb.has-cover::after { display:none; }
+.mc-ph { position:relative; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; width:100%; min-height:0; }
+.mc-ph-orn { font-size:13px; line-height:1; color:var(--mc-accent,#2E4156); opacity:.55; }
+.mc-ph-title { font-family:var(--display); font-style:italic; font-size:16.5px; line-height:1.28; font-weight:500; color:color-mix(in srgb, var(--mc-accent,#2E4156) 74%, #232019); padding:0 8px; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+.mc-ph-rule { width:26px; border-top:1px solid color-mix(in srgb, var(--mc-accent,#2E4156) 42%, transparent); }
+.mc-ph-composer { font-size:8.5px; font-weight:600; letter-spacing:1.9px; text-transform:uppercase; color:color-mix(in srgb, var(--mc-accent,#2E4156) 58%, #6F6858); max-width:92%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mc-ph-foot { position:relative; font-size:8px; font-weight:550; letter-spacing:1.6px; text-transform:uppercase; color:var(--faint); }
+.mc-cat-label { position:relative; font-size:8.5px; font-weight:600; letter-spacing:2.2px; text-transform:uppercase; color:var(--mc-accent,#2E4156); opacity:.8; }
+.mc-thumb.has-cover .mc-cat-label { position:absolute; left:10px; top:10px; background:rgba(253,252,250,.94); border-radius:3px; padding:3px 8px; opacity:1; z-index:3; letter-spacing:1.6px; }
 .mc-avail-dot { position:absolute; right:10px; top:10px; width:8px; height:8px; border-radius:50%; background:var(--danger); box-shadow:0 0 0 3px rgba(253,252,250,.85); z-index:2; }
 .mc-actions { position:absolute; right:8px; bottom:8px; display:flex; gap:6px; opacity:0; transform:translateY(4px); transition:opacity .18s ease, transform .18s ease; z-index:3; }
 .mc:hover .mc-actions, .mc:focus-within .mc-actions { opacity:1; transform:none; }
 .mc-act { width:30px; height:30px; border-radius:50%; padding:0; display:flex; align-items:center; justify-content:center; background:rgba(253,252,250,.95); color:var(--ink); border:1px solid var(--line); box-shadow:var(--shadow-md); }
 .mc-act:hover { background:#fff; color:var(--accent); transform:scale(1.06); }
-.mc-info { padding:10px 2px 0; }
-.mc-title { font-size:13.5px; font-weight:550; line-height:1.3; color:var(--ink); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.mc-composer { font-size:12px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mc-info { padding:11px 2px 0; }
+.mc-title { font-family:var(--display); font-size:15px; font-weight:550; line-height:1.25; color:var(--ink); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.mc-composer { font-size:11.5px; color:var(--muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mc-tags { display:flex; align-items:center; gap:7px; margin-top:5px; min-height:16px; }
 .mc-chip { font-size:10px; font-weight:550; letter-spacing:.6px; text-transform:uppercase; color:var(--faint); }
 .mc-chip-book { color:var(--gold); }
 .mc-chip-unavail { color:var(--danger); }
 .mc-callnum { font-family:var(--mono); font-size:10px; color:var(--faint); margin-left:auto; }
-.shelf-scroll .mc-title { font-size:12.5px; }
-.shelf-scroll .mc-composer { font-size:11px; }
+.shelf-scroll .mc-title { font-size:13.5px; }
+.shelf-scroll .mc-composer { font-size:10.5px; }
+.shelf-scroll .mc-ph-title { font-size:13px; -webkit-line-clamp:3; }
+.shelf-scroll .mc-ph-composer { font-size:7.5px; letter-spacing:1.4px; }
+.shelf-scroll .mc-ph-foot { display:none; }
+.shelf-scroll .mc-thumb { padding:16px 8px 12px; }
+.shelf-scroll .mc-cat-label { font-size:7.5px; letter-spacing:1.7px; }
 
 /* ── Skeletons ── */
 .sk { pointer-events:none; }
@@ -511,10 +529,10 @@ header .auth-pill.disconnected, .settings-section .auth-pill.disconnected { colo
 .sbe-divider-line { flex:1; border-top:1px dashed var(--line); }
 
 /* ── Footer ── */
-footer { border-top:1px solid var(--line); margin-top:64px; }
-.footer-inner { max-width:1360px; margin:0 auto; padding:32px 40px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.footer-brand { font-family:var(--display); font-size:15px; font-weight:550; }
-.footer-sub { font-size:12px; color:var(--faint); }
+footer { margin-top:72px; }
+.footer-inner { max-width:1360px; margin:0 auto; padding:8px 40px 48px; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; }
+.footer-brand { font-family:var(--display); font-style:italic; font-size:17px; font-weight:500; margin-top:10px; }
+.footer-sub { font-size:10px; font-weight:600; letter-spacing:2.2px; text-transform:uppercase; color:var(--faint); }
 
 /* ── Responsive ── */
 @media (max-width:960px){
@@ -1061,6 +1079,7 @@ footer { border-top:1px solid var(--line); margin-top:64px; }
 
 <footer>
   <div class="footer-inner">
+    <div class="orn-rule" style="width:200px;margin:0 auto;">❦</div>
     <div class="footer-brand">Choral Catalog</div>
     <div class="footer-sub">Sheet Music Library</div>
   </div>
@@ -1553,11 +1572,14 @@ document.head.insertAdjacentHTML('beforeend','<style>body:not(.is-admin) .admin-
 function buildPanel(tab){
   const T = tab==='all' ? 'Full Library' : cap(tab);
   const heroTitle = tab==='all' ? 'The <em>Library</em>' : `${cap(tab)} <em>Library</em>`;
+  const kicker = tab==='all' ? 'A Choral Music Collection' : tab==='work' ? 'The Work Collection' : 'The Personal Collection';
   document.getElementById('tab-'+tab).innerHTML = `
   <div class="lib-hero">
+    <div class="lib-hero-kicker">${kicker}</div>
     <h1 class="lib-hero-title">${heroTitle}</h1>
     ${tab==='all'?`<p class="viewer-only" style="font-size:13.5px;color:var(--muted);margin:8px 0 0;line-height:1.6;max-width:560px;">Browse and request sheet music from our choral collection. Search by title, composer, or voicing — then click <strong>Request</strong> on any piece.</p>`:''}
     <div class="lib-statline" id="stats-${tab}"></div>
+    <div class="orn-rule">❦</div>
   </div>
 
   <div class="search-hero">
@@ -1674,7 +1696,7 @@ function renderShelves(tab){
       const sc=SEASON_CODES.find(s=>s.code===top[0]);
       const items=rows.filter(e=>e.season===top[0]).sort(()=>0.5-Math.random()).slice(0,12);
       seasonSection=`<div class="shelf-section">
-        <div class="shelf-head"><span class="shelf-title">${esc(sc?sc.label:top[0])}</span><span class="shelf-sub">${top[1]} works · <a href="#" onclick="event.preventDefault();_shelfSeeAll('${tab}','season','${escAttr(top[0])}')">see all</a></span></div>
+        <div class="shelf-head"><span class="shelf-title">${esc(sc?sc.label:top[0])}</span><span class="shelf-rule"></span><span class="shelf-sub">${top[1]} works · <a href="#" onclick="event.preventDefault();_shelfSeeAll('${tab}','season','${escAttr(top[0])}')">see all</a></span></div>
         <div class="shelf-scroll">${items.map(e=>_cardHTML(tab,e)).join('')}</div>
       </div>`;
     }
@@ -1685,13 +1707,13 @@ function renderShelves(tab){
   rows.forEach(e=>{const c=(e.composer||e.author||'').trim();if(c)cc[c]=(cc[c]||0)+1;});
   const topComposers=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,10).filter(([,n])=>n>=3);
   const composerSection=topComposers.length>=4?`<div class="shelf-section">
-    <div class="shelf-head"><span class="shelf-title">Composers &amp; arrangers</span></div>
+    <div class="shelf-head"><span class="shelf-title">Composers &amp; arrangers</span><span class="shelf-rule"></span></div>
     <div class="composer-chips">${topComposers.map(([c,n])=>`<button class="composer-chip" onclick="_shelfSeeAll('${tab}','search','${escAttr(c)}')"><b>${esc(c)}</b>${n}</button>`).join('')}</div>
   </div>`:'';
 
   el.innerHTML=`
     <div class="shelf-section">
-      <div class="shelf-head"><span class="shelf-title">Recently added</span><span class="shelf-sub">the newest arrivals in this collection</span></div>
+      <div class="shelf-head"><span class="shelf-title">Recently added</span><span class="shelf-rule"></span><span class="shelf-sub">Newest arrivals</span></div>
       <div class="shelf-scroll">${recent.map(e=>_cardHTML(tab,e)).join('')}</div>
     </div>
     ${seasonSection}
@@ -3439,13 +3461,20 @@ function _cardHTML(tab,e){
   const unavailBadge=e.unavailable?`<span class="mc-chip mc-chip-unavail">In Use</span>`:'';
   const hasCover=!isBook&&!!e.coverUrl;
   const coverImg=hasCover?`<img class="mc-thumb-img" src="${escAttr(e.coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">`:'';
-  const placeholder=hasCover?'':`<span class="mc-ph-title">${esc(e.title||'Untitled')}</span>`;
+  const footBits=[e.voicing||'',(parseFloat(e.copies)>0?`${e.copies} ${parseFloat(e.copies)==1?'copy':'copies'}`:'')].filter(Boolean).join(' · ');
+  const placeholder=hasCover?'':`<span class="mc-ph">
+      <span class="mc-ph-orn">❦</span>
+      <span class="mc-ph-title">${esc(e.title||'Untitled')}</span>
+      <span class="mc-ph-rule"></span>
+      <span class="mc-ph-composer">${esc(e.composer||e.author||'')}</span>
+    </span>
+    <span class="mc-ph-foot">${esc(footBits)}</span>`;
   const linkBtn=e.link?`<button class="mc-act" title="Preview / open link" onclick="event.stopPropagation();window.open('${escAttr(e.link)}','_blank')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>`:'';
   const requestBtn=`<button class="mc-act viewer-only" title="Request this piece" onclick="event.stopPropagation();openRequestModal('${srcTab}',${e._id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></button>`;
   return `<div class="mc" tabindex="0" role="button" onclick="_cardClick('${srcTab}',${e._id})" onkeydown="if(event.key==='Enter')_cardClick('${srcTab}',${e._id})" title="${escAttr(e.title||'')}">
     <div class="mc-thumb${hasCover?' has-cover':''}" style="--mc-accent:${color};">
       ${coverImg}
-      <span class="mc-cat-label">${e.season?esc(e.season):(isBook?'Book':'')}</span>
+      <span class="mc-cat-label">${e.season?esc(e.season):(isBook?'Music Book':'Octavo')}</span>
       ${placeholder}
       ${e.unavailable?'<span class="mc-avail-dot" title="In use"></span>':''}
       <div class="mc-actions">${requestBtn}${linkBtn}</div>
