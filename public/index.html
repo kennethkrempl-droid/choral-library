@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Choral Catalog</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+<meta name="theme-color" content="#FAF9F6">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap" rel="stylesheet">
@@ -534,6 +539,64 @@ footer { margin-top:72px; }
 .footer-brand { font-family:var(--display); font-style:italic; font-size:17px; font-weight:500; margin-top:10px; }
 .footer-sub { font-size:10px; font-weight:600; letter-spacing:2.2px; text-transform:uppercase; color:var(--faint); }
 
+/* ── Programs ── */
+.programs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
+.program-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:20px 22px; cursor:pointer; box-shadow:var(--shadow); transition:transform .2s ease, box-shadow .2s ease; }
+.program-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); }
+.pc-name { font-family:var(--display); font-size:18px; font-weight:550; }
+.pc-meta { font-size:12.5px; color:var(--muted); margin-top:4px; }
+.program-add-results { position:absolute; left:0; right:0; top:100%; margin-top:6px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-lg); z-index:50; overflow:hidden; }
+.program-add-results:empty { display:none; }
+
+/* ── Stats page ── */
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+.stats-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:20px 22px; box-shadow:var(--shadow); }
+.stats-card-title { font-family:var(--display); font-style:italic; font-size:16px; font-weight:500; margin-bottom:14px; }
+.stat-bar-row { display:flex; align-items:center; gap:10px; font-size:12.5px; padding:3px 0; }
+.stat-bar-row .sb-name { width:38%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--muted); }
+.stat-bar-row .sb-track { flex:1; height:5px; background:var(--line-soft); border-radius:999px; overflow:hidden; }
+.stat-bar-row .sb-fill { display:block; height:100%; background:var(--accent); border-radius:999px; opacity:.75; }
+.stat-bar-row .sb-val { width:36px; text-align:right; font-variant-numeric:tabular-nums; color:var(--ink); font-weight:550; }
+
+/* ── Health / aux rows ── */
+.health-row { display:flex; align-items:center; gap:10px; font-size:13px; padding:7px 0; border-bottom:1px solid var(--line-soft); }
+.health-row:last-child { border-bottom:none; }
+.health-dot { width:7px; height:7px; border-radius:50%; background:var(--warning); flex-shrink:0; }
+.health-row.ok .health-dot { background:var(--success); opacity:.5; }
+.health-row.ok { color:var(--faint); }
+.settings-section.collapsible .settings-section-body { display:none; }
+.settings-section.collapsible.open .settings-section-body { display:block; }
+
+/* ── Dark mode — the reading room at night ── */
+html[data-theme="dark"] {
+  --bg:#1E1B16; --surface:#272319; --line:#3A342A; --line-soft:#2F2A21;
+  --ink:#EDE8DD; --muted:#A79D8A; --faint:#6E675A;
+  --accent:#A8BDD3; --accent-hover:#C0D1E2; --accent-light:#2A313B; --accent-line:#465362;
+  --navy-soft:#2A313B;
+  --gold:#C9A96A; --gold-bright:#DBBC7E; --gold-light:#332C1E; --gold-line:#5C4E33;
+  --header-bg-a:#1E1B16; --header-fg:#EDE8DD;
+  --danger:#D98F8C; --danger-light:#362323; --danger-line:#5C3B39;
+  --success:#93C0A0; --success-light:#222E24; --success-line:#3D5745;
+  --warning:#D9B36A; --warning-light:#332B1B; --warning-line:#5C4C2E;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+  --shadow-md:0 2px 6px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.5);
+  --shadow-lg:0 4px 12px rgba(0,0,0,.5),0 24px 64px rgba(0,0,0,.6);
+}
+html[data-theme="dark"] header { background:rgba(30,27,22,.88); }
+html[data-theme="dark"] .mc-thumb { background-color:color-mix(in srgb, var(--mc-accent,#A8BDD3) 14%, #262219); border-color:rgba(237,232,221,.1); }
+html[data-theme="dark"] .mc-ph-title { color:color-mix(in srgb, var(--mc-accent,#A8BDD3) 45%, #EDE8DD); }
+html[data-theme="dark"] .mc-ph-composer { color:color-mix(in srgb, var(--mc-accent,#A8BDD3) 35%, #A79D8A); }
+html[data-theme="dark"] .mc-act { background:rgba(39,35,25,.95); color:var(--ink); border-color:var(--line); }
+html[data-theme="dark"] .mc-thumb.has-cover .mc-cat-label { background:rgba(30,27,22,.92); }
+html[data-theme="dark"] .mc-avail-dot { box-shadow:0 0 0 3px rgba(30,27,22,.85); }
+html[data-theme="dark"] .toast { background:#EDE8DD; color:#1E1B16; }
+html[data-theme="dark"] .bulk-bar { background:#EDE8DD; color:#1E1B16; }
+html[data-theme="dark"] .bulk-bar button { background:rgba(30,27,22,.1); color:#1E1B16; }
+html[data-theme="dark"] .btn-primary { background:#EDE8DD; color:#1E1B16; }
+html[data-theme="dark"] .btn-primary:hover:not(:disabled) { background:#fff; }
+html[data-theme="dark"] .btn-scan { background:#EDE8DD; color:#1E1B16; }
+html[data-theme="dark"] .brand-mark { border-color:var(--gold-line); color:var(--gold); }
+
 /* ── Responsive ── */
 @media (max-width:960px){
   .tab-panel { padding:24px 20px 80px; }
@@ -561,6 +624,7 @@ footer { margin-top:72px; }
   </div>
   <div class="header-actions">
     <button class="cmdk-btn" onclick="openCmdk()" title="Search everything"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg> Search <span class="cmdk-kbd">⌘K</span></button>
+    <button class="btn-ghost btn-icon" id="theme-btn" onclick="toggleTheme()" title="Light / dark mode"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
     <span id="auth-pill" class="auth-pill disconnected admin-only"><span class="dot"></span>Google</span>
     <button id="admin-btn" class="btn-header btn-sm" onclick="toggleAdmin()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Librarian Login</button>
   </div>
@@ -577,6 +641,8 @@ footer { margin-top:72px; }
   <button class="tab-btn admin-only" data-tab="all">All Music</button>
   <button class="tab-btn active admin-only" data-tab="work">Work</button>
   <button class="tab-btn admin-only" data-tab="personal">Personal</button>
+  <button class="tab-btn admin-only" data-tab="programs">Programs</button>
+  <button class="tab-btn admin-only" data-tab="stats">Statistics</button>
   <button class="tab-btn admin-only" data-tab="shelving">Shelving</button>
   <button class="tab-btn admin-only" data-tab="import">Import</button>
   <button class="tab-btn admin-only" data-tab="settings">Settings</button>
@@ -599,6 +665,26 @@ footer { margin-top:72px; }
 <div class="tab-panel" id="tab-all"></div>
 <div class="tab-panel active" id="tab-work"></div>
 <div class="tab-panel" id="tab-personal"></div>
+
+<!-- ═══ PROGRAMS TAB ═══ -->
+<div class="tab-panel admin-only" id="tab-programs">
+  <div class="lib-hero">
+    <div class="lib-hero-kicker">Concert Planning</div>
+    <h1 class="lib-hero-title">Programs</h1>
+    <div class="orn-rule" style="margin-top:18px;">❦</div>
+  </div>
+  <div id="programs-body"></div>
+</div>
+
+<!-- ═══ STATISTICS TAB ═══ -->
+<div class="tab-panel admin-only" id="tab-stats">
+  <div class="lib-hero">
+    <div class="lib-hero-kicker">The Collection In Numbers</div>
+    <h1 class="lib-hero-title">Statistics</h1>
+    <div class="orn-rule" style="margin-top:18px;">❦</div>
+  </div>
+  <div id="stats-body"></div>
+</div>
 
 <!-- ═══ SHELVING TAB ═══ -->
 <div class="tab-panel admin-only" id="tab-shelving">
@@ -693,6 +779,7 @@ footer { margin-top:72px; }
 <!-- ═══ SETTINGS TAB ═══ -->
 <div class="tab-panel" id="tab-settings">
   <div class="settings-grid">
+    <div id="aux-sections"></div>
 
     <div class="settings-section admin-only" style="grid-column:1/-1;">
       <div class="settings-section-header">
@@ -1142,10 +1229,29 @@ const DEFAULT_SIDEBAR_CONFIG=[
   {id:'viewer',type:'tab',     label:'Library',        tab:'all',      icon:'book',    viewerOnly:true},
   {id:'_div1', type:'divider', adminOnly:true},
   {id:'_sl2',  type:'section', label:'Library Tools',  adminOnly:true},
+  {id:'programs',type:'tab',   label:'Programs',       tab:'programs', icon:'music',   adminOnly:true},
+  {id:'stats', type:'tab',     label:'Statistics',     tab:'stats',    icon:'book',    adminOnly:true},
   {id:'shelving',type:'tab',   label:'Shelving',       tab:'shelving', icon:'shelves', adminOnly:true},
   {id:'import',type:'tab',     label:'Import',         tab:'import',   icon:'camera',  adminOnly:true},
   {id:'settings',type:'tab',   label:'Settings',       tab:'settings', icon:'gear',    adminOnly:true},
 ];
+// Older saved sidebar configs won't have the new tabs — merge them in once
+(function(){
+  try{
+    const saved=JSON.parse(localStorage.getItem('sidebarConfig')||'null');
+    if(saved&&Array.isArray(saved)){
+      let changed=false;
+      ['programs','stats'].forEach(idKey=>{
+        if(!saved.some(i=>i.id===idKey||i.tab===idKey)){
+          const def=DEFAULT_SIDEBAR_CONFIG.find(i=>i.id===idKey);
+          const at=saved.findIndex(i=>i.tab==='shelving');
+          saved.splice(at>=0?at:saved.length,0,def);changed=true;
+        }
+      });
+      if(changed)localStorage.setItem('sidebarConfig',JSON.stringify(saved));
+    }
+  }catch{}
+})();
 
 // ── Season card colors ─────────────────────────────────────────────────────
 const SEASON_COLORS={
@@ -1159,7 +1265,7 @@ let data        = { work:[], personal:[] };
 let entryTypes  = { work:'octavo', personal:'octavo' };
 let viewMode    = (()=>{try{return JSON.parse(localStorage.getItem('viewMode')||'{}')||{};}catch{return{}}})();
 let sidebarConfig=(()=>{try{const s=JSON.parse(localStorage.getItem('sidebarConfig')||'null');return(s&&Array.isArray(s))?s:JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_CONFIG));}catch{return JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_CONFIG));}})();
-let filters     = { work:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false}, personal:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false}, all:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false} };
+let filters     = { work:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false,perf:''}, personal:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false,perf:''}, all:{search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false,perf:''} };
 let showDupsOnly = { work:false, personal:false, all:false };
 let sortState   = { work:{col:null,dir:1}, personal:{col:null,dir:1}, all:{col:null,dir:1} };
 let selected    = { work:new Set(), personal:new Set(), all:new Set() };
@@ -1234,18 +1340,22 @@ function generateOctavoLabels(){
       voicing:    e.voicing||'',
       genre:      e.genre||'',
       copies:     e.copies!=null?e.copies:'—',
+      qrUrl:      `${location.origin}/?piece=work:${e._id}`,
     }))
     .sort((a,b)=>a.title.localeCompare(b.title));
 
   if(!octavos.length){alert('No Work Octavos found in the library.');return;}
 
-  const labelHtml=octavos.map(item=>`
+  const labelHtml=octavos.map((item,i)=>`
     <div class="label">
-      <div class="lbl-call">${esc(item.callNumber)}</div>
-      <div class="lbl-title">${esc(item.title)}</div>
-      <div class="lbl-composer">${esc(item.composer)}</div>
-      <div class="lbl-voicing">${esc([item.voicing,item.genre].filter(Boolean).join('  ·  '))}</div>
-      <div class="lbl-copies">Copies: ${esc(String(item.copies))}</div>
+      <div class="lbl-main">
+        <div class="lbl-call">${esc(item.callNumber)}</div>
+        <div class="lbl-title">${esc(item.title)}</div>
+        <div class="lbl-composer">${esc(item.composer)}</div>
+        <div class="lbl-voicing">${esc([item.voicing,item.genre].filter(Boolean).join('  ·  '))}</div>
+        <div class="lbl-copies">Copies: ${esc(String(item.copies))}</div>
+      </div>
+      <div class="lbl-qr" id="qr-${i}" data-url="${esc(item.qrUrl)}"></div>
     </div>`).join('');
 
   const html=`<!DOCTYPE html>
@@ -1282,8 +1392,11 @@ body{font-family:Arial,sans-serif;background:white;}
   width:4in;height:2in;overflow:hidden;
   border:1px solid #bbb;
   padding:0.1in 0.15in;
-  display:flex;flex-direction:column;gap:2px;
+  display:flex;flex-direction:row;gap:0.12in;align-items:stretch;
 }
+.lbl-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.lbl-qr{width:0.85in;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.lbl-qr img,.lbl-qr canvas{width:0.85in !important;height:0.85in !important;}
 .lbl-call{font-size:10pt;font-weight:bold;color:#166534;
   border-bottom:1px dashed #ccc;padding-bottom:3px;margin-bottom:2px;
   font-family:monospace;letter-spacing:.5px;}
@@ -1299,6 +1412,13 @@ body{font-family:Arial,sans-serif;background:white;}
   Print at 100% scale — do <em>not</em> use "fit to page"</p>
 </div>
 <div class="labels-grid">${labelHtml}</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+<script>
+// QR codes deep-link each box to its catalog entry (scan with any phone camera)
+document.querySelectorAll('.lbl-qr').forEach(el=>{
+  try{new QRCode(el,{text:el.dataset.url,width:82,height:82,correctLevel:QRCode.CorrectLevel.M});}catch(e){}
+});
+<\/script>
 </body></html>`;
 
   const win=window.open('','_blank','width=950,height=720');
@@ -1594,8 +1714,11 @@ function buildPanel(tab){
     </select>
     <select class="filter-select" id="fvoicing-${tab}" onchange="setFilter('${tab}','voicing',this.value)"><option value="">All Voicings</option></select>
     <select class="filter-select" id="fgenre-${tab}" onchange="setFilter('${tab}','genre',this.value)"><option value="">All Genres</option></select>
-    ${tab==='work'?`<select class="filter-select" id="fseason-${tab}" onchange="setFilter('${tab}','season',this.value)"><option value="">All Seasons</option>${SEASON_CODES.map(s=>`<option value="${s.code}">${s.code} — ${s.label}</option>`).join('')}</select><button class="btn-secondary btn-sm admin-only" id="needs-cat-btn-${tab}" onclick="toggleNeedsCat('${tab}')" title="Show octavos missing a season/call number">Needs Cat.</button><button class="btn-secondary btn-sm admin-only" id="unshelved-btn-${tab}" onclick="toggleUnshelved('${tab}')" title="Show octavos with a season but no shelf location">Unshelved</button>`:''}
+    ${tab==='work'?`<select class="filter-select" id="fseason-${tab}" onchange="setFilter('${tab}','season',this.value)"><option value="">All Seasons</option>${SEASON_CODES.map(s=>`<option value="${s.code}">${s.code} — ${s.label}</option>`).join('')}</select>`:''}
+    ${tab!=='personal'?`<select class="filter-select admin-only" id="fperf-${tab}" onchange="setFilter('${tab}','perf',this.value)" title="Filter by performance history"><option value="">Any Performance</option><option value="thisyear">Sung this year</option><option value="gt3">Not sung in 3+ yrs</option><option value="gt5">Not sung in 5+ yrs</option><option value="never">Never performed</option></select>`:''}
+    ${tab==='work'?`<button class="btn-secondary btn-sm admin-only" id="needs-cat-btn-${tab}" onclick="toggleNeedsCat('${tab}')" title="Show octavos missing a season/call number">Needs Cat.</button><button class="btn-secondary btn-sm admin-only" id="unshelved-btn-${tab}" onclick="toggleUnshelved('${tab}')" title="Show octavos with a season but no shelf location">Unshelved</button>`:''}
     <button class="btn-ghost btn-sm clear-filters" id="clearf-${tab}" onclick="clearFilters('${tab}')">${ICO.x} Clear</button>
+    <button class="btn-ghost btn-sm" onclick="copyViewLink('${tab}')" title="Copy a link that opens this exact filtered view">${ICO.link} Copy View Link</button>
     <span style="flex:1"></span>
     <button class="btn-secondary btn-sm btn-view-toggle" id="view-toggle-${tab}" onclick="toggleViewMode('${tab}')" title="Toggle grid / table view">${ICO.grid}</button>
   </div>
@@ -1610,6 +1733,7 @@ function buildPanel(tab){
     <button class="btn-secondary btn-sm btn-icon" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
     <button class="btn-success btn-sm" id="sync-${tab}-btn" onclick="syncBidirectional('${tab}')">${ICO.sync} Sync Sheet</button>
     ${tab==='work'?`<button class="btn-gold btn-sm" onclick="generateOctavoLabels()" title="Generate printable box labels for all Work Octavos">${ICO.print} Labels</button>`:''}
+    <button class="btn-secondary btn-sm" onclick="printCatalog('${tab}')" title="Print a typeset catalog of the current view (save as PDF from the print dialog)">${ICO.print} Catalog PDF</button>
   </div>
 
   <div class="card add-card admin-only" id="add-card-${tab}">
@@ -1645,6 +1769,7 @@ function buildPanel(tab){
   <div class="bulk-bar" id="bulk-bar-${tab}">
       <span class="bulk-count" id="bulk-count-${tab}"></span>
       <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}',true)">${ICO.download} Export Selected</button>
+      <button class="btn-secondary btn-sm" onclick="addSelectedToProgram('${tab}')">${ICO.music} Add to Program</button>
       <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','genre')">${ICO.music} Set Genre</button>
       <button class="btn-secondary btn-sm" onclick="openBulkTag('${tab}','tags')">${ICO.tag} Add Tag</button>
       ${tab==='work'?`<button class="btn-secondary btn-sm admin-only" onclick="openBulkLocation('${tab}')">${ICO.tag} Set Location</button>`:''}
@@ -1662,6 +1787,422 @@ function buildPanel(tab){
 
 function toggleAddCard(tab){ document.getElementById('add-card-'+tab).classList.toggle('open'); }
 
+// ── Listen (saved recording, else YouTube search) ─────────────────────────
+function listenTo(tab,id){
+  const e=data[tab]&&data[tab].find(x=>x._id===id); if(!e)return;
+  const url=e.referenceLink||`https://www.youtube.com/results?search_query=${encodeURIComponent([e.title,e.composer||e.author,'choir'].filter(Boolean).join(' '))}`;
+  window.open(url,'_blank');
+}
+
+// ── Shareable view links & deep links ─────────────────────────────────────
+function copyViewLink(tab){
+  const f=filters[tab],p=new URLSearchParams();
+  p.set('view',tab);
+  if(f.search)p.set('q',f.search);
+  if(f.type)p.set('type',f.type);
+  if(f.voicing)p.set('voicing',f.voicing);
+  if(f.genre)p.set('genre',f.genre);
+  if(f.season)p.set('season',f.season);
+  if(f.perf)p.set('perf',f.perf);
+  const url=`${location.origin}/?${p.toString()}`;
+  navigator.clipboard.writeText(url).then(()=>toast('View link copied — anyone can open this exact view','success'))
+    .catch(()=>prompt('Copy this link:',url));
+}
+function applyUrlParams(){
+  const p=window._initialParams||new URLSearchParams(location.search);
+  if(![...p.keys()].length)return;
+  const view=p.get('view'), piece=p.get('piece');
+  const tab=view&&['work','personal','all'].includes(view)?view:(isAdmin?'work':'all');
+  const f=filters[tab];
+  if(p.get('q'))f.search=p.get('q');
+  if(p.get('type'))f.type=p.get('type');
+  if(p.get('voicing'))f.voicing=p.get('voicing');
+  if(p.get('genre'))f.genre=p.get('genre');
+  if(p.get('season'))f.season=p.get('season');
+  if(p.get('perf'))f.perf=p.get('perf');
+  switchTab(tab);
+  const si=document.getElementById('search-'+tab); if(si&&f.search)si.value=f.search;
+  renderTable(tab);
+  if(piece){
+    const [pt,pidRaw]=piece.includes(':')?piece.split(':'):['work',piece];
+    const pid=parseInt(pidRaw);
+    const src=['work','personal'].includes(pt)?pt:'work';
+    const entry=(data[src]||[]).find(e=>e._id===pid);
+    if(entry){
+      const t2=isAdmin?src:'all';
+      switchTab(t2);
+      const si2=document.getElementById('search-'+t2);
+      if(si2){si2.value=entry.title||'';filterTable(t2,entry.title||'');}
+      setTimeout(()=>_cardClick(src,pid),350);
+    }
+  }
+  history.replaceState(null,'',location.pathname);
+}
+
+// ── Programs (concert set lists) ───────────────────────────────────────────
+let programs=[],_openProgramId=null;
+async function loadPrograms(){
+  try{const r=await fetch('/api/programs',adminHeaders());if(r.ok)programs=(await r.json()).programs||[];}catch{}
+}
+function _pieceOf(ref){return (data[ref.tab]||[]).find(e=>e._id===ref.id)||null;}
+function _durSecs(e){const m=String(e&&e.duration||'').match(/(\d+):(\d{1,2})/);return m?(+m[1]*60)+ +m[2]:0;}
+function _fmtDur(s){if(!s)return'—';const m=Math.floor(s/60),sec=s%60;return `${m}:${String(sec).padStart(2,'0')}`;}
+
+async function renderPrograms(){
+  await loadPrograms();
+  const el=document.getElementById('programs-body'); if(!el)return;
+  const open=_openProgramId?programs.find(p=>p._id===_openProgramId):null;
+  if(open)return _renderProgramDetail(el,open);
+  el.innerHTML=`
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+      <button class="btn-primary" onclick="createProgram()">＋ New Program</button>
+    </div>
+    ${programs.length?`<div class="programs-grid">${programs.map(p=>{
+      const secs=(p.pieces||[]).reduce((s,ref)=>{const e=_pieceOf(ref);return s+_durSecs(e);},0);
+      return `<div class="program-card" onclick="openProgram(${p._id})">
+        <div class="pc-name">${esc(p.name)}</div>
+        <div class="pc-meta">${(p.pieces||[]).length} pieces${secs?` · ${_fmtDur(secs)} of music`:''}${p.concertDate?` · ${esc(p.concertDate)}`:''}</div>
+      </div>`;}).join('')}</div>`
+    :`<div class="empty-state"><div class="empty-icon" style="font-family:var(--display);font-style:italic;font-size:32px;">♪</div><strong>No programs yet</strong><p>A program is a concert set list: gather pieces, see total copies and shelf locations, print a pull sheet, and mark everything performed in one click. You can also select pieces in any library view and use “Add to Program.”</p></div>`}`;
+}
+
+async function createProgram(){
+  const name=prompt('Program name (e.g. "Winter Concert 2026"):','');
+  if(name===null)return;
+  const r=await fetch('/api/programs',adminFetchOpts({name:name||'Untitled Program',pieces:[]}));
+  if(r.ok){const j=await r.json();programs.push(j.program);_openProgramId=j.program._id;renderPrograms();}
+  else toast('Could not create program','error');
+}
+function openProgram(id){_openProgramId=id;renderPrograms();}
+function closeProgram(){_openProgramId=null;renderPrograms();}
+
+function _renderProgramDetail(el,p){
+  const refs=p.pieces||[];
+  let totSecs=0,totCopies=0;
+  const rows=refs.map((ref,i)=>{
+    const e=_pieceOf(ref);
+    if(!e)return `<tr><td colspan="6" class="text-muted" style="font-style:italic;">(piece removed from library) <button class="btn-ghost btn-sm" onclick="removeProgramPiece(${i})">✕</button></td></tr>`;
+    totSecs+=_durSecs(e);totCopies+=parseFloat(e.copies)||0;
+    const loc=computeLocationTag(e);
+    return `<tr>
+      <td style="width:24px;color:var(--faint);">${i+1}</td>
+      <td class="cell-title">${esc(e.title||'')}</td>
+      <td>${esc(e.composer||e.author||'')}</td>
+      <td>${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:'—'}</td>
+      <td>${e.duration?esc(e.duration):'—'}</td>
+      <td>${esc(String(e.copies||'—'))}</td>
+      <td>${loc==='Unassigned'?'<span class="text-muted">—</span>':`<span class="loc-tag-badge">${esc(loc)}</span>`}</td>
+      <td style="text-align:right;"><div style="display:flex;gap:2px;justify-content:flex-end;">
+        <button class="btn-ghost btn-icon btn-sm" title="Move up" onclick="moveProgramPiece(${i},-1)">↑</button>
+        <button class="btn-ghost btn-icon btn-sm" title="Move down" onclick="moveProgramPiece(${i},1)">↓</button>
+        <button class="btn-ghost btn-icon btn-sm" title="Remove" style="color:var(--danger);" onclick="removeProgramPiece(${i})">✕</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+      <button class="btn-ghost btn-sm" onclick="closeProgram()">← All programs</button>
+      <input class="search-input" style="font-family:var(--display);font-size:17px;flex:1;min-width:200px;" value="${escAttr(p.name)}" onchange="renameProgram(this.value)">
+      <input class="search-input" type="date" title="Concert date" value="${escAttr(p.concertDate||'')}" onchange="setProgramDate(this.value)">
+      <button class="btn-secondary btn-sm" onclick="printPullSheet()">${ICO.print} Pull Sheet</button>
+      <button class="btn-gold btn-sm" onclick="markProgramPerformed()" title="Adds this year to every piece's performance history">✓ Mark Performed</button>
+      <button class="btn-danger btn-sm" onclick="deleteProgram()">Delete</button>
+    </div>
+    <div class="lib-statline" style="margin-bottom:16px;">
+      <span class="lib-stat static"><b>${refs.length}</b> pieces</span>
+      <span class="lib-stat static"><b>${_fmtDur(totSecs)}</b> of music</span>
+      <span class="lib-stat static"><b>${totCopies.toLocaleString()}</b> copies to pull</span>
+    </div>
+    <div class="search-hero" style="margin-bottom:16px;">
+      <svg class="search-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+      <input type="text" class="search-input" id="program-add-search" placeholder="Type to add a piece to this program…" oninput="_programSearch(this.value)" autocomplete="off">
+      <div id="program-add-results" class="program-add-results"></div>
+    </div>
+    ${refs.length?`<div class="table-wrap"><table><thead><tr><th></th><th>Title</th><th>Composer</th><th>Voicing</th><th>Length</th><th>Copies</th><th>Location</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+      :'<div class="empty-state"><p>No pieces yet — search above, or select pieces in the library and “Add to Program.”</p></div>'}`;
+}
+function _currentProgram(){return programs.find(p=>p._id===_openProgramId);}
+async function _saveProgram(p){
+  const r=await fetch(`/api/programs/${p._id}`,adminFetchOpts(p,'PUT'));
+  if(!r.ok)toast('Save failed','error');
+}
+function renameProgram(name){const p=_currentProgram();if(!p)return;p.name=name||'Untitled Program';_saveProgram(p);}
+function setProgramDate(d){const p=_currentProgram();if(!p)return;p.concertDate=d;_saveProgram(p);}
+function moveProgramPiece(i,dir){
+  const p=_currentProgram();if(!p)return;
+  const j=i+dir;if(j<0||j>=p.pieces.length)return;
+  [p.pieces[i],p.pieces[j]]=[p.pieces[j],p.pieces[i]];
+  _saveProgram(p);renderPrograms();
+}
+function removeProgramPiece(i){const p=_currentProgram();if(!p)return;p.pieces.splice(i,1);_saveProgram(p);renderPrograms();}
+async function deleteProgram(){
+  const p=_currentProgram();if(!p)return;
+  if(!confirm(`Delete program "${p.name}"? (The pieces themselves are untouched.)`))return;
+  await fetch(`/api/programs/${p._id}`,{method:'DELETE',...adminHeaders()});
+  _openProgramId=null;renderPrograms();
+}
+function _programSearch(q){
+  const box=document.getElementById('program-add-results');if(!box)return;
+  q=(q||'').trim().toLowerCase();
+  if(q.length<2){box.innerHTML='';return;}
+  const p=_currentProgram();if(!p)return;
+  const inProg=new Set((p.pieces||[]).map(r=>`${r.tab}:${r.id}`));
+  const hits=[];
+  for(const tab of ['work','personal'])
+    for(const e of data[tab]||[]){
+      if(inProg.has(`${tab}:${e._id}`))continue;
+      if(((e.title||'')+' '+(e.composer||e.author||'')).toLowerCase().includes(q))hits.push({tab,e});
+      if(hits.length>=8)break;
+    }
+  box.innerHTML=hits.map(({tab,e})=>`<button class="cmdk-item" onclick="addProgramPiece('${tab}',${e._id})">
+    <span class="ci-ico">♪</span>${esc(e.title||'')}<span class="ci-meta">${esc(e.composer||e.author||'')}${e.voicing?' · '+esc(e.voicing):''}</span></button>`).join('')||'<div class="cmdk-empty">No matches</div>';
+}
+function addProgramPiece(tab,id){
+  const p=_currentProgram();if(!p)return;
+  p.pieces=p.pieces||[];p.pieces.push({tab,id});
+  _saveProgram(p);renderPrograms();
+}
+async function addSelectedToProgram(tab){
+  const ids=[...selected[tab]];
+  if(!ids.length)return;
+  await loadPrograms();
+  let choice;
+  if(!programs.length){choice='new';}
+  else{
+    const list=programs.map((p,i)=>`${i+1} = ${p.name}`).join('\n');
+    const ans=prompt(`Add ${ids.length} piece(s) to which program?\n\n${list}\n\nEnter a number, or type a name to create a new program:`,'');
+    if(ans===null)return;
+    const n=parseInt(ans);
+    choice=(n>=1&&n<=programs.length)?programs[n-1]:(ans.trim()?ans.trim():null);
+    if(!choice)return;
+  }
+  let prog;
+  if(typeof choice==='string'&&choice!=='new'){ // new program with given name
+    const r=await fetch('/api/programs',adminFetchOpts({name:choice,pieces:[]}));
+    if(!r.ok)return toast('Could not create program','error');
+    prog=(await r.json()).program;programs.push(prog);
+  }else if(choice==='new'){
+    const name=prompt('New program name:','')||'Untitled Program';
+    const r=await fetch('/api/programs',adminFetchOpts({name,pieces:[]}));
+    if(!r.ok)return toast('Could not create program','error');
+    prog=(await r.json()).program;programs.push(prog);
+  }else prog=choice;
+  prog.pieces=prog.pieces||[];
+  for(const id of ids){
+    const srcTab=tab==='all'?(data.work.find(x=>x._id===id)?'work':'personal'):tab;
+    if(!prog.pieces.some(r=>r.tab===srcTab&&r.id===id))prog.pieces.push({tab:srcTab,id});
+  }
+  await _saveProgram(prog);
+  toast(`Added ${ids.length} piece(s) to “${prog.name}”`,'success');
+  clearSelection(tab);
+}
+function printPullSheet(){
+  const p=_currentProgram();if(!p)return;
+  const items=(p.pieces||[]).map(ref=>_pieceOf(ref)).filter(Boolean);
+  const sorted=[...items].sort((a,b)=>((a.location_cabinet||99)-(b.location_cabinet||99))||((a.location_shelf||99)-(b.location_shelf||99)));
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Pull Sheet — ${esc(p.name)}</title><style>
+    body{font-family:Georgia,serif;color:#232019;max-width:700px;margin:32px auto;padding:0 24px;}
+    h1{font-size:22px;font-weight:600;margin:0;}
+    .sub{color:#6F6858;font-size:13px;margin:4px 0 24px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#A69D8C;border-bottom:1px solid #232019;padding:6px 8px;}
+    td{padding:8px;border-bottom:1px solid #E9E5DE;vertical-align:top;}
+    .loc{font-family:monospace;font-size:12px;}
+    .check{width:26px;} .box{display:inline-block;width:13px;height:13px;border:1.5px solid #232019;border-radius:2px;}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+  <h1>Pull Sheet — ${esc(p.name)}</h1>
+  <div class="sub">${p.concertDate?esc(p.concertDate)+' · ':''}${sorted.length} pieces · sorted by cabinet &amp; shelf</div>
+  <table><thead><tr><th class="check"></th><th>Location</th><th>Call #</th><th>Title</th><th>Voicing</th><th>Copies</th></tr></thead><tbody>
+  ${sorted.map(e=>`<tr><td class="check"><span class="box"></span></td><td class="loc">${esc(computeLocationTag(e))}</td><td class="loc">${esc(e.call_number||'—')}</td><td>${esc(e.title||'')}<br><span style="color:#6F6858;font-size:11px;">${esc(e.composer||e.author||'')}</span></td><td>${esc(e.voicing||'—')}</td><td>${esc(String(e.copies||'—'))}</td></tr>`).join('')}
+  </tbody></table>
+  <p class="noprint" style="margin-top:24px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print</button></p>
+  </body></html>`);
+  w.document.close();
+}
+async function markProgramPerformed(){
+  const p=_currentProgram();if(!p)return;
+  const yr=prompt('Mark all pieces performed in year:',String(new Date().getFullYear()));
+  if(yr===null)return;
+  const year=parseInt(yr)||new Date().getFullYear();
+  let n=0;
+  for(const ref of (p.pieces||[])){
+    const e=_pieceOf(ref);if(!e)continue;
+    const yrs=String(e.yearsPerformed||'');
+    if(new RegExp('\\b'+year+'\\b').test(yrs))continue;
+    const updated={...e,yearsPerformed:yrs?`${yrs}, ${year}`:String(year),lastPerformed:`${year}-06-01`};
+    const r=await fetch(`/api/entries/${ref.tab}/${e._id}`,adminFetchOpts(updated,'PUT'));
+    if(r.ok){const j=await r.json();const i=data[ref.tab].findIndex(x=>x._id===e._id);if(i>-1)data[ref.tab][i]=j.entry;n++;}
+  }
+  toast(`Marked ${n} piece(s) performed in ${year}`,'success');
+  renderAll();
+}
+
+// ── Printable catalog ──────────────────────────────────────────────────────
+function printCatalog(tab){
+  const rows=getSorted(tab,getFiltered(tab));
+  if(!rows.length)return toast('Nothing to print','info');
+  const w=window.open('','_blank');
+  const title=tab==='all'?'The Library':cap(tab)+' Library';
+  w.document.write(`<!DOCTYPE html><html><head><title>Choral Catalog — ${title}</title><style>
+    body{font-family:Georgia,serif;color:#232019;max-width:720px;margin:36px auto;padding:0 24px;}
+    h1{font-size:26px;font-weight:500;margin:0;} .orn{color:#8A6D3B;text-align:center;margin:16px 0;}
+    .sub{color:#6F6858;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:20px;}
+    th{text-align:left;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:#A69D8C;border-bottom:1px solid #232019;padding:5px 7px;}
+    td{padding:6px 7px;border-bottom:1px solid #EFEBE4;vertical-align:top;}
+    .cn{font-family:monospace;font-size:11px;white-space:nowrap;}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+  <h1>Choral Catalog</h1><div class="sub">${title} · ${rows.length} works · ${new Date().toLocaleDateString()}</div>
+  <div class="orn">❦</div>
+  <table><thead><tr><th class="cn">Call #</th><th>Title</th><th>Composer / Author</th><th>Voicing</th><th>Genre</th><th>Copies</th></tr></thead><tbody>
+  ${rows.map(e=>`<tr><td class="cn">${esc(e.call_number||'')}</td><td>${esc(e.title||'')}</td><td>${esc(e.composer||e.author||'')}</td><td>${esc(e.voicing||'')}</td><td>${esc(e.genre||'')}</td><td>${esc(String(e.copies||''))}</td></tr>`).join('')}
+  </tbody></table>
+  <p class="noprint" style="margin-top:24px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print / Save as PDF</button></p>
+  </body></html>`);
+  w.document.close();
+}
+
+// ── Statistics page ────────────────────────────────────────────────────────
+function _statBars(counts,total){
+  const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const max=entries.length?entries[0][1]:1;
+  return entries.map(([k,v])=>`<div class="stat-bar-row">
+    <span class="sb-name">${esc(k)}</span>
+    <span class="sb-track"><span class="sb-fill" style="width:${Math.round(v/max*100)}%"></span></span>
+    <span class="sb-val">${v}</span>
+  </div>`).join('');
+}
+function renderStatsPage(){
+  const el=document.getElementById('stats-body');if(!el)return;
+  const all=rowsFor('all');
+  const count=(key,map)=>{const c={};all.forEach(e=>{const v=map?map(e):e[key];if(v)c[v]=(c[v]||0)+1;});return c;};
+  const genres=count('genre'),voicings=count('voicing');
+  const seasons=count(null,e=>{if(!e.season)return null;const s=SEASON_CODES.find(x=>x.code===e.season);return s?s.label:e.season;});
+  const composers=count(null,e=>(e.composer||e.author||'').trim()||null);
+  const now=new Date().getFullYear();
+  const recency={'This year':0,'1–2 years':0,'3–5 years':0,'5+ years':0,'Never recorded':0};
+  all.filter(e=>e._type==='octavo').forEach(e=>{
+    const y=lastPerfYear(e);
+    if(y===null)recency['Never recorded']++;
+    else if(now-y<1)recency['This year']++;
+    else if(now-y<=2)recency['1–2 years']++;
+    else if(now-y<=5)recency['3–5 years']++;
+    else recency['5+ years']++;
+  });
+  const copies=all.reduce((s,e)=>s+(parseFloat(e.copies)||0),0);
+  const covers=all.filter(e=>e.coverUrl).length;
+  el.innerHTML=`
+    <div class="lib-statline" style="margin-bottom:28px;">
+      <span class="lib-stat static"><b>${all.length.toLocaleString()}</b> titles</span>
+      <span class="lib-stat static"><b>${copies.toLocaleString()}</b> copies</span>
+      <span class="lib-stat static"><b>${Object.keys(composers).length}</b> composers</span>
+      <span class="lib-stat static"><b>${covers}</b> with cover art</span>
+    </div>
+    <div class="stats-grid">
+      <div class="stats-card"><div class="stats-card-title">By genre</div>${_statBars(genres)}</div>
+      <div class="stats-card"><div class="stats-card-title">By voicing</div>${_statBars(voicings)}</div>
+      <div class="stats-card"><div class="stats-card-title">By season</div>${_statBars(seasons)}</div>
+      <div class="stats-card"><div class="stats-card-title">Most-collected composers</div>${_statBars(composers)}</div>
+      <div class="stats-card"><div class="stats-card-title">When octavos were last performed</div>${_statBars(recency)}
+        <p style="font-size:11.5px;color:var(--faint);margin-top:10px;">Based on the “years performed” field — use Programs → Mark Performed to keep this current.</p></div>
+    </div>`;
+}
+
+// ── Settings: backups, health, trash, history ──────────────────────────────
+async function refreshAuxSections(){
+  const host=document.getElementById('aux-sections');if(!host||!isAdmin)return;
+  let aux={trash:[],programs:[],log:[]};
+  try{const r=await fetch('/api/aux',adminHeaders());if(r.ok)aux=await r.json();}catch{}
+  let bstat=null;
+  try{const r=await fetch('/api/backup-status',adminHeaders());if(r.ok)bstat=(await r.json()).lastBackup;}catch{}
+
+  // Health checks
+  const all=rowsFor('all');
+  const checks=[
+    {label:'Missing voicing (octavos)',n:all.filter(e=>e._type==='octavo'&&!e.voicing).length,go:()=>_healthGo('','octavo')},
+    {label:'Missing genre',n:all.filter(e=>!e.genre).length,go:null},
+    {label:'Octavos needing cataloging',n:all.filter(e=>e._type==='octavo'&&!e.season).length,go:null},
+    {label:'No copy count',n:all.filter(e=>!e.copies&&e.copies!==0).length,go:null},
+    {label:'Unverified search-page links',n:all.filter(e=>/amazon\.com\/s\?|sheetmusicplus\.com\/search|youtube\.com\/results/.test(e.link||'')).length,go:null},
+    {label:'No cover art',n:all.filter(e=>!e.coverUrl).length,go:null},
+    {label:'Copies checked out',n:all.filter(e=>parseFloat(e.copiesOut)>0).length,go:null},
+  ];
+  const dupCN={};all.forEach(e=>{if(e.call_number)dupCN[e.call_number]=(dupCN[e.call_number]||0)+1;});
+  const dupCount=Object.values(dupCN).filter(n=>n>1).length;
+  checks.push({label:'Duplicate call numbers',n:dupCount,go:null});
+
+  host.innerHTML=`
+  <div class="settings-section collapsible">
+    <div class="settings-section-header" onclick="this.parentElement.classList.toggle('open')">🛟 Backups <span style="margin-left:auto;font-size:12px;color:var(--muted);font-weight:400;">${bstat?`last: ${new Date(bstat.when).toLocaleString()}`:'no automatic backup yet'}</span></div>
+    <div class="settings-section-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Backups are <strong>read-only snapshots</strong> of the catalog — they never write to your Google Sheet. A dated file is saved automatically every 24 hours to a <strong>“Choral Catalog Backups”</strong> folder in your Google Drive (last 21 kept).</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a class="btn-secondary btn-sm" href="/api/backup" onclick="this.href='/api/backup'" style="text-decoration:none;">${ICO.download} Download snapshot now</a>
+        <button class="btn-gold btn-sm" onclick="backupNow(this)">Back up to Drive now</button>
+      </div>
+    </div>
+  </div>
+  <div class="settings-section collapsible">
+    <div class="settings-section-header" onclick="this.parentElement.classList.toggle('open')">🩺 Catalog Health</div>
+    <div class="settings-section-body">
+      ${checks.map(c=>`<div class="health-row${c.n?'':' ok'}"><span class="health-dot"></span>${esc(c.label)}<b style="margin-left:auto;">${c.n}</b></div>`).join('')}
+      <p style="font-size:11.5px;color:var(--faint);margin-top:10px;">Tip: use the filters and “Needs Cat.” / “Unshelved” buttons in the library view to work through these.</p>
+    </div>
+  </div>
+  <div class="settings-section collapsible">
+    <div class="settings-section-header" onclick="this.parentElement.classList.toggle('open')">🗑 Trash <span style="margin-left:auto;font-size:12px;color:var(--muted);font-weight:400;">${aux.trash.length} item${aux.trash.length===1?'':'s'} · kept 30 days</span></div>
+    <div class="settings-section-body">
+      ${aux.trash.length?aux.trash.sort((a,b)=>(b._deletedAt||0)-(a._deletedAt||0)).map(t=>`<div class="health-row">
+        <span>${esc(t.title||'(untitled)')} <span class="text-muted" style="font-size:11px;">${esc(t._srcTab||'')} · deleted ${new Date(t._deletedAt||0).toLocaleDateString()}</span></span>
+        <span style="margin-left:auto;display:flex;gap:6px;">
+          <button class="btn-secondary btn-sm" onclick="restoreTrash([${t._id}])">Restore</button>
+          <button class="btn-danger btn-sm" onclick="purgeTrash([${t._id}])">Delete forever</button>
+        </span></div>`).join('')
+        +`<div style="margin-top:10px;"><button class="btn-danger btn-sm" onclick="purgeTrash(null)">Empty trash</button></div>`
+      :'<p class="text-muted" style="font-size:13px;">Trash is empty. Deleted entries land here for 30 days before disappearing for good.</p>'}
+    </div>
+  </div>
+  <div class="settings-section collapsible">
+    <div class="settings-section-header" onclick="this.parentElement.classList.toggle('open')">📜 Recent Changes</div>
+    <div class="settings-section-body">
+      ${aux.log.length?`<div style="max-height:280px;overflow-y:auto;">${aux.log.map(l=>`<div class="health-row"><span class="text-muted" style="font-size:11px;white-space:nowrap;">${new Date(l.ts).toLocaleString()}</span><span><b>${esc(l.action)}</b> ${esc(l.detail||'')}</span></div>`).join('')}</div>`
+      :'<p class="text-muted" style="font-size:13px;">Changes to the catalog will be listed here.</p>'}
+    </div>
+  </div>`;
+}
+function _healthGo(){switchTab('work');}
+async function backupNow(btn){
+  btn.disabled=true;const o=btn.innerHTML;btn.innerHTML='<span class="spinner"></span> Backing up…';
+  try{
+    const r=await fetch('/api/backup-now',adminFetchOpts({}));
+    const j=await r.json();
+    if(j.file)toast(`Backed up to Drive: ${j.file}`,'success',6000);
+    else toast(j.skipped?`Skipped: ${j.skipped}`:(j.error||'Backup failed'),j.skipped?'info':'error',6000);
+  }catch(e){toast('Backup failed: '+e.message,'error');}
+  btn.disabled=false;btn.innerHTML=o;
+  refreshAuxSections();
+}
+async function restoreTrash(ids){
+  const r=await fetch('/api/trash/restore',adminFetchOpts({ids}));
+  if(r.ok){await loadData();renderAll();refreshAuxSections();toast('Restored','success');}
+}
+async function purgeTrash(ids){
+  if(!ids&&!confirm('Permanently delete everything in the trash?'))return;
+  const r=await fetch('/api/trash/purge',adminFetchOpts(ids?{ids}:{}));
+  if(r.ok){refreshAuxSections();toast('Removed permanently','success');}
+}
+
+// ── Theme ──────────────────────────────────────────────────────────────────
+function toggleTheme(){
+  const dark=document.documentElement.dataset.theme==='dark';
+  document.documentElement.dataset.theme=dark?'':'dark';
+  try{localStorage.setItem('theme',dark?'light':'dark');}catch{}
+}
+try{if(localStorage.getItem('theme')==='dark')document.documentElement.dataset.theme='dark';}catch{}
+
 // ── Sidebar collapse ──────────────────────────────────────────────────────
 function toggleSidebar(){
   document.body.classList.toggle('sb-collapsed');
@@ -1672,7 +2213,7 @@ try{if(localStorage.getItem('sbCollapsed')==='1')document.body.classList.add('sb
 // ── Curated shelves ───────────────────────────────────────────────────────
 function _anyFilterActive(tab){
   const f=filters[tab];
-  return !!(f.search||f.type||f.genre||f.voicing||f.season||f.needsCat||f.unshelved||showDupsOnly[tab]);
+  return !!(f.search||f.type||f.genre||f.voicing||f.season||f.needsCat||f.unshelved||f.perf||showDupsOnly[tab]);
 }
 function renderShelves(tab){
   const el=document.getElementById('shelves-'+tab);
@@ -1859,6 +2400,7 @@ document.addEventListener('keydown',e=>{
 // ── Boot ──────────────────────────────────────────────────────────────────
 async function init() {
   const p = new URLSearchParams(location.search);
+  window._initialParams = p; // preserved for deep links (applyUrlParams)
   if (p.get('auth')==='success') toast('Connected to Google!','success');
   if (p.get('error')) toast('Error: '+decodeURIComponent(p.get('error')),'error');
   history.replaceState(null,'',location.pathname);
@@ -1866,6 +2408,7 @@ async function init() {
   initDatalists(); renderSidebar();
   await Promise.all([loadData(), loadAuthStatus(), checkAdminStatus()]);
   renderAll(); loadShareInfo();
+  try{applyUrlParams();}catch(e){console.error('deep link:',e);}
 }
 
 async function loadData() { const r=await fetch('/api/data'); data=await r.json(); data.work=data.work||[]; data.personal=data.personal||[]; }
@@ -1935,8 +2478,10 @@ function switchTab(name){
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
   renderSidebar(); // re-renders with correct active state
   if(name==='all') renderTable('all');
-  if(name==='settings') renderOptionChips();
+  if(name==='settings'){renderOptionChips();refreshAuxSections();}
   if(name==='shelving') renderZoneView();
+  if(name==='programs') renderPrograms();
+  if(name==='stats') renderStatsPage();
 }
 document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
 
@@ -1949,7 +2494,13 @@ function octavoFields(tab){return[
   {key:'copies',label:'Copy Count',type:'number',min:0},
   {key:'lastPerformed',label:'Last Performed',type:'date'},
   {key:'yearsPerformed',label:'Years Performed',type:'text',placeholder:'e.g. 2019, 2022, 2024'},
+  {key:'difficulty',label:'Difficulty',type:'select',options:['Easy','Medium','Advanced']},
+  {key:'duration',label:'Duration (m:ss)',type:'text',placeholder:'e.g. 3:45'},
   {key:'link',label:'Song Link (URL)',type:'url'},
+  {key:'referenceLink',label:'Listen Link (recording URL)',type:'url',placeholder:'YouTube, Spotify…'},
+  {key:'coverUrl',label:'Cover Image (URL)',type:'url'},
+  {key:'copiesOut',label:'Copies Checked Out',type:'number',min:0},
+  {key:'checkedOutTo',label:'Checked Out To',type:'text',placeholder:'e.g. Chamber Choir, Festival'},
   {key:'tags',label:'Tags (comma-separated)',type:'text'},
   // Cataloging fields — work tab only
   ...(tab==='work'?[
@@ -1971,6 +2522,7 @@ function bookFields(){return[
   {key:'year',label:'Year',type:'text'},
   {key:'description',label:'Description',type:'textarea',full:true},
   {key:'link',label:'Link (URL)',type:'url'},
+  {key:'coverUrl',label:'Cover Image (URL)',type:'url'},
   {key:'tags',label:'Tags (comma-separated)',type:'text'},
 ];}
 
@@ -2650,7 +3202,14 @@ async function confirmDelete(){
   data[tab]=data[tab].filter(e=>!set.has(e._id));
   ids.forEach(id=>selected[tab].delete(id));
   renderTable(tab);closeDeleteModal();
-  toast(ids.length>1?ids.length+' entries deleted':'Entry deleted','info');
+  // Undo toast — deleted entries sit in the trash for 30 days
+  const el=document.createElement('div');
+  el.className='toast info';
+  el.innerHTML=`${ids.length>1?ids.length+' entries':'Entry'} moved to trash <button style="background:rgba(250,249,246,.15);color:inherit;border:none;border-radius:999px;padding:2px 12px;font-size:12px;margin-left:6px;cursor:pointer;">Undo</button>`;
+  el.querySelector('button').onclick=async ev=>{ev.stopPropagation();el.remove();await restoreTrash(ids);};
+  el.onclick=()=>el.remove();
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(()=>el.remove(),8000);
 }
 function closeDeleteModal(){document.getElementById('delete-modal').classList.remove('open');deleteTarget=null;}
 
@@ -3233,10 +3792,35 @@ function toggleFindDuplicates(tab){
   if(showDupsOnly[tab]) sortState[tab]={col:'title',dir:1};
   renderTable(tab);
 }
+// Last year a piece was performed (from yearsPerformed text + lastPerformed date)
+function lastPerfYear(e){
+  const yrs=String(e.yearsPerformed||'').match(/\b(19|20)\d{2}\b/g)||[];
+  const lp=String(e.lastPerformed||'').match(/\b(19|20)\d{2}\b/);
+  const all=yrs.map(Number).concat(lp?[Number(lp[0])]:[]);
+  return all.length?Math.max(...all):null;
+}
+function _perfMatch(e,mode){
+  if(!mode)return true;
+  if(e._type!=='octavo')return false;
+  const y=lastPerfYear(e),now=new Date().getFullYear();
+  if(mode==='never')return y===null;
+  if(mode==='thisyear')return y===now;
+  if(mode==='gt3')return y===null||now-y>=3;
+  if(mode==='gt5')return y===null||now-y>=5;
+  return true;
+}
+// Fuzzy word match: every query word appears somewhere with ≤1 typo
+function _fuzzyHit(e,q){
+  const hay=Object.entries(e).filter(([k])=>k!=='_id'&&!k.startsWith('__'))
+    .map(([,v])=>String(Array.isArray(v)?v.join(' '):(v||''))).join(' ').toLowerCase();
+  const words=hay.split(/[^a-z0-9]+/);
+  return q.toLowerCase().split(/\s+/).filter(Boolean).every(qw=>
+    hay.includes(qw)||words.some(w=>Math.abs(w.length-qw.length)<=1&&editDist(w,qw)<=1));
+}
 function getFiltered(tab){
   const f=filters[tab];
   const dupIds=showDupsOnly[tab]?getLibraryDupIds(tab):null;
-  return rowsFor(tab).filter(e=>{
+  const base=e=>{
     if(dupIds&&!dupIds.has(e._id))return false;
     if(f.type&&e._type!==f.type)return false;
     if(f.genre&&e.genre!==f.genre)return false;
@@ -3244,12 +3828,15 @@ function getFiltered(tab){
     if(f.season&&e.season!==f.season)return false;
     if(f.needsCat&&!(e.needs_cataloging||(!e.season&&e._type==='octavo')))return false;
     if(f.unshelved&&!(e._type==='octavo'&&e.season&&!e.location_cabinet))return false;
-    if(f.search){
-      const q=f.search.toLowerCase();
-      return Object.entries(e).some(([k,v])=>k!=='_id'&&!k.startsWith('__')&&String(Array.isArray(v)?v.join(' '):(v||'')).toLowerCase().includes(q));
-    }
+    if(f.perf&&!_perfMatch(e,f.perf))return false;
     return true;
-  });
+  };
+  const rows=rowsFor(tab).filter(base);
+  if(!f.search)return rows;
+  const q=f.search.toLowerCase();
+  const exact=rows.filter(e=>Object.entries(e).some(([k,v])=>k!=='_id'&&!k.startsWith('__')&&String(Array.isArray(v)?v.join(' '):(v||'')).toLowerCase().includes(q)));
+  if(exact.length||q.length<4)return exact;
+  return rows.filter(e=>_fuzzyHit(e,q)); // typo tolerance when nothing matches exactly
 }
 function getSorted(tab,rows){
   const{col,dir}=sortState[tab];
@@ -3280,7 +3867,8 @@ function toggleUnshelved(tab){
   renderTable(tab);
 }
 function clearFilters(tab){
-  filters[tab]={search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false};
+  filters[tab]={search:'',type:'',genre:'',voicing:'',season:'',needsCat:false,unshelved:false,perf:''};
+  const pf=document.getElementById('fperf-'+tab);if(pf)pf.value='';
   showDupsOnly[tab]=false;
   const sc=document.getElementById('fseason-'+tab);if(sc)sc.value='';
   const nb=document.getElementById('needs-cat-btn-'+tab);if(nb)nb.classList.remove('active-filter');
@@ -3307,7 +3895,9 @@ function refreshFilterOptions(tab){
   });
   const sSel=document.getElementById('fseason-'+tab);
   if(sSel){sSel.value=f.season||'';sSel.classList.toggle('active-filter',!!f.season);}
-  document.getElementById('clearf-'+tab).classList.toggle('visible',!!(f.search||f.type||f.genre||f.voicing||f.season||f.needsCat||f.unshelved));
+  const pSel=document.getElementById('fperf-'+tab);
+  if(pSel){pSel.value=f.perf||'';pSel.classList.toggle('active-filter',!!f.perf);}
+  document.getElementById('clearf-'+tab).classList.toggle('visible',!!(f.search||f.type||f.genre||f.voicing||f.season||f.needsCat||f.unshelved||f.perf));
 }
 
 // ── Tables ────────────────────────────────────────────────────────────────
@@ -3523,6 +4113,7 @@ function _cardHTML(tab,e){
     </span>
     <span class="mc-ph-foot">${esc(footBits)}</span>`;
   const linkBtn=e.link?`<button class="mc-act" title="Preview / open link" onclick="event.stopPropagation();window.open('${escAttr(e.link)}','_blank')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>`:'';
+  const listenBtn=`<button class="mc-act" title="Listen to a recording" onclick="event.stopPropagation();listenTo('${srcTab}',${e._id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg></button>`;
   const requestBtn=`<button class="mc-act viewer-only" title="Request this piece" onclick="event.stopPropagation();openRequestModal('${srcTab}',${e._id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></button>`;
   return `<div class="mc" tabindex="0" role="button" onclick="_cardClick('${srcTab}',${e._id})" onkeydown="if(event.key==='Enter')_cardClick('${srcTab}',${e._id})" title="${escAttr(e.title||'')}">
     <div class="mc-thumb${hasCover?' has-cover':''}" style="--mc-accent:${color};">
@@ -3530,14 +4121,14 @@ function _cardHTML(tab,e){
       <span class="mc-cat-label">${e.season?esc(e.season):(isBook?'Music Book':'Octavo')}</span>
       ${placeholder}
       ${e.unavailable?'<span class="mc-avail-dot" title="In use"></span>':''}
-      <div class="mc-actions">${requestBtn}${linkBtn}</div>
+      <div class="mc-actions">${requestBtn}${listenBtn}${linkBtn}</div>
     </div>
     <div class="mc-info">
       <p class="mc-title">${esc(e.title||'Untitled')}</p>
       <p class="mc-composer">${esc(e.composer||e.author||'—')}</p>
       <div class="mc-tags">
         ${e.voicing?`<span class="mc-chip">${esc(e.voicing)}</span>`:''}
-        ${unavailBadge}
+        ${(parseFloat(e.copiesOut)>0)?`<span class="mc-chip mc-chip-unavail" title="${escAttr((e.copiesOut||'')+' copies out'+(e.checkedOutTo?' to '+e.checkedOutTo:''))}">${esc(e.copiesOut)} out</span>`:unavailBadge}
         ${e.call_number?`<span class="mc-callnum">${esc(e.call_number)}</span>`:''}
       </div>
     </div>

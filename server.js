@@ -105,9 +105,19 @@ function adminRequired(req, res, next) {
 // ── Data ──────────────────────────────────────────────────────────────────────
 
 app.get('/api/data', async (req, res) => {
-  try { res.json(await db.getData()); }
+  try {
+    const d = await db.getData();
+    res.json({ work: d.work || [], personal: d.personal || [] }); // aux tabs (trash/programs/log) stay admin-only
+  }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// Audit log — negative ids so they can never collide with entry ids
+let _logSeq = 0;
+async function logChange(action, detail) {
+  try { await db.addEntry('_log', { _id: -(Date.now() * 100 + (_logSeq = (_logSeq + 1) % 100)), ts: Date.now(), action, detail: String(detail || '').slice(0, 300) }); }
+  catch (e) { /* logging must never break the operation */ }
+}
 
 // Legacy whole-document replace (kept for compatibility)
 app.post('/api/data', adminRequired, async (req, res) => {
@@ -127,6 +137,7 @@ app.post('/api/entries/:tab', adminRequired, async (req, res) => {
       return res.status(400).json({ error: `Data integrity error: composer ("${entry.composer}") equals title — check column mapping in your import.` });
     }
     await db.addEntry(tab, entry);
+    logChange('added', `${entry.title} (${tab})`);
     res.json({ success: true, entry });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -140,6 +151,7 @@ app.put('/api/entries/:tab/:id', adminRequired, async (req, res) => {
     }
     const updated = await db.updateEntry(req.params.tab, parseInt(req.params.id), body);
     if (!updated) return res.status(404).json({ error: 'Entry not found' });
+    logChange('updated', `${updated.title} (${req.params.tab})`);
     res.json({ success: true, entry: updated });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -149,19 +161,159 @@ app.post('/api/entries/:tab/bulk', adminRequired, async (req, res) => {
     const { action, ids, patch } = req.body;
     if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids required' });
     let n = 0;
-    if (action === 'delete')     n = await db.deleteEntries(req.params.tab, ids);
-    else if (action === 'patch') n = await db.patchEntries(req.params.tab, ids, patch || {});
+    if (action === 'delete')     n = await softDelete(req.params.tab, ids);
+    else if (action === 'patch') { n = await db.patchEntries(req.params.tab, ids, patch || {}); logChange('bulk edit', `${n} entries (${req.params.tab}): ${Object.keys(patch||{}).join(', ')}`); }
     else return res.status(400).json({ error: 'Unknown action' });
     res.json({ success: true, count: n });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Soft delete: move entries to the trash tab instead of destroying them
+async function softDelete(tab, ids) {
+  const d = await db.getData();
+  const set = new Set(ids.map(Number));
+  const doomed = (d[tab] || []).filter(e => set.has(e._id));
+  if (!doomed.length) return 0;
+  const n = await db.deleteEntries(tab, ids);
+  for (const e of doomed) {
+    await db.addEntry('trash', { ...e, _srcTab: tab, _deletedAt: Date.now() });
+    logChange('deleted', `${e.title} (${tab}) — in trash 30 days`);
+  }
+  return n;
+}
+
 app.delete('/api/entries/:tab/:id', adminRequired, async (req, res) => {
   try {
-    const n = await db.deleteEntries(req.params.tab, [parseInt(req.params.id)]);
+    const n = await softDelete(req.params.tab, [parseInt(req.params.id)]);
     res.json({ success: true, count: n });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// ── Aux data: trash, programs, audit log (admin-only) ────────────────────────
+app.get('/api/aux', adminRequired, async (req, res) => {
+  try {
+    const d = await db.getData();
+    const log = (d._log || []).sort((a, b) => b.ts - a.ts).slice(0, 200);
+    res.json({ trash: d.trash || [], programs: d.programs || [], log });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/trash/restore', adminRequired, async (req, res) => {
+  try {
+    const ids = (req.body.ids || []).map(Number);
+    const d = await db.getData();
+    let n = 0;
+    for (const t of (d.trash || []).filter(e => ids.includes(e._id))) {
+      const { _srcTab, _deletedAt, ...clean } = t;
+      await db.deleteEntries('trash', [t._id]);
+      await db.addEntry(_srcTab || 'work', clean);
+      logChange('restored', `${clean.title} (${_srcTab || 'work'})`);
+      n++;
+    }
+    res.json({ success: true, count: n });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/trash/purge', adminRequired, async (req, res) => {
+  try {
+    const d = await db.getData();
+    const ids = req.body.ids ? req.body.ids.map(Number) : (d.trash || []).map(e => e._id);
+    const n = ids.length ? await db.deleteEntries('trash', ids) : 0;
+    if (n) logChange('purged', `${n} entries permanently removed from trash`);
+    res.json({ success: true, count: n });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Programs (concert set lists) ──────────────────────────────────────────────
+app.get('/api/programs', adminRequired, async (req, res) => {
+  try { res.json({ programs: (await db.getData()).programs || [] }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/programs', adminRequired, async (req, res) => {
+  try {
+    const p = { name: 'Untitled Program', pieces: [], ...req.body, _id: Date.now(), createdAt: new Date().toISOString() };
+    await db.addEntry('programs', p);
+    logChange('program created', p.name);
+    res.json({ success: true, program: p });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.put('/api/programs/:id', adminRequired, async (req, res) => {
+  try {
+    const updated = await db.updateEntry('programs', parseInt(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ error: 'Program not found' });
+    res.json({ success: true, program: updated });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/programs/:id', adminRequired, async (req, res) => {
+  try {
+    const n = await db.deleteEntries('programs', [parseInt(req.params.id)]);
+    logChange('program deleted', `id ${req.params.id}`);
+    res.json({ success: true, count: n });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Backups — READ-ONLY snapshots; never writes to any spreadsheet ───────────
+let lastBackup = null;
+
+app.get('/api/backup', adminRequired, async (req, res) => {
+  try {
+    const d = await db.getData();
+    const payload = {
+      backedUpAt: new Date().toISOString(),
+      note: 'Full catalog snapshot. Restore by contacting your librarian tools.',
+      data: { work: d.work || [], personal: d.personal || [], programs: d.programs || [], trash: d.trash || [] },
+      requests: await db.getRequests(),
+    };
+    res.setHeader('Content-Disposition', `attachment; filename="catalog-backup-${new Date().toISOString().slice(0, 10)}.json"`);
+    res.json(payload);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/backup-status', adminRequired, (req, res) => res.json({ lastBackup }));
+app.post('/api/backup-now', adminRequired, async (req, res) => res.json(await runDriveBackup()));
+
+async function runDriveBackup() {
+  try {
+    const tokens = await db.getTokens(); if (!tokens) return { skipped: 'Google not connected' };
+    const cfg = await effectiveConfig();
+    if (!cfg.clientId || !cfg.clientSecret) return { skipped: 'no OAuth config' };
+    const c = new google.auth.OAuth2(cfg.clientId, cfg.clientSecret, 'urn:ietf:wg:oauth:2.0:oob');
+    c.setCredentials(tokens);
+    c.on('tokens', t => db.saveTokens({ ...tokens, ...t }).catch(() => {}));
+    const drive = google.drive({ version: 'v3', auth: c });
+    let folderId;
+    const fq = await drive.files.list({ q: "name='Choral Catalog Backups' and mimeType='application/vnd.google-apps.folder' and trashed=false", fields: 'files(id)' });
+    if (fq.data.files && fq.data.files.length) folderId = fq.data.files[0].id;
+    else folderId = (await drive.files.create({ requestBody: { name: 'Choral Catalog Backups', mimeType: 'application/vnd.google-apps.folder' }, fields: 'id' })).data.id;
+    const d = await db.getData();
+    const payload = {
+      backedUpAt: new Date().toISOString(),
+      data: { work: d.work || [], personal: d.personal || [], programs: d.programs || [], trash: d.trash || [] },
+      requests: await db.getRequests(),
+    };
+    const name = `catalog-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const ex = await drive.files.list({ q: `name='${name}' and '${folderId}' in parents and trashed=false`, fields: 'files(id)' });
+    for (const f of (ex.data.files || [])) await drive.files.delete({ fileId: f.id }).catch(() => {});
+    await drive.files.create({ requestBody: { name, parents: [folderId] }, media: { mimeType: 'application/json', body: JSON.stringify(payload) }, fields: 'id' });
+    const all = await drive.files.list({ q: `'${folderId}' in parents and trashed=false`, orderBy: 'createdTime desc', fields: 'files(id,name)', pageSize: 100 });
+    for (const f of (all.data.files || []).slice(21)) await drive.files.delete({ fileId: f.id }).catch(() => {});
+    lastBackup = { when: new Date().toISOString(), file: name, where: 'Google Drive › Choral Catalog Backups' };
+    console.log('Backup saved:', name);
+    return lastBackup;
+  } catch (e) { console.error('Drive backup failed:', e.message); return { error: e.message }; }
+}
+
+// Prune trash >30 days old and cap the audit log
+async function pruneAux() {
+  try {
+    const d = await db.getData();
+    const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    const oldTrash = (d.trash || []).filter(e => (e._deletedAt || 0) < cutoff).map(e => e._id);
+    if (oldTrash.length) await db.deleteEntries('trash', oldTrash);
+    const logs = (d._log || []).sort((a, b) => b.ts - a.ts);
+    if (logs.length > 400) await db.deleteEntries('_log', logs.slice(400).map(e => e._id));
+  } catch (e) { console.error('pruneAux:', e.message); }
+}
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
@@ -585,7 +737,37 @@ app.get('/api/requests', adminRequired, async (req, res) => {
 });
 
 app.post('/api/requests/:id/status', adminRequired, async (req, res) => {
-  try { await db.setRequestStatus(parseInt(req.params.id), req.body.status); res.json({ success: true }); }
+  try {
+    const id = parseInt(req.params.id), status = req.body.status;
+    await db.setRequestStatus(id, status);
+    // Notify the requester when their request is resolved (best-effort)
+    if (['fulfilled', 'declined'].includes(status)) {
+      try {
+        const r = (await db.getRequests()).find(x => x.id === id);
+        const cfg = await effectiveConfig();
+        if (r && r.email && cfg.smtpUser && cfg.smtpPass) {
+          const transporter = nodemailer.createTransport({
+            host: cfg.smtpHost || 'smtp.gmail.com', port: cfg.smtpPort || 587,
+            secure: cfg.smtpPort === 465, auth: { user: cfg.smtpUser, pass: cfg.smtpPass },
+          });
+          const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const approved = status === 'fulfilled';
+          await transporter.sendMail({
+            from: `"Choral Catalog" <${cfg.smtpUser}>`,
+            to: r.email,
+            subject: `${approved ? '✓ Approved' : 'Update'}: your request for "${r.entryTitle}"`,
+            html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;color:#232019;">
+  <p>Hi ${esc(r.name)},</p>
+  <p>Your request for <strong>${esc(r.entryTitle)}</strong>${r.entryComposer ? ` (${esc(r.entryComposer)})` : ''} has been
+  <strong>${approved ? 'approved' : 'declined'}</strong>.</p>
+  ${approved ? '<p>The librarian will follow up about getting the copies to you.</p>' : '<p>Feel free to reply if you have questions, or browse the catalog for an alternative.</p>'}
+  <p style="color:#6F6858;font-size:13px;">— Choral Catalog</p></div>`,
+          });
+        }
+      } catch (e) { console.error('Status email failed:', e.message); }
+    }
+    res.json({ success: true });
+  }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -741,4 +923,8 @@ db.init().then(() => {
     if (db.mode === 'json') getLocalIPs().forEach(ip => console.log(`   Network: http://${ip}:${PORT}`));
     console.log('');
   });
+  // Housekeeping + daily read-only Drive backup (never touches spreadsheets)
+  setTimeout(() => pruneAux(), 30 * 1000);
+  setTimeout(() => runDriveBackup(), 90 * 1000);
+  setInterval(() => { pruneAux(); runDriveBackup(); }, 24 * 3600 * 1000);
 }).catch(e => { console.error('Failed to initialize storage:', e); process.exit(1); });

@@ -1,0 +1,12 @@
+{
+  "name": "Choral Catalog",
+  "short_name": "Choral",
+  "description": "Sheet music library — browse, search, and manage the choral collection",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF9F6",
+  "theme_color": "#FAF9F6",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
