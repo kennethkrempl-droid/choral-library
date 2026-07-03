@@ -548,6 +548,16 @@ footer { margin-top:72px; }
 .program-add-results { position:absolute; left:0; right:0; top:100%; margin-top:6px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-lg); z-index:50; overflow:hidden; }
 .program-add-results:empty { display:none; }
 
+/* ── Program suggestions ── */
+.sug-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; }
+.sug-card { display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; box-shadow:var(--shadow); }
+.sug-cover { width:44px; height:58px; object-fit:cover; border-radius:4px; border:1px solid var(--line); flex-shrink:0; }
+.sug-main { flex:1; min-width:0; }
+.sug-title { font-family:var(--display); font-size:14.5px; font-weight:550; line-height:1.25; }
+.sug-meta { font-size:11.5px; color:var(--muted); margin-top:2px; }
+.sug-why { font-size:11.5px; font-style:italic; color:var(--gold); margin-top:4px; }
+.sug-card .btn-sm { flex-shrink:0; }
+
 /* ── Stats page ── */
 .stats-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
 .stats-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:20px 22px; box-shadow:var(--shadow); }
@@ -1919,7 +1929,115 @@ function _renderProgramDetail(el,p){
       <div id="program-add-results" class="program-add-results"></div>
     </div>
     ${refs.length?`<div class="table-wrap"><table><thead><tr><th></th><th>Title</th><th>Composer</th><th>Voicing</th><th>Length</th><th>Copies</th><th>Location</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
-      :'<div class="empty-state"><p>No pieces yet — search above, or select pieces in the library and “Add to Program.”</p></div>'}`;
+      :'<div class="empty-state"><p>No pieces yet — search above, or select pieces in the library and “Add to Program.”</p></div>'}
+    <div id="program-suggestions"></div>`;
+  renderProgramSuggestions();
+}
+
+// ── Program suggestions ─────────────────────────────────────────────────────
+function _programProfile(p){
+  const prof={seasons:{},genres:{},voicings:{},composers:new Set(),tags:{},titles:new Set()};
+  for(const ref of (p.pieces||[])){
+    const e=_pieceOf(ref);if(!e)continue;
+    prof.titles.add(norm(e.title||''));
+    if(e.season)prof.seasons[e.season]=(prof.seasons[e.season]||0)+1;
+    if(e.genre)prof.genres[e.genre]=(prof.genres[e.genre]||0)+1;
+    if(e.voicing)prof.voicings[e.voicing]=(prof.voicings[e.voicing]||0)+1;
+    const c=(e.composer||e.author||'').trim();if(c)prof.composers.add(norm(c));
+    (Array.isArray(e.tags)?e.tags:[]).forEach(t=>{prof.tags[t.toLowerCase()]=(prof.tags[t.toLowerCase()]||0)+1;});
+  }
+  return prof;
+}
+function _suggestFromLibrary(p,limit=8){
+  const prof=_programProfile(p);
+  const inProg=new Set((p.pieces||[]).map(r=>`${r.tab}:${r.id}`));
+  const out=[];
+  for(const tab of ['work','personal']){
+    for(const e of data[tab]||[]){
+      if(e._type!=='octavo'||!e.title)continue;
+      if(inProg.has(`${tab}:${e._id}`))continue;
+      if(prof.titles.has(norm(e.title)))continue;
+      let s=0;
+      if(e.genre&&prof.genres[e.genre])s+=2;
+      if(e.season&&prof.seasons[e.season])s+=2;
+      if(e.voicing&&prof.voicings[e.voicing])s+=1.5;
+      (Array.isArray(e.tags)?e.tags:[]).forEach(t=>{if(prof.tags[t.toLowerCase()])s+=1;});
+      const y=lastPerfYear(e);
+      if(y===null||new Date().getFullYear()-y>=3)s+=0.75; // fresh repertoire bonus
+      if(parseFloat(e.copies)>=20)s+=0.25;
+      if(prof.composers.has(norm(e.composer||e.author||'')))s+=0.5;
+      if(s>=2)out.push({tab,e,s});
+    }
+  }
+  return out.sort((a,b)=>b.s-a.s).slice(0,limit);
+}
+function renderProgramSuggestions(){
+  const host=document.getElementById('program-suggestions');
+  const p=_currentProgram();
+  if(!host||!p||!(p.pieces||[]).length){if(host)host.innerHTML='';return;}
+  const libSugs=_suggestFromLibrary(p);
+  host.innerHTML=`
+    <div class="shelf-section" style="margin-top:32px;">
+      <div class="shelf-head"><span class="shelf-title">Might fit this program</span><span class="shelf-rule"></span><span class="shelf-sub">From your library</span></div>
+      ${libSugs.length?`<div class="sug-grid">${libSugs.map(({tab,e})=>`
+        <div class="sug-card">
+          <div class="sug-main">
+            <div class="sug-title">${esc(e.title||'')}</div>
+            <div class="sug-meta">${esc(e.composer||e.author||'')}${e.voicing?' · '+esc(e.voicing):''}${e.genre?' · '+esc(e.genre):''}${parseFloat(e.copies)?` · ${esc(String(e.copies))} copies`:''}</div>
+          </div>
+          <button class="btn-secondary btn-sm" onclick="addProgramPiece('${tab}',${e._id})">＋ Add</button>
+        </div>`).join('')}</div>`
+      :'<p class="text-muted" style="font-size:13px;">No close matches in the library yet — add another piece or two and suggestions sharpen up.</p>'}
+    </div>
+    <div class="shelf-section" style="margin-top:24px;">
+      <div class="shelf-head"><span class="shelf-title">Worth buying</span><span class="shelf-rule"></span><span class="shelf-sub">New repertoire via JW Pepper</span></div>
+      <div id="pepper-sug-body"><button class="btn-gold btn-sm" onclick="suggestFromPepper(this)">${ICO.sparkles} Suggest new pieces to buy</button>
+      <p class="text-muted" style="font-size:12px;margin-top:8px;">Uses your free AI key to pick real published works that fit this program, then finds them on JW Pepper.</p></div>
+    </div>`;
+}
+async function suggestFromPepper(btn){
+  const p=_currentProgram();if(!p)return;
+  const box=document.getElementById('pepper-sug-body');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Thinking…';
+  try{
+    const pieces=(p.pieces||[]).map(ref=>_pieceOf(ref)).filter(Boolean)
+      .map(e=>({title:e.title,composer:e.composer||e.author||'',voicing:e.voicing||'',genre:e.genre||''}));
+    const owned=[...data.work,...data.personal].map(e=>e.title).filter(Boolean);
+    const r=await fetch('/api/suggest-repertoire',adminFetchOpts({pieces,exclude:owned.slice(0,200)}));
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||'Suggestion failed');
+    const sugs=j.suggestions||[];
+    if(!sugs.length)throw new Error('No suggestions came back — try again.');
+    box.innerHTML='<div class="sug-grid" id="pepper-sug-grid"></div>';
+    const grid=document.getElementById('pepper-sug-grid');
+    let found=0;
+    for(const s of sugs){
+      try{
+        const pr=await fetch(`/api/pepper-lookup?title=${encodeURIComponent(s.title)}&composer=${encodeURIComponent(s.composer||'')}`);
+        if(!pr.ok)continue;
+        const pj=await pr.json();
+        let best=null,bs=0;
+        for(const it of (pj.results||[])){const sc=_linkMatchScore({title:s.title,composer:s.composer},it);if(sc>bs){best=it;bs=sc;}}
+        if(!best||bs<0.6)continue;
+        found++;
+        grid.insertAdjacentHTML('beforeend',`
+          <div class="sug-card sug-buy">
+            ${best.image?`<img class="sug-cover" src="${escAttr(best.image)}" alt="" loading="lazy">`:''}
+            <div class="sug-main">
+              <div class="sug-title">${esc(best.title)}</div>
+              <div class="sug-meta">${esc(best.composer||s.composer||'')}${best.voicings&&best.voicings.length?' · '+esc(best.voicings.join(', ')):''}</div>
+              ${s.why?`<div class="sug-why">“${esc(s.why)}”</div>`:''}
+            </div>
+            <a class="btn-gold btn-sm" href="${escAttr(best.url)}" target="_blank" rel="noopener" style="text-decoration:none;">View at Pepper</a>
+          </div>`);
+      }catch{}
+      await new Promise(x=>setTimeout(x,250));
+    }
+    if(!found)box.innerHTML='<p class="text-muted" style="font-size:13px;">Couldn’t confirm any of the AI’s picks on JW Pepper this time — try the button again.</p>';
+  }catch(e){
+    box.insertAdjacentHTML('afterbegin',`<p style="font-size:13px;color:var(--danger);margin-bottom:8px;">${esc(e.message)}</p>`);
+    btn.disabled=false;btn.innerHTML=`${ICO.sparkles} Suggest new pieces to buy`;
+  }
 }
 function _currentProgram(){return programs.find(p=>p._id===_openProgramId);}
 async function _saveProgram(p){

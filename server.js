@@ -623,6 +623,49 @@ If you cannot read anything, return [].`;
 
 const SCAN_GENRES = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater','Jazz','Sacred','Other'];
 
+// ── AI repertoire suggestions for the program builder ─────────────────────────
+app.post('/api/suggest-repertoire', adminRequired, async (req, res) => {
+  try {
+    const cfg = await effectiveConfig();
+    const key = cfg.geminiApiKey;
+    if (!key) return res.status(400).json({ error: 'No Google AI key configured — add one on the Import page.' });
+    const pieces = req.body.pieces;
+    if (!Array.isArray(pieces) || !pieces.length || pieces.length > 40)
+      return res.status(400).json({ error: 'Send 1-40 pieces.' });
+    const exclude = (req.body.exclude || []).slice(0, 200).map(t => String(t).slice(0, 100));
+
+    const list = pieces.map((p, i) => `${i + 1}. "${String(p.title || '').slice(0, 100)}" — ${String(p.composer || 'unknown').slice(0, 60)}${p.voicing ? ` (${p.voicing})` : ''}${p.genre ? ` [${p.genre}]` : ''}`).join('\n');
+    const prompt = `You are helping a school/church choir director plan a concert program. The program so far:
+${list}
+
+Suggest 8 REAL, published choral octavos that would complement this program — matching its themes, season, difficulty level, and voicings. Prefer well-known, widely available pieces a JW Pepper search would find. Do NOT suggest any of these titles: ${exclude.slice(0, 60).join('; ') || '(none)'}.
+
+Respond with ONLY a strict JSON array of 8 objects: [{"title":"...","composer":"...","why":"one short phrase on why it fits"}]. No markdown.`;
+
+    const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+    let status, body;
+    for (const model of models) {
+      ({ status, body } = await httpsPost(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+        { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }
+      ));
+      if (status !== 429 && status !== 404) break;
+    }
+    if (status === 429) return res.status(429).json({ error: 'Free-tier rate limit hit — wait a minute and retry.' });
+    const j = JSON.parse(body);
+    if (status !== 200) return res.status(status).json({ error: j.error?.message || `Failed (HTTP ${status})` });
+    let text = (j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+    const start = text.indexOf('['), end = text.lastIndexOf(']');
+    if (start === -1 || end === -1) return res.json({ suggestions: [] });
+    let suggestions;
+    try { suggestions = JSON.parse(text.slice(start, end + 1)); } catch { suggestions = []; }
+    if (!Array.isArray(suggestions)) suggestions = [];
+    suggestions = suggestions.filter(s => s && s.title).slice(0, 8)
+      .map(s => ({ title: String(s.title).slice(0, 140), composer: String(s.composer || '').slice(0, 100), why: String(s.why || '').slice(0, 160) }));
+    res.json({ suggestions });
+  } catch (e) { res.status(500).json({ error: 'Suggestion failed: ' + e.message }); }
+});
+
 app.post('/api/suggest-genres', adminRequired, async (req, res) => {
   try {
     const cfg = await effectiveConfig();
