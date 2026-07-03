@@ -623,22 +623,69 @@ If you cannot read anything, return [].`;
 
 const SCAN_GENRES = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater','Jazz','Sacred','Other'];
 
+// ── AI theme match: pick pieces from the OWNED library that fit a vibe ────────
+app.post('/api/theme-match', adminRequired, async (req, res) => {
+  try {
+    const cfg = await effectiveConfig();
+    const key = cfg.geminiApiKey;
+    if (!key) return res.status(400).json({ error: 'No Google AI key configured — add one on the Import page.' });
+    const theme = String(req.body.theme || '').trim().slice(0, 200);
+    if (!theme) return res.status(400).json({ error: 'Theme required' });
+    const excl = new Set((req.body.excludeIds || []).map(String));
+    const d = await db.getData();
+    const items = [];
+    for (const tab of ['work', 'personal'])
+      for (const e of d[tab] || []) {
+        if (!e.title || excl.has(`${tab}:${e._id}`)) continue;
+        items.push({ tab, id: e._id, line: `${items.length}. "${String(e.title).slice(0, 90)}" — ${String(e.composer || e.author || '?').slice(0, 50)}${e.genre ? ` [${e.genre}]` : ''}${e.voicing ? ` (${e.voicing})` : ''}` });
+      }
+    if (!items.length) return res.json({ matches: [] });
+    const prompt = `A choir director is planning a concert with this theme/vibe: "${theme}".
+Below is their complete sheet music library, numbered. Choose up to 14 pieces that GENUINELY fit the theme — judge by what each piece is actually about, not just its genre tag. Fewer good matches beat many weak ones.
+${items.map(x => x.line).join('\n')}
+
+Respond with ONLY a strict JSON array: [{"n":<number>,"why":"very short phrase on the fit"}]. No markdown.`;
+    const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+    let status, body;
+    for (const model of models) {
+      ({ status, body } = await httpsPost(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+        { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4 } }
+      ));
+      if (status !== 429 && status !== 404) break;
+    }
+    if (status === 429) return res.status(429).json({ error: 'Free-tier rate limit hit — wait a minute and retry.' });
+    const j = JSON.parse(body);
+    if (status !== 200) return res.status(status).json({ error: j.error?.message || `Failed (HTTP ${status})` });
+    let text = (j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+    const s = text.indexOf('['), e2 = text.lastIndexOf(']');
+    let picks = [];
+    if (s > -1 && e2 > -1) { try { picks = JSON.parse(text.slice(s, e2 + 1)); } catch { picks = []; } }
+    if (!Array.isArray(picks)) picks = [];
+    const matches = picks.filter(p => p && Number.isInteger(p.n) && items[p.n]).slice(0, 14)
+      .map(p => ({ tab: items[p.n].tab, id: items[p.n].id, why: String(p.why || '').slice(0, 140) }));
+    res.json({ matches });
+  } catch (e) { res.status(500).json({ error: 'Theme match failed: ' + e.message }); }
+});
+
 // ── AI repertoire suggestions for the program builder ─────────────────────────
 app.post('/api/suggest-repertoire', adminRequired, async (req, res) => {
   try {
     const cfg = await effectiveConfig();
     const key = cfg.geminiApiKey;
     if (!key) return res.status(400).json({ error: 'No Google AI key configured — add one on the Import page.' });
-    const pieces = req.body.pieces;
-    if (!Array.isArray(pieces) || !pieces.length || pieces.length > 40)
-      return res.status(400).json({ error: 'Send 1-40 pieces.' });
+    const pieces = Array.isArray(req.body.pieces) ? req.body.pieces : [];
+    const theme = String(req.body.theme || '').trim().slice(0, 200);
+    if ((!pieces.length && !theme) || pieces.length > 40)
+      return res.status(400).json({ error: 'Send pieces and/or a theme.' });
     const exclude = (req.body.exclude || []).slice(0, 200).map(t => String(t).slice(0, 100));
 
-    const list = pieces.map((p, i) => `${i + 1}. "${String(p.title || '').slice(0, 100)}" — ${String(p.composer || 'unknown').slice(0, 60)}${p.voicing ? ` (${p.voicing})` : ''}${p.genre ? ` [${p.genre}]` : ''}`).join('\n');
-    const prompt = `You are helping a school/church choir director plan a concert program. The program so far:
+    const list = pieces.length ? pieces.map((p, i) => `${i + 1}. "${String(p.title || '').slice(0, 100)}" — ${String(p.composer || 'unknown').slice(0, 60)}${p.voicing ? ` (${p.voicing})` : ''}${p.genre ? ` [${p.genre}]` : ''}`).join('\n') : '(no pieces chosen yet)';
+    const prompt = `You are helping a school/church choir director plan a concert program.${theme ? `\nThe concert THEME is: "${theme}" — every suggestion MUST fit this theme.` : ''}
+The program so far:
 ${list}
 
-Suggest 8 REAL, published choral octavos that would complement this program — matching its themes, season, difficulty level, and voicings. Prefer well-known, widely available pieces a JW Pepper search would find. Do NOT suggest any of these titles: ${exclude.slice(0, 60).join('; ') || '(none)'}.
+Suggest 8 REAL, published choral octavos that would complement this program — matching its ${theme ? 'theme, ' : ''}season, difficulty level, and voicings. Prefer well-known, widely available pieces a JW Pepper search would find. Do NOT suggest any of these titles: ${exclude.slice(0, 60).join('; ') || '(none)'}.
 
 Respond with ONLY a strict JSON array of 8 objects: [{"title":"...","composer":"...","why":"one short phrase on why it fits"}]. No markdown.`;
 
