@@ -2006,7 +2006,9 @@ async function suggestFromPepper(btn){
     const r=await fetch('/api/suggest-repertoire',adminFetchOpts({pieces,exclude:owned.slice(0,200)}));
     const j=await r.json();
     if(!r.ok)throw new Error(j.error||'Suggestion failed');
-    const sugs=j.suggestions||[];
+    // Drop anything already in the library (normalized — catches hyphen/punctuation variants)
+    const ownedNorm=new Set([...data.work,...data.personal].map(e=>norm(e.title||'')).filter(Boolean));
+    const sugs=(j.suggestions||[]).filter(s=>!ownedNorm.has(norm(s.title||'')));
     if(!sugs.length)throw new Error('No suggestions came back — try again.');
     box.innerHTML='<div class="sug-grid" id="pepper-sug-grid"></div>';
     const grid=document.getElementById('pepper-sug-grid');
