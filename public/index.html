@@ -2082,8 +2082,14 @@ function addProgramPiece(tab,id){
   p.pieces=p.pieces||[];p.pieces.push({tab,id});
   _saveProgram(p);renderPrograms();
 }
+function addOneToProgram(tab,id){event&&event.stopPropagation();_addIdsToProgram(tab,[id]);}
 async function addSelectedToProgram(tab){
   const ids=[...selected[tab]];
+  if(!ids.length)return;
+  await _addIdsToProgram(tab,ids);
+  clearSelection(tab);
+}
+async function _addIdsToProgram(tab,ids){
   if(!ids.length)return;
   await loadPrograms();
   let choice;
@@ -2114,7 +2120,7 @@ async function addSelectedToProgram(tab){
   }
   await _saveProgram(prog);
   toast(`Added ${ids.length} piece(s) to “${prog.name}”`,'success');
-  clearSelection(tab);
+  if(document.querySelector('.tab-panel.active')?.id==='tab-programs')renderPrograms();
 }
 function printPullSheet(){
   const p=_currentProgram();if(!p)return;
@@ -4234,6 +4240,7 @@ function _cardHTML(tab,e){
     <span class="mc-ph-foot">${esc(footBits)}</span>`;
   const linkBtn=e.link?`<button class="mc-act" title="Preview / open link" onclick="event.stopPropagation();window.open('${escAttr(e.link)}','_blank')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>`:'';
   const listenBtn=`<button class="mc-act" title="Listen to a recording" onclick="event.stopPropagation();listenTo('${srcTab}',${e._id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg></button>`;
+  const progBtn=`<button class="mc-act admin-only" title="Add to a program" onclick="addOneToProgram('${srcTab}',${e._id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>`;
   const requestBtn=`<button class="mc-act viewer-only" title="Request this piece" onclick="event.stopPropagation();openRequestModal('${srcTab}',${e._id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></button>`;
   return `<div class="mc" tabindex="0" role="button" onclick="_cardClick('${srcTab}',${e._id})" onkeydown="if(event.key==='Enter')_cardClick('${srcTab}',${e._id})" title="${escAttr(e.title||'')}">
     <div class="mc-thumb${hasCover?' has-cover':''}" style="--mc-accent:${color};">
@@ -4241,7 +4248,7 @@ function _cardHTML(tab,e){
       <span class="mc-cat-label">${e.season?esc(e.season):(isBook?'Music Book':'Octavo')}</span>
       ${placeholder}
       ${e.unavailable?'<span class="mc-avail-dot" title="In use"></span>':''}
-      <div class="mc-actions">${requestBtn}${listenBtn}${linkBtn}</div>
+      <div class="mc-actions">${requestBtn}${progBtn}${listenBtn}${linkBtn}</div>
     </div>
     <div class="mc-info">
       <p class="mc-title">${esc(e.title||'Untitled')}</p>
@@ -4352,7 +4359,7 @@ function renderTable(tab){
         }
         return `<td>${esc(e[c.key]||'')||'<span class="text-muted">—</span>'}</td>`;
       }).join('');
-      const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="Find link (JW Pepper / Amazon)" onclick="pepperLookupEntry('${srcTab}',${e._id})">${ICO.search}</button><button class="btn-ghost btn-icon btn-sm" title="${e.unavailable?'Marked IN USE — click to mark available':'Available — click to mark in use'}" onclick="toggleAvail('${srcTab}',${e._id})">${e.unavailable?ICO.ban:ICO.check}</button><button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${srcTab}',${e._id})">${ICO.edit}</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${srcTab}',${e._id})" style="color:var(--danger)">${ICO.trash}</button>`:'';
+      const adminActions=isAdmin?`<button class="btn-ghost btn-icon btn-sm" title="Add to a program" onclick="addOneToProgram('${srcTab}',${e._id})">${ICO.music}</button><button class="btn-ghost btn-icon btn-sm" title="Find link (JW Pepper / Amazon)" onclick="pepperLookupEntry('${srcTab}',${e._id})">${ICO.search}</button><button class="btn-ghost btn-icon btn-sm" title="${e.unavailable?'Marked IN USE — click to mark available':'Available — click to mark in use'}" onclick="toggleAvail('${srcTab}',${e._id})">${e.unavailable?ICO.ban:ICO.check}</button><button class="btn-ghost btn-icon btn-sm" title="Edit" onclick="openEdit('${srcTab}',${e._id})">${ICO.edit}</button><button class="btn-ghost btn-icon btn-sm" title="Delete" onclick="openDelete('${srcTab}',${e._id})" style="color:var(--danger)">${ICO.trash}</button>`:'';
       return sep+`<tr data-id="${e._id}" class="${selected[tab].has(e._id)?'selected':''}">${checkTd}${cells}<td><div class="row-actions"><button class="btn-request viewer-only" onclick="openRequestModal('${srcTab}',${e._id})">${ICO.mail} Request</button>${adminActions}</div></td></tr>`;
     }).join('');
   }
