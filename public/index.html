@@ -1458,8 +1458,23 @@ function _initZoneMap(){
   try{const z=JSON.parse(localStorage.getItem('zoneMap'));if(z&&z.length)ZONE_MAP=z;}catch{}
   try{const c=JSON.parse(localStorage.getItem('shelfCap'));if(c)SHELF_CAP=c;}catch{}
 }
-function _saveZoneMap(){try{localStorage.setItem('zoneMap',JSON.stringify(ZONE_MAP));}catch{}}
-function _saveShelfCap(){try{localStorage.setItem('shelfCap',JSON.stringify(SHELF_CAP));}catch{}}
+function _saveZoneMap(){
+  try{localStorage.setItem('zoneMap',JSON.stringify(ZONE_MAP));}catch{}
+  if(typeof isAdmin!=='undefined'&&isAdmin)fetch('/api/config',adminFetchOpts({zoneMap:ZONE_MAP})).catch(()=>{});
+}
+function _saveShelfCap(){
+  try{localStorage.setItem('shelfCap',JSON.stringify(SHELF_CAP));}catch{}
+  if(typeof isAdmin!=='undefined'&&isAdmin)fetch('/api/config',adminFetchOpts({shelfCap:SHELF_CAP})).catch(()=>{});
+}
+async function loadZonesFromServer(){
+  try{
+    const r=await fetch('/api/zones',adminHeaders());
+    if(!r.ok)return;
+    const j=await r.json();
+    if(j.zoneMap&&j.zoneMap.length)ZONE_MAP=j.zoneMap;
+    if(j.shelfCap)SHELF_CAP=j.shelfCap;
+  }catch{}
+}
 function getShelfCapacity(c,s){
   const k=`C${c}-S${s}`;
   if(SHELF_CAP.overrides[k]!=null)return SHELF_CAP.overrides[k];
@@ -2584,6 +2599,7 @@ async function init() {
   initDatalists(); renderSidebar();
   await Promise.all([loadData(), loadAuthStatus(), checkAdminStatus()]);
   renderAll(); loadShareInfo();
+  if(isAdmin)loadZonesFromServer();
   try{applyUrlParams();}catch(e){console.error('deep link:',e);}
 }
 
@@ -3491,11 +3507,13 @@ function renderZoneView(){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
       <h2 style="margin:0;font-size:18px;font-weight:800;">Shelving Dashboard</h2>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn-gold btn-sm" onclick="rebalanceSuggest()" title="Suggest a fair shelf split based on how much music each zone actually holds">⚖ Rebalance shelves</button>
         <label style="font-size:13px;color:var(--muted);">Default shelf capacity:</label>
         <input type="number" id="global-cap-input" value="${SHELF_CAP.default!=null?SHELF_CAP.default:''}" placeholder="not set" min="1" style="width:80px;padding:5px 8px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:13px;background:var(--bg);color:var(--ink);">
         <button class="btn-primary btn-sm" onclick="saveGlobalCap()">Set</button>
       </div>
     </div>
+    <div id="rebalance-panel"></div>
     ${!capSet?'<div class="zone-no-cap-notice">Set a default shelf capacity above to track fill levels and get location suggestions.</div>':''}
     <div class="zone-lookup" style="margin-bottom:24px;">
       <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Where does this go?</div>
@@ -3512,6 +3530,135 @@ function renderZoneView(){
       ${stats.map(z=>renderZoneCard(z)).join('')}
     </div>`;
 }
+// ── Shelf rebalancing: suggest → approve → apply + move list ────────────────
+function _zonePieceCounts(){
+  return ZONE_MAP.map(z=>data.work.filter(e=>e._type==='octavo'&&e.season&&z.seasons.includes(e.season)).length);
+}
+function _suggestShelfCounts(){
+  const total=_allShelvesList().length;
+  const counts=_zonePieceCounts();
+  // +3 smoothing keeps small/empty zones alive; overflow zone gets a base weight too
+  const weights=ZONE_MAP.map((z,i)=>z.seasons.length?counts[i]+3:Math.max(3,counts[i]));
+  const W=weights.reduce((a,b)=>a+b,0)||1;
+  const raw=weights.map(w=>w/W*total);
+  const floors=raw.map(r=>Math.max(1,Math.floor(r)));
+  let used=floors.reduce((a,b)=>a+b,0);
+  // largest-remainder to land exactly on total
+  const rema=raw.map((r,i)=>({i,frac:r-Math.floor(r)})).sort((a,b)=>b.frac-a.frac);
+  let k=0;
+  while(used<total){floors[rema[k%rema.length].i]++;used++;k++;}
+  while(used>total){ // steal from the largest above 1
+    const j=floors.indexOf(Math.max(...floors));
+    if(floors[j]>1){floors[j]--;used--;}else break;
+  }
+  return floors;
+}
+function rebalanceSuggest(){
+  const panel=document.getElementById('rebalance-panel');if(!panel)return;
+  const suggested=_suggestShelfCounts();
+  const counts=_zonePieceCounts();
+  const total=_allShelvesList().length;
+  const placed=data.work.filter(e=>e._type==='octavo'&&e.location_cabinet&&e.location_shelf).length;
+  panel.innerHTML=`
+  <div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Suggested shelf split</h3><span style="font-size:12px;color:var(--muted);">${total} shelves · based on what each zone actually holds, with room to grow</span></div>
+    <div class="card-body">
+      <table style="max-width:640px;">
+        <thead><tr><th>Zone</th><th>Pieces</th><th>Now</th><th>Suggested</th></tr></thead>
+        <tbody>
+        ${ZONE_MAP.map((z,i)=>`<tr>
+          <td style="font-weight:550;">${esc(z.name)}</td>
+          <td>${counts[i]}</td>
+          <td class="text-muted">${z.shelves.length}</td>
+          <td><input type="number" min="1" max="${total}" value="${suggested[i]}" data-rb="${i}" onchange="_rbTotal()" style="width:64px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;font-family:var(--mono);font-size:13px;"></td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;font-size:13px;font-weight:600;" id="rb-total"></div>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:10px;max-width:600px;">Tweak the numbers if you like, then apply. Zones get contiguous runs of shelves in cabinet order. The <b>${placed}</b> boxes already placed will be re-slotted to match and you'll get a move list — everything else keeps getting slot suggestions as you shelve it.</p>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn-primary btn-sm" onclick="applyRebalance()">Apply &amp; make move list</button>
+        <button class="btn-ghost btn-sm" onclick="document.getElementById('rebalance-panel').innerHTML=''">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+  _rbTotal();
+}
+function _rbTotal(){
+  const total=_allShelvesList().length;
+  const sum=[...document.querySelectorAll('[data-rb]')].reduce((s,el)=>s+(parseInt(el.value)||0),0);
+  const el=document.getElementById('rb-total');
+  if(el)el.innerHTML=`Total: ${sum} of ${total} shelves ${sum===total?'<span style="color:var(--success);">✓</span>':`<span style="color:var(--danger);">— must equal ${total}</span>`}`;
+}
+async function applyRebalance(){
+  const total=_allShelvesList().length;
+  const counts=[...document.querySelectorAll('[data-rb]')].map(el=>parseInt(el.value)||0);
+  if(counts.reduce((a,b)=>a+b,0)!==total){toast(`Shelf counts must add up to ${total}`,'error');return;}
+  if(counts.some(c=>c<1)){toast('Every zone needs at least 1 shelf','error');return;}
+  const panel=document.getElementById('rebalance-panel');
+  panel.querySelectorAll('button').forEach(b=>b.disabled=true);
+  _redistributeShelves(counts);
+  _saveZoneMap();
+  // Re-slot pieces that already have a physical location
+  const moves=[];let checked=0;
+  for(const z of ZONE_MAP){
+    if(!z.shelves.length||!z.seasons.length)continue;
+    const placed=data.work
+      .filter(e=>e._type==='octavo'&&e.location_cabinet&&e.location_shelf&&e.season&&z.seasons.includes(e.season))
+      .sort((a,b)=>String(a.call_number||'').localeCompare(String(b.call_number||'')));
+    for(let i=0;i<placed.length;i++){
+      checked++;
+      const slot=z.shelves[Math.min(z.shelves.length-1,Math.floor(i*z.shelves.length/Math.max(1,placed.length)))];
+      const e=placed[i];
+      if(e.location_cabinet===slot.c&&e.location_shelf===slot.s)continue;
+      const from=`C${e.location_cabinet}-S${e.location_shelf}`;
+      const updated={...e,location_cabinet:slot.c,location_shelf:slot.s};
+      try{
+        const r=await fetch(`/api/entries/work/${e._id}`,adminFetchOpts(updated,'PUT'));
+        if(r.ok){
+          const j=await r.json();
+          const idx=data.work.findIndex(x=>x._id===e._id);
+          if(idx>-1)data.work[idx]=j.entry;
+          moves.push({title:e.title,call:e.call_number||'',from,to:`C${slot.c}-S${slot.s}`});
+        }
+      }catch{}
+    }
+  }
+  renderZoneView();
+  const p2=document.getElementById('rebalance-panel');
+  p2.innerHTML=`
+  <div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>New layout applied ✓</h3><span style="font-size:12px;color:var(--muted);">${moves.length} box${moves.length===1?'':'es'} to physically move (of ${checked} placed)</span></div>
+    <div class="card-body">
+      ${moves.length?`<table style="max-width:640px;"><thead><tr><th>Call #</th><th>Title</th><th>From</th><th>To</th></tr></thead><tbody>
+        ${moves.map(m=>`<tr><td class="cn" style="font-family:var(--mono);font-size:12px;">${esc(m.call)}</td><td>${esc(m.title)}</td><td style="font-family:var(--mono);font-size:12px;">${esc(m.from)}</td><td style="font-family:var(--mono);font-size:12px;font-weight:600;">${esc(m.to)}</td></tr>`).join('')}
+      </tbody></table>
+      <div style="margin-top:12px;"><button class="btn-secondary btn-sm" onclick='printMoveList(${JSON.stringify(moves).replace(/'/g,"&#39;")})'>${ICO.print} Print move list</button></div>`
+      :'<p class="text-muted" style="font-size:13px;">Nothing needs to physically move — every placed box already sits inside its zone’s new shelves.</p>'}
+    </div>
+  </div>`;
+  toast('Shelves rebalanced','success');
+}
+function printMoveList(moves){
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Shelf Move List</title><style>
+    body{font-family:Georgia,serif;color:#232019;max-width:640px;margin:32px auto;padding:0 24px;}
+    h1{font-size:20px;margin:0 0 4px;} .sub{color:#6F6858;font-size:12px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#A69D8C;border-bottom:1px solid #232019;padding:6px;}
+    td{padding:7px 6px;border-bottom:1px solid #E9E5DE;} .cn{font-family:monospace;font-size:11.5px;white-space:nowrap;}
+    .box{display:inline-block;width:12px;height:12px;border:1.5px solid #232019;border-radius:2px;}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+  <h1>Shelf Move List</h1><div class="sub">${moves.length} boxes · ${new Date().toLocaleDateString()}</div>
+  <table><thead><tr><th></th><th>Call #</th><th>Title</th><th>From</th><th>To</th></tr></thead><tbody>
+  ${moves.map(m=>`<tr><td><span class="box"></span></td><td class="cn">${esc(m.call)}</td><td>${esc(m.title)}</td><td class="cn">${esc(m.from)}</td><td class="cn"><b>${esc(m.to)}</b></td></tr>`).join('')}
+  </tbody></table>
+  <p class="noprint" style="margin-top:20px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print</button></p>
+  </body></html>`);
+  w.document.close();
+}
+
 function renderZoneCard(z){
   const pctN=z.pct!=null?Math.round(z.pct*100):null;
   const warnClass=z.warn?' zone-card-warn':'';

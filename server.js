@@ -896,13 +896,19 @@ app.get('/api/config-read', adminRequired, async (req, res) => {
 
 app.post('/api/config', adminRequired, async (req, res) => {
   try {
-    const allowed = ['clientId', 'clientSecret', 'notifyEmail', 'smtpUser', 'smtpPass', 'smtpHost', 'smtpPort', 'geminiApiKey'];
+    const allowed = ['clientId', 'clientSecret', 'notifyEmail', 'smtpUser', 'smtpPass', 'smtpHost', 'smtpPort', 'geminiApiKey', 'zoneMap', 'shelfCap'];
     const cfg = await db.getConfig();
     for (const k of allowed) if (k in req.body) cfg[k] = req.body[k];
     await db.saveConfig(cfg);
     if (req.body.clientId || req.body.clientSecret) await db.deleteTokens();
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Zone map (shelving layout) — synced across devices
+app.get('/api/zones', adminRequired, async (req, res) => {
+  try { const cfg = await db.getConfig(); res.json({ zoneMap: cfg.zoneMap || null, shelfCap: cfg.shelfCap || null }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Google OAuth ──────────────────────────────────────────────────────────────
