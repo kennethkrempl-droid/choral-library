@@ -284,14 +284,44 @@ def norm_voicing(v):
     return 'Other'
 
 import csv, io
+
+# ─── IMPORTANT: Expected CSV column order ──────────────────────────────────
+# col 0: Name (title)
+# col 1: Composer
+# col 2: Voicing
+# col 3: # Of Copies
+# col 4: Last Year Performed
+# col 5: Description (optional)
+#
+# If you pasted from the Google Sheets export, the format is DIFFERENT:
+#   Library | Type | Title | Composer | Voicing | Genre | Copies | ...
+# You must remove the Library and Type columns first, or update the indices below.
+# ──────────────────────────────────────────────────────────────────────────
+
 reader = csv.reader(io.StringIO(CSV_DATA.strip()))
 rows = []
 for i, row in enumerate(reader):
-    if i == 0: continue
+    if i == 0:
+        # Sanity-check the header to catch Google Sheets export format mistakes
+        if row and row[0].strip().lower() in ('library', 'type', 'library/source'):
+            raise SystemExit(
+                f"ERROR: CSV header starts with '{row[0]}' — this looks like a Google Sheets export.\n"
+                "Remove the 'Library' and 'Type' columns first so the format is:\n"
+                "  Name, Composer, Voicing, # Of Copies, ..."
+            )
+        continue
     if not row or not row[0].strip(): continue
+    name = row[0].strip()
+    composer = row[1].strip() if len(row) > 1 else ''
+    # Catch the most common column-shift corruption pattern
+    if name and composer and name == composer:
+        raise SystemExit(
+            f"ERROR: Row has composer == title ('{name}'). "
+            "This usually means the CSV has extra leading columns — check column mapping."
+        )
     rows.append({
-        'name': row[0].strip(),
-        'composer': row[1].strip() if len(row) > 1 else '',
+        'name': name,
+        'composer': composer,
         'voicing': row[2].strip() if len(row) > 2 else '',
         'copies': row[3].strip() if len(row) > 3 else '',
         'lastPerformed': row[4].strip() if len(row) > 4 else '',

@@ -13,3 +13,12 @@ deploy.command
 .database-url.txt
 update-site.command
 update.log
+__pycache__/
+data.backup.*.json
+deploy-redesign.command
+force-redeploy.command
+push-now.command
+push-server-fix.command
+preview-redesign.command
+sync-sheet-now.command
+push-to-sheet.command
