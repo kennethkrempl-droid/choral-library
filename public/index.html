@@ -1300,12 +1300,15 @@ let GENRES   = ['Pop','Spiritual','Classical','Folk','Holiday','Musical Theater'
 const SEASON_CODES=[
   {code:'MT', label:'Musical Theater'},
   {code:'POP',label:'Pop'},
+  {code:'JAZ',label:'Jazz'},
   {code:'CON',label:'Concert'},
-  {code:'HLD',label:'Holiday/Christmas/Advent/Winter'},
+  {code:'HLD',label:'Holiday/Christmas/Advent'},
+  {code:'WNT',label:'Winter'},
   {code:'EAS',label:'Easter/Lent/Spring Sacred'},
   {code:'SAC',label:'Sacred General'},
+  {code:'SPR',label:'Spiritual'},
   {code:'PAT',label:'Patriotic/Civic'},
-  {code:'FOL',label:'Folk/Americana/Spiritual'},
+  {code:'FOL',label:'Folk/Americana'},
   {code:'SEA',label:'Seasonal Secular'},
   {code:'MSC',label:'Miscellaneous'},
 ];
@@ -1321,7 +1324,7 @@ const VOICING_TO_CODE={
 };
 const GENRE_TO_SEASON={
   'Pop':'POP','Holiday':'HLD','Musical Theater':'MT',
-  'Classical':'CON','Sacred':'SAC','Spiritual':'FOL','Folk':'FOL','Jazz':'POP',
+  'Classical':'CON','Sacred':'SAC','Spiritual':'SPR','Folk':'FOL','Jazz':'JAZ','Winter':'WNT',
 };
 function voicingCode(v){return VOICING_TO_CODE[v]||'SPC';}
 function computeCallNumber(entry){
@@ -1444,19 +1447,31 @@ function getNextAccessionId(){
 
 // ── Zone map ─────────────────────────────────────────────────────────────────
 const DEFAULT_ZONE_MAP=[
-  {key:'sacred',   name:'Sacred',           seasons:['SAC','EAS'],     shelves:[{c:1,s:1},{c:1,s:2},{c:1,s:3},{c:1,s:4},{c:1,s:5},{c:1,s:6},{c:1,s:7},{c:2,s:1}]},
-  {key:'holiday',  name:'Holiday',           seasons:['HLD'],           shelves:[{c:2,s:2},{c:2,s:3},{c:2,s:4},{c:2,s:5},{c:2,s:6},{c:2,s:7}]},
+  {key:'sacred',   name:'Sacred',           seasons:['SAC','EAS','SPR'],shelves:[{c:1,s:1},{c:1,s:2},{c:1,s:3},{c:1,s:4},{c:1,s:5},{c:1,s:6},{c:1,s:7},{c:2,s:1}]},
+  {key:'holiday',  name:'Holiday',           seasons:['HLD','WNT'],     shelves:[{c:2,s:2},{c:2,s:3},{c:2,s:4},{c:2,s:5},{c:2,s:6},{c:2,s:7}]},
   {key:'secular',  name:'Secular/Seasonal',  seasons:['SEA','FOL'],     shelves:[{c:3,s:1},{c:3,s:2},{c:3,s:3},{c:3,s:4},{c:3,s:5},{c:3,s:6},{c:3,s:7}]},
-  {key:'pop',      name:'Pop/Show',          seasons:['POP','MT'],      shelves:[{c:4,s:1},{c:4,s:2},{c:4,s:3},{c:4,s:4},{c:4,s:5}]},
+  {key:'pop',      name:'Pop/Show',          seasons:['POP','MT','JAZ'],shelves:[{c:4,s:1},{c:4,s:2},{c:4,s:3},{c:4,s:4},{c:4,s:5}]},
   {key:'concert',  name:'Concert/Classical', seasons:['CON'],           shelves:[{c:4,s:6},{c:4,s:7},{c:5,s:1},{c:5,s:2}]},
   {key:'patriotic',name:'Patriotic/Misc',    seasons:['PAT','MSC'],     shelves:[{c:5,s:3},{c:5,s:4},{c:5,s:5}]},
   {key:'growth',   name:'Growth (overflow)', seasons:[],                shelves:[{c:5,s:6},{c:5,s:7}]},
 ];
 let ZONE_MAP=DEFAULT_ZONE_MAP.map(z=>({...z,shelves:z.shelves.map(s=>({...s}))}));
 let SHELF_CAP={default:null,overrides:{}};
+// Saved zone maps (localStorage/server) may predate newer season codes — make sure
+// they're always present so those pieces can be shelved.
+const ZONE_SEASON_ADDITIONS={sacred:['SPR'],holiday:['WNT'],pop:['JAZ']};
+function _ensureZoneSeasons(){
+  for(const [key,codes] of Object.entries(ZONE_SEASON_ADDITIONS)){
+    const z=ZONE_MAP.find(z=>z.key===key);
+    if(!z)continue;
+    z.seasons=z.seasons||[];
+    for(const c of codes)if(!z.seasons.includes(c))z.seasons.push(c);
+  }
+}
 function _initZoneMap(){
   try{const z=JSON.parse(localStorage.getItem('zoneMap'));if(z&&z.length)ZONE_MAP=z;}catch{}
   try{const c=JSON.parse(localStorage.getItem('shelfCap'));if(c)SHELF_CAP=c;}catch{}
+  _ensureZoneSeasons();
 }
 function _saveZoneMap(){
   try{localStorage.setItem('zoneMap',JSON.stringify(ZONE_MAP));}catch{}
@@ -1473,6 +1488,7 @@ async function loadZonesFromServer(){
     const j=await r.json();
     if(j.zoneMap&&j.zoneMap.length)ZONE_MAP=j.zoneMap;
     if(j.shelfCap)SHELF_CAP=j.shelfCap;
+    _ensureZoneSeasons();
   }catch{}
 }
 function getShelfCapacity(c,s){
@@ -4627,6 +4643,7 @@ async function syncBidirectional(tab){
   let pullCount=0;
   const sheetMatchedIds=new Set();
   const sheetSortNums=new Map();   // entry._id → Sort # they had in the sheet
+  const sheetOrigRows=new Map();   // entry._id → original sheet row (preserves extra columns like PRINTED)
   let maxSheetNum=0;
   let sheetHeaderRaw=null;         // exact header row from sheet (for push)
   let sheetHeaderLower=null;
@@ -4681,6 +4698,7 @@ async function syncBidirectional(tab){
 
       sheetMatchedIds.add(entry._id);
       if(sortNum)sheetSortNums.set(entry._id,parseInt(sortNum,10)||0);
+      sheetOrigRows.set(entry._id,row.slice());
 
       if(!callNum)continue;
       // Don't assign a call number already claimed by a different entry this session
@@ -4747,7 +4765,11 @@ async function syncBidirectional(tab){
     });
 
     const rows=allEntries.map(({e,sec},idx)=>{
-      const row=new Array(sheetHeaderRaw.length).fill('');
+      // Start from the entry's original sheet row so extra columns (e.g. the
+      // PRINTED label-tracking column) survive the push; new entries get a blank row.
+      const orig=sheetOrigRows.get(e._id);
+      const row=orig?orig.slice(0,sheetHeaderRaw.length):new Array(sheetHeaderRaw.length).fill('');
+      while(row.length<sheetHeaderRaw.length)row.push('');
       const s=(i,v)=>{if(i>=0&&i<row.length)row[i]=String(v||'');};
       const getCallNum=()=>{
         const cn=e.call_number||'';if(!cn)return '';
@@ -4755,7 +4777,7 @@ async function syncBidirectional(tab){
         const n=callSuffix(cn);
         return(n&&allowedNewNums.has(n))?cn:'';
       };
-      // IDX_SORT intentionally skipped — the sheet drives Sort # via its own formula
+      s(IDX_SORT,idx+1); // plain sequential number — simple row ordering, no formulas to break
       s(IDX_LIB,sec==='work'?'Work':'Personal');
       s(IDX_TYPE,e._type==='book'?'Book':'Octavo');
       s(IDX_CALL,getCallNum());
