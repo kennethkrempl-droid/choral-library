@@ -1772,7 +1772,7 @@ function buildPanel(tab){
     <span class="tools-sep"></span>
     <button class="btn-secondary btn-sm" onclick="exportCSV('${tab}')" id="export-btn-${tab}">${ICO.download} Export CSV</button>
     <button class="btn-secondary btn-sm btn-icon" onclick="showCSVImportTip()" title="How to import the CSV into Google Sheets">${ICO.table}</button>
-    <button class="btn-success btn-sm" id="sync-${tab}-btn" onclick="syncBidirectional('${tab}')">${ICO.sync} Sync Sheet</button>
+    <button class="btn-success btn-sm" id="sync-${tab}-btn" onclick="syncBidirectional('${tab}')">${ICO.sync} Pull from Sheet</button>
     ${tab==='work'?`<button class="btn-gold btn-sm" onclick="generateOctavoLabels()" title="Generate printable box labels for all Work Octavos">${ICO.print} Labels</button>`:''}
     <button class="btn-secondary btn-sm" onclick="printCatalog('${tab}')" title="Print a typeset catalog of the current view (save as PDF from the print dialog)">${ICO.print} Catalog PDF</button>
   </div>
@@ -4630,6 +4630,11 @@ function _parseCSV(text){
 }
 
 async function syncBidirectional(tab){
+  // Push-back to the sheet is disabled for now — the sheet is the master for
+  // genre + call number, and the full-tab rewrite was too destructive.
+  // Set PUSH_TO_SHEET_ENABLED=true to restore two-way sync (needs a gentler,
+  // diff-based push first).
+  const PUSH_TO_SHEET_ENABLED=false;
   if(!authStatus.authenticated){toast('Connect Google in Settings first','error');return;}
   const btn=document.getElementById(`sync-${tab}-btn`);
   btn.disabled=true;const orig=btn.innerHTML;
@@ -4738,8 +4743,9 @@ async function syncBidirectional(tab){
   }
 
   // ── STEP 2: Push back to sheet in the sheet's own column format ───────────
-  btn.innerHTML='<span class="spinner"></span> Pushing to sheet…';
   let pushCount=0;
+  if(PUSH_TO_SHEET_ENABLED){
+  btn.innerHTML='<span class="spinner"></span> Pushing to sheet…';
   try{
     if(!sheetHeaderRaw)throw new Error('No sheet header captured — cannot push');
 
@@ -4810,13 +4816,14 @@ async function syncBidirectional(tab){
   }catch(e){
     toast('Push failed: '+e.message,'error');btn.disabled=false;btn.innerHTML=orig;return;
   }
+  } // end PUSH_TO_SHEET_ENABLED
 
   btn.disabled=false;btn.innerHTML=orig;
   if(pullCount>0){renderGrid('work',data.work);renderGrid('personal',data.personal);}
   const parts=[];
-  if(pullCount>0)parts.push(`↓ ${pullCount} pulled`);
+  if(pullCount>0)parts.push(`↓ ${pullCount} pulled from sheet`);
   if(pushCount>0)parts.push(`↑ ${pushCount} pushed`);
-  toast((parts.join(' · ')||'Already in sync')+` <a href="https://docs.google.com/spreadsheets/d/${authStatus.spreadsheetId||_SHEET_ID}" target="_blank">Open ↗</a>`,'success',6000);
+  toast((parts.join(' · ')||'Everything up to date — no changes to pull')+` <a href="https://docs.google.com/spreadsheets/d/${authStatus.spreadsheetId||_SHEET_ID}" target="_blank">Open ↗</a>`,'success',6000);
 }
 
 async function syncSheets(tab){
