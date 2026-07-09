@@ -506,6 +506,10 @@ header .auth-pill.disconnected, .settings-section .auth-pill.disconnected { colo
 .shelf-count { font-size:10.5px; color:var(--faint); width:52px; text-align:right; font-variant-numeric:tabular-nums; }
 .shelf-count.full { color:var(--warning); }
 .shelf-cap-input { width:52px; font-family:var(--mono); font-size:11px; padding:3px 6px; border:1px solid var(--line); border-radius:4px; text-align:center; }
+.shelf-row-click { display:flex; align-items:center; gap:9px; flex:1; min-width:0; cursor:pointer; padding:3px 5px; margin:-3px -5px; border-radius:5px; transition:background .12s ease; }
+.shelf-row-click:hover { background:var(--line-soft); }
+.shelf-row-click:hover .shelf-tag { color:var(--ink); }
+#shelf-plan-body table td { padding:6px; border-bottom:1px solid var(--line-soft); vertical-align:top; }
 .zone-lookup { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .zone-lookup-result-wrap { margin-top:10px; }
 .zone-suggest-box { border-radius:var(--r); padding:12px 16px; font-size:13px; }
@@ -1000,6 +1004,13 @@ html[data-theme="dark"] .brand-mark { border-color:var(--gold-line); color:var(-
   <div class="modal" style="max-width:500px;">
     <div class="modal-header"><h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Request This Item</h2><button class="btn-ghost btn-icon" onclick="closeRequestModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body" id="request-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="shelf-plan-modal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header"><h2 id="shelf-plan-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="4" rx="1"/><rect x="2" y="10" width="20" height="4" rx="1"/><rect x="2" y="17" width="20" height="4" rx="1"/></svg> <span id="shelf-plan-title-text">Shelf</span></h2><button class="btn-ghost btn-icon" onclick="document.getElementById('shelf-plan-modal').classList.remove('open')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body" id="shelf-plan-body"></div>
   </div>
 </div>
 
@@ -3687,9 +3698,11 @@ function renderZoneCard(z){
     const capTxt=sh.cap!=null?`${sh.occ}/${sh.cap}`:sh.occ>0?`${sh.occ} placed`:'empty';
     const barColor=fillPct>=85?'#dc2626':fillPct>=60?'#d97706':'#16a34a';
     return `<div class="shelf-row">
-      <span class="shelf-tag">${esc(sh.tag)}</span>
-      <div class="shelf-bar-wrap">${sh.cap?`<div class="shelf-bar" style="width:${fillPct}%;background:${barColor}"></div>`:''}</div>
-      <span class="shelf-count${sh.cap&&sh.open===0?' full':''}">${esc(capTxt)}</span>
+      <span class="shelf-row-click" onclick="showShelfPlan(${sh.c},${sh.s})" title="See what belongs on ${esc(sh.tag)}">
+        <span class="shelf-tag">${esc(sh.tag)}</span>
+        <div class="shelf-bar-wrap">${sh.cap?`<div class="shelf-bar" style="width:${fillPct}%;background:${barColor}"></div>`:''}</div>
+        <span class="shelf-count${sh.cap&&sh.open===0?' full':''}">${esc(capTxt)}</span>
+      </span>
       <input type="number" class="shelf-cap-input" min="1" value="${sh.cap!=null?sh.cap:''}" placeholder="cap" title="Per-shelf capacity override for ${esc(sh.tag)}" onchange="setShelfCapOverride(${sh.c},${sh.s},this.value)">
     </div>`;
   }).join('');
@@ -3712,6 +3725,117 @@ function renderZoneCard(z){
     </details>
   </div>`;
 }
+// ── Shelf plan: which boxes belong on each shelf ─────────────────────────
+// Within each zone, genres stay together (in the zone's season order, e.g.
+// POP → MT → JAZ), sorted by call number inside each genre, then shelves are
+// filled front to back respecting capacity. Overflow spills to Growth.
+function _seasonOf(e){
+  if(e.season)return e.season;
+  const m=String(e.call_number||'').match(/^([A-Z]+)-/);
+  return m?m[1]:'';
+}
+function seasonLabel(code){const s=SEASON_CODES.find(x=>x.code===code);return s?s.label:code;}
+function computeShelfPlan(){
+  const plan={};           // "c-s" -> ordered pieces that belong there
+  const overflow=[];       // pieces that fit nowhere (even Growth is full)
+  const growth=ZONE_MAP.find(z=>z.key==='growth');
+  const growthQueue=[];
+  for(const z of ZONE_MAP){
+    if((growth&&z.key===growth.key)||!z.seasons.length||!z.shelves.length)continue;
+    const pieces=data.work
+      .filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e)))
+      .sort((a,b)=>{
+        const ga=z.seasons.indexOf(_seasonOf(a)),gb=z.seasons.indexOf(_seasonOf(b));
+        if(ga!==gb)return ga-gb;
+        return String(a.call_number).localeCompare(String(b.call_number),undefined,{numeric:true});
+      });
+    const caps=z.shelves.map(sh=>getShelfCapacity(sh.c,sh.s));
+    const capKnown=caps.every(c=>c!=null);
+    if(capKnown){
+      let i=0;
+      z.shelves.forEach((sh,si)=>{
+        const take=pieces.slice(i,i+caps[si]);
+        plan[`${sh.c}-${sh.s}`]=take;i+=take.length;
+      });
+      if(i<pieces.length)growthQueue.push(...pieces.slice(i));
+    }else{
+      const per=Math.ceil(pieces.length/z.shelves.length)||1;
+      z.shelves.forEach((sh,si)=>{plan[`${sh.c}-${sh.s}`]=pieces.slice(si*per,(si+1)*per);});
+    }
+  }
+  if(growth&&growth.shelves.length){
+    let i=0;
+    for(const sh of growth.shelves){
+      const cap=getShelfCapacity(sh.c,sh.s);
+      const take=cap!=null?growthQueue.slice(i,i+cap):growthQueue.slice(i);
+      plan[`${sh.c}-${sh.s}`]=take;i+=take.length;
+    }
+    if(i<growthQueue.length)overflow.push(...growthQueue.slice(i));
+  }else overflow.push(...growthQueue);
+  return{plan,overflow};
+}
+function showShelfPlan(c,s){
+  const{plan,overflow}=computeShelfPlan();
+  const zone=ZONE_MAP.find(z=>z.shelves.some(sh=>Number(sh.c)===Number(c)&&Number(sh.s)===Number(s)));
+  const pieces=plan[`${c}-${s}`]||[];
+  const cap=getShelfCapacity(c,s);
+  document.getElementById('shelf-plan-title-text').textContent=`C${c}-S${s} — ${zone?zone.name:'Unassigned'}`;
+  const body=document.getElementById('shelf-plan-body');
+  if(!pieces.length){
+    body.innerHTML='<p style="font-size:13px;color:var(--muted);">Nothing is slated for this shelf yet — no cataloged boxes reach it in the current plan.</p>';
+  }else{
+    let lastSeason=null;
+    const rows=pieces.map(e=>{
+      const sn=_seasonOf(e);
+      const hdr=sn!==lastSeason?`<tr><td colspan="4" style="padding:12px 6px 3px;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:none;">${esc(seasonLabel(sn))}</td></tr>`:'';
+      lastSeason=sn;
+      const here=Number(e.location_cabinet)===Number(c)&&Number(e.location_shelf)===Number(s);
+      const placed=e.location_cabinet&&e.location_shelf?`C${e.location_cabinet}-S${e.location_shelf}`:'';
+      const note=placed?(here?'<span style="color:#16a34a;font-size:11px;white-space:nowrap;">✓ here</span>':`<span style="color:#d97706;font-size:11px;white-space:nowrap;">now ${esc(placed)}</span>`):'';
+      return hdr+`<tr>
+        <td style="font-family:var(--mono);font-size:11.5px;white-space:nowrap;">${esc(e.call_number)}</td>
+        <td style="font-size:13px;">${esc(e.title)}</td>
+        <td style="font-size:12px;color:var(--muted);">${esc(e.composer||'')}</td>
+        <td style="text-align:right;">${note}</td>
+      </tr>`;
+    }).join('');
+    body.innerHTML=`
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px;">${pieces.length} box${pieces.length===1?'':'es'} belong${pieces.length===1?'s':''} here${cap!=null?` · capacity ${cap}`:''}${overflow.length?` · <span style="color:#dc2626;">⚠ ${overflow.length} piece${overflow.length===1?'':'s'} overflow all shelves</span>`:''}</div>
+      <table style="width:100%;border-collapse:collapse;"><tbody>${rows}</tbody></table>
+      <div style="margin-top:14px;"><button class="btn-secondary btn-sm" onclick="printShelfPlan(${c},${s})">${ICO.print} Print shelf list</button></div>`;
+  }
+  document.getElementById('shelf-plan-modal').classList.add('open');
+}
+function printShelfPlan(c,s){
+  const{plan}=computeShelfPlan();
+  const zone=ZONE_MAP.find(z=>z.shelves.some(sh=>Number(sh.c)===Number(c)&&Number(sh.s)===Number(s)));
+  const pieces=plan[`${c}-${s}`]||[];
+  const w=window.open('','_blank');
+  let lastSeason=null;
+  w.document.write(`<!DOCTYPE html><html><head><title>Shelf C${c}-S${s}</title><style>
+    body{font-family:Georgia,serif;color:#232019;max-width:640px;margin:32px auto;padding:0 24px;}
+    h1{font-size:20px;margin:0 0 4px;} .sub{color:#6F6858;font-size:12px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    td{padding:7px 6px;border-bottom:1px solid #E9E5DE;} .cn{font-family:monospace;font-size:11.5px;white-space:nowrap;}
+    .sec{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#A69D8C;font-weight:700;padding-top:14px;border-bottom:1px solid #232019;}
+    .box{display:inline-block;width:12px;height:12px;border:1.5px solid #232019;border-radius:2px;}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+  <h1>Shelf C${c}-S${s}${zone?' — '+esc(zone.name)+' zone':''}</h1>
+  <div class="sub">${pieces.length} boxes · ${new Date().toLocaleDateString()}</div>
+  <table><tbody>
+  ${pieces.map(e=>{
+    const sn=_seasonOf(e);
+    const hdr=sn!==lastSeason?`<tr><td colspan="4" class="sec">${esc(seasonLabel(sn))}</td></tr>`:'';
+    lastSeason=sn;
+    return hdr+`<tr><td><span class="box"></span></td><td class="cn">${esc(e.call_number)}</td><td>${esc(e.title)}</td><td style="color:#6F6858;font-size:12px;">${esc(e.composer||'')}</td></tr>`;
+  }).join('')}
+  </tbody></table>
+  <p class="noprint" style="margin-top:20px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print</button></p>
+  </body></html>`);
+  w.document.close();
+}
+
 function runZoneLookup(){
   const code=document.getElementById('zone-lookup-season').value;
   const el=document.getElementById('zone-lookup-result');
