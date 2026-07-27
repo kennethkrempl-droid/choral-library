@@ -3877,46 +3877,11 @@ async function applyRebalance(){
   panel.querySelectorAll('button').forEach(b=>b.disabled=true);
   _redistributeShelves(counts);
   _saveZoneMap();
-  // Re-slot pieces that already have a physical location
-  const moves=[];let checked=0;
-  for(const z of ZONE_MAP){
-    if(!z.shelves.length||!z.seasons.length)continue;
-    const placed=data.work
-      // location_area==='file' boxes live in filing cabinets (FC coords, not shelf coords) —
-      // re-slotting them here would corrupt their location. Auto-shelve is what moves them.
-      .filter(e=>e._type==='octavo'&&e.location_area!=='file'&&e.location_cabinet&&e.location_shelf&&e.season&&z.seasons.includes(e.season))
-      .sort((a,b)=>String(a.call_number||'').localeCompare(String(b.call_number||''),undefined,{numeric:true}));
-    for(let i=0;i<placed.length;i++){
-      checked++;
-      const slot=z.shelves[Math.min(z.shelves.length-1,Math.floor(i*z.shelves.length/Math.max(1,placed.length)))];
-      const e=placed[i];
-      if(e.location_cabinet===slot.c&&e.location_shelf===slot.s)continue;
-      const from=`C${e.location_cabinet}-S${e.location_shelf}`;
-      const updated={...e,location_cabinet:slot.c,location_shelf:slot.s};
-      try{
-        const r=await fetch(`/api/entries/work/${e._id}`,adminFetchOpts(updated,'PUT'));
-        if(r.ok){
-          const j=await r.json();
-          const idx=data.work.findIndex(x=>x._id===e._id);
-          if(idx>-1)data.work[idx]=j.entry;
-          moves.push({title:e.title,call:e.call_number||'',from,to:`C${slot.c}-S${slot.s}`});
-        }
-      }catch{}
-    }
-  }
-  renderZoneView();
-  const p2=document.getElementById('rebalance-panel');
-  p2.innerHTML=`
-  <div class="card" style="margin-bottom:24px;">
-    <div class="card-header"><h3>New layout applied ✓</h3><span style="font-size:12px;color:var(--muted);">${moves.length} box${moves.length===1?'':'es'} to physically move (of ${checked} placed)</span></div>
-    <div class="card-body">
-      ${moves.length?`<table style="max-width:640px;"><thead><tr><th>Call #</th><th>Title</th><th>From</th><th>To</th></tr></thead><tbody>
-        ${moves.map(m=>`<tr><td class="cn" style="font-family:var(--mono);font-size:12px;">${esc(m.call)}</td><td>${esc(m.title)}</td><td style="font-family:var(--mono);font-size:12px;">${esc(m.from)}</td><td style="font-family:var(--mono);font-size:12px;font-weight:600;">${esc(m.to)}</td></tr>`).join('')}
-      </tbody></table>
-      <div style="margin-top:12px;"><button class="btn-secondary btn-sm" onclick='printMoveList(${JSON.stringify(moves).replace(/'/g,"&#39;")})'>${ICO.print} Print move list</button></div>`
-      :'<p class="text-muted" style="font-size:13px;">Nothing needs to physically move — every placed box already sits inside its zone’s new shelves.</p>'}
-    </div>
-  </div>`;
+  // Place boxes with the SAME shared plan the shelf-detail view shows
+  // (computeAutoShelvePlan / computeShelfPlan). The old ad-hoc even-spread
+  // re-slotter put boxes on shelves the plan view said were empty — the two
+  // could never agree. rebalance:false = keep the split just applied above.
+  await autoShelveAll({rebalance:false});
   toast('Shelves rebalanced','success');
 }
 function printMoveList(moves){
@@ -3998,25 +3963,21 @@ function computeShelfPlan(){
     const pieces=data.work
       .filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e)))
       .sort(_zoneOrderCompare(z));   // same comparator as computeAutoShelvePlan — keep in lockstep
-    const caps=z.shelves.map(sh=>getShelfCapacity(sh.c,sh.s));
-    const capKnown=caps.every(c=>c!=null);
-    if(capKnown){
-      let i=0;
-      z.shelves.forEach((sh,si)=>{
-        const take=pieces.slice(i,i+caps[si]);
-        plan[`${sh.c}-${sh.s}`]=take;i+=take.length;
-      });
-      if(i<pieces.length)growthQueue.push(...pieces.slice(i));
-    }else{
-      const per=Math.ceil(pieces.length/z.shelves.length)||1;
-      z.shelves.forEach((sh,si)=>{plan[`${sh.c}-${sh.s}`]=pieces.slice(si*per,(si+1)*per);});
-    }
+    // _shelfCapOf (not getShelfCapacity): same default-15 fallback as the
+    // auto-shelve engine, so this view and Auto-shelve/Apply can never disagree.
+    const caps=z.shelves.map(sh=>Math.max(1,_shelfCapOf(sh.c,sh.s)));
+    let i=0;
+    z.shelves.forEach((sh,si)=>{
+      const take=pieces.slice(i,i+caps[si]);
+      plan[`${sh.c}-${sh.s}`]=take;i+=take.length;
+    });
+    if(i<pieces.length)growthQueue.push(...pieces.slice(i));
   }
   if(growth&&growth.shelves.length){
     let i=0;
     for(const sh of growth.shelves){
-      const cap=getShelfCapacity(sh.c,sh.s);
-      const take=cap!=null?growthQueue.slice(i,i+cap):growthQueue.slice(i);
+      const cap=Math.max(1,_shelfCapOf(sh.c,sh.s));
+      const take=growthQueue.slice(i,i+cap);
       plan[`${sh.c}-${sh.s}`]=take;i+=take.length;
     }
     if(i<growthQueue.length)overflow.push(...growthQueue.slice(i));
@@ -4030,8 +3991,36 @@ function showShelfPlan(c,s){
   const cap=getShelfCapacity(c,s);
   document.getElementById('shelf-plan-title-text').textContent=`C${c}-S${s} — ${zone?zone.name:'Unassigned'}`;
   const body=document.getElementById('shelf-plan-body');
+  // Boxes physically sitting on this shelf right now (what the fill bar counts).
+  const current=data.work.filter(e=>e._type==='octavo'&&e.location_area!=='file'&&Number(e.location_cabinet)===Number(c)&&Number(e.location_shelf)===Number(s));
+  const plannedIds=new Set(pieces.map(e=>e._id));
+  const extras=current.filter(e=>!plannedIds.has(e._id));
+  const destOf=e=>{
+    for(const k in plan){if(plan[k].some(p=>p._id===e._id)){const[dc,ds]=k.split('-');return`C${dc}-S${ds}`;}}
+    if(overflow.some(p=>p._id===e._id))return'Filing cabinets';
+    return null;   // not in the plan at all — usually missing a call number
+  };
+  const extrasHtml=extras.length?`
+    <div style="margin-top:${pieces.length?'18px':'4px'};padding-top:${pieces.length?'12px':'0'};${pieces.length?'border-top:1px solid var(--line);':''}">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#d97706;margin-bottom:4px;">On this shelf now, but not in the plan (${extras.length})</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">The fill bar counts these. They should move to the location shown — or need a call number before the plan can place them.</div>
+      <table style="width:100%;border-collapse:collapse;"><tbody>
+      ${extras.map(e=>{
+        const d=destOf(e);
+        const note=d?`<span style="color:#d97706;font-size:11px;white-space:nowrap;">→ ${esc(d)}</span>`:'<span style="color:#dc2626;font-size:11px;white-space:nowrap;">needs call number</span>';
+        return`<tr>
+          <td style="font-family:var(--mono);font-size:11.5px;white-space:nowrap;">${esc(e.call_number||'—')}</td>
+          <td style="font-size:13px;">${esc(e.title)}</td>
+          <td style="font-size:12px;color:var(--muted);">${esc(e.composer||'')}</td>
+          <td style="text-align:right;">${note}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table>
+    </div>`:'';
   if(!pieces.length){
-    body.innerHTML='<p style="font-size:13px;color:var(--muted);">Nothing is slated for this shelf yet — no cataloged boxes reach it in the current plan.</p>';
+    body.innerHTML=`<p style="font-size:13px;color:var(--muted);">${extras.length
+      ?`No boxes end up on this shelf in the current plan — earlier shelves absorb everything in this zone. The ${extras.length} box${extras.length===1?'':'es'} below ${extras.length===1?'is':'are'} here now and should move:`
+      :'Nothing is slated for this shelf, and nothing is on it — it’s a free shelf in the current plan.'}</p>${extrasHtml}`;
   }else{
     let lastSeason=null;
     const rows=pieces.map(e=>{
@@ -4051,6 +4040,7 @@ function showShelfPlan(c,s){
     body.innerHTML=`
       <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px;">${pieces.length} box${pieces.length===1?'':'es'} belong${pieces.length===1?'s':''} here${cap!=null?` · capacity ${cap}`:''}${overflow.length?` · <span style="color:#dc2626;">⚠ ${overflow.length} piece${overflow.length===1?'':'s'} overflow all shelves</span>`:''}</div>
       <table style="width:100%;border-collapse:collapse;"><tbody>${rows}</tbody></table>
+      ${extrasHtml}
       <div style="margin-top:14px;"><button class="btn-secondary btn-sm" onclick="printShelfPlan(${c},${s})">${ICO.print} Print shelf list</button></div>`;
   }
   document.getElementById('shelf-plan-modal').classList.add('open');
