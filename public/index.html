@@ -1453,7 +1453,7 @@ document.querySelectorAll('.lbl-qr').forEach(el=>{
 // filled via document.write as EMPTY pages (print preview reloads the blank
 // URL instead of the written DOM), so print windows get a real Blob URL.
 function openPrintDoc(html,features){
-  const url=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+  const url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
   const w=features?window.open(url,'_blank',features):window.open(url,'_blank');
   if(!w){alert('Pop-up blocked — please allow pop-ups for this site and try again.');URL.revokeObjectURL(url);return null;}
   setTimeout(()=>URL.revokeObjectURL(url),120000);
