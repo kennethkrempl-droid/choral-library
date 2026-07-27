@@ -1447,10 +1447,17 @@ document.querySelectorAll('.lbl-qr').forEach(el=>{
 <\/script>
 </body></html>`;
 
-  const win=window.open('','_blank','width=950,height=720');
-  if(!win){alert('Pop-up blocked — please allow pop-ups for this site and try again.');return;}
-  win.document.write(html);
-  win.document.close();
+  openPrintDoc(html,'width=950,height=720');
+}
+// Open a printable document reliably. Chrome often prints about:blank popups
+// filled via document.write as EMPTY pages (print preview reloads the blank
+// URL instead of the written DOM), so print windows get a real Blob URL.
+function openPrintDoc(html,features){
+  const url=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+  const w=features?window.open(url,'_blank',features):window.open(url,'_blank');
+  if(!w){alert('Pop-up blocked — please allow pop-ups for this site and try again.');URL.revokeObjectURL(url);return null;}
+  setTimeout(()=>URL.revokeObjectURL(url),120000);
+  return w;
 }
 function getNextAccessionId(){
   const all=data.work.filter(e=>e._type==='octavo'&&e.accession_id);
@@ -1778,8 +1785,12 @@ function showAutoShelveSummary(plan,moves){
       ${plan.inFiling?`<div class="zone-suggest-box zone-suggest-warn" style="max-width:560px;margin-bottom:12px;">${plan.inFiling} box${plan.inFiling===1?'':'es'} didn't fit the open shelves and went into <b>${plan.filingCabinets} filing cabinet${plan.filingCabinets===1?'':'s'}</b> (${plan.drawersPer} drawers each, ${plan.drawerCap}/drawer). Raise the default shelf capacity or rebalance to move more onto open shelves.</div>`
         :`<div class="zone-suggest-box zone-suggest-ok" style="max-width:560px;margin-bottom:12px;">Everything fit on the open display shelves — no filing cabinets needed.</div>`}
       ${moves.length?`<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">${moves.length} box${moves.length===1?'':'es'} moved this run.</div>
-        <button class="btn-secondary btn-sm" onclick='printMoveList(${JSON.stringify(moves).replace(/'/g,"&#39;")})'>${ICO.print} Print placement list</button>`
-        :'<div class="text-muted" style="font-size:13px;">Nothing needed to move.</div>'}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-secondary btn-sm" onclick='printMoveList(${JSON.stringify(moves).replace(/'/g,"&#39;")})'>${ICO.print} Print move list (this run)</button>
+        <button class="btn-secondary btn-sm" onclick="printFullPlacement()" title="Every shelf and filing drawer with everything that belongs on it">${ICO.print} Print all shelf lists</button>
+        </div>`
+        :`<div class="text-muted" style="font-size:13px;margin-bottom:8px;">Nothing needed to move.</div>
+        <button class="btn-secondary btn-sm" onclick="printFullPlacement()" title="Every shelf and filing drawer with everything that belongs on it">${ICO.print} Print all shelf lists</button>`}
     </div>
   </div>`;
   if(panel){panel.innerHTML=html;panel.scrollIntoView({behavior:'smooth',block:'nearest'});}
@@ -2460,8 +2471,7 @@ function printPullSheet(){
   // pull route reads wall first, then cabinets.
   const _pullKey=e=>(e.location_area==='file'?100:0)+(e.location_cabinet||99);
   const sorted=[...items].sort((a,b)=>(_pullKey(a)-_pullKey(b))||((a.location_shelf||99)-(b.location_shelf||99)));
-  const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Pull Sheet — ${esc(p.name)}</title><style>
+  openPrintDoc(`<!DOCTYPE html><html><head><title>Pull Sheet — ${esc(p.name)}</title><style>
     body{font-family:Georgia,serif;color:#232019;max-width:700px;margin:32px auto;padding:0 24px;}
     h1{font-size:22px;font-weight:600;margin:0;}
     .sub{color:#6F6858;font-size:13px;margin:4px 0 24px;}
@@ -2479,7 +2489,6 @@ function printPullSheet(){
   </tbody></table>
   <p class="noprint" style="margin-top:24px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print</button></p>
   </body></html>`);
-  w.document.close();
 }
 async function markProgramPerformed(){
   const p=_currentProgram();if(!p)return;
@@ -2503,9 +2512,8 @@ async function markProgramPerformed(){
 function printCatalog(tab){
   const rows=getSorted(tab,getFiltered(tab));
   if(!rows.length)return toast('Nothing to print','info');
-  const w=window.open('','_blank');
   const title=tab==='all'?'The Library':cap(tab)+' Library';
-  w.document.write(`<!DOCTYPE html><html><head><title>Choral Catalog — ${title}</title><style>
+  openPrintDoc(`<!DOCTYPE html><html><head><title>Choral Catalog — ${title}</title><style>
     body{font-family:Georgia,serif;color:#232019;max-width:720px;margin:36px auto;padding:0 24px;}
     h1{font-size:26px;font-weight:500;margin:0;} .orn{color:#8A6D3B;text-align:center;margin:16px 0;}
     .sub{color:#6F6858;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;}
@@ -2522,7 +2530,6 @@ function printCatalog(tab){
   </tbody></table>
   <p class="noprint" style="margin-top:24px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print / Save as PDF</button></p>
   </body></html>`);
-  w.document.close();
 }
 
 // ── Statistics page ────────────────────────────────────────────────────────
@@ -3885,8 +3892,7 @@ async function applyRebalance(){
   toast('Shelves rebalanced','success');
 }
 function printMoveList(moves){
-  const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Shelf Move List</title><style>
+  openPrintDoc(`<!DOCTYPE html><html><head><title>Shelf Move List</title><style>
     body{font-family:Georgia,serif;color:#232019;max-width:640px;margin:32px auto;padding:0 24px;}
     h1{font-size:20px;margin:0 0 4px;} .sub{color:#6F6858;font-size:12px;margin-bottom:20px;}
     table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -3901,7 +3907,6 @@ function printMoveList(moves){
   </tbody></table>
   <p class="noprint" style="margin-top:20px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print</button></p>
   </body></html>`);
-  w.document.close();
 }
 
 function renderZoneCard(z){
@@ -4049,9 +4054,8 @@ function printShelfPlan(c,s){
   const{plan}=computeShelfPlan();
   const zone=ZONE_MAP.find(z=>z.shelves.some(sh=>Number(sh.c)===Number(c)&&Number(sh.s)===Number(s)));
   const pieces=plan[`${c}-${s}`]||[];
-  const w=window.open('','_blank');
   let lastSeason=null;
-  w.document.write(`<!DOCTYPE html><html><head><title>Shelf C${c}-S${s}</title><style>
+  openPrintDoc(`<!DOCTYPE html><html><head><title>Shelf C${c}-S${s}</title><style>
     body{font-family:Georgia,serif;color:#232019;max-width:640px;margin:32px auto;padding:0 24px;}
     h1{font-size:20px;margin:0 0 4px;} .sub{color:#6F6858;font-size:12px;margin-bottom:20px;}
     table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -4072,7 +4076,41 @@ function printShelfPlan(c,s){
   </tbody></table>
   <p class="noprint" style="margin-top:20px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print</button></p>
   </body></html>`);
-  w.document.close();
+}
+// Full placement printout: EVERY shelf and filing drawer with everything that
+// belongs on it — the complete re-shelving worksheet, not just this run's moves.
+function printFullPlacement(){
+  const{plan}=computeShelfPlan();
+  const shelfKeys=[];
+  for(const z of ZONE_MAP)for(const sh of z.shelves){
+    const k=`${sh.c}-${sh.s}`;
+    if(plan[k]&&plan[k].length)shelfKeys.push({k,c:sh.c,s:sh.s,zone:z.name});
+  }
+  // Filing-cabinet boxes come from saved locations (auto-shelve writes them there)
+  const fileBoxes=data.work.filter(e=>e._type==='octavo'&&e.location_area==='file'&&e.location_cabinet&&e.location_shelf)
+    .sort((a,b)=>(a.location_cabinet-b.location_cabinet)||(a.location_shelf-b.location_shelf)||String(a.call_number||'').localeCompare(String(b.call_number||''),undefined,{numeric:true}));
+  const fileGroups={};
+  fileBoxes.forEach(e=>{const k=`FC${e.location_cabinet}-D${e.location_shelf}`;(fileGroups[k]=fileGroups[k]||[]).push(e);});
+  const total=shelfKeys.reduce((n,x)=>n+plan[x.k].length,0)+fileBoxes.length;
+  if(!total){toast('Nothing is placed in the plan yet — run Auto-shelve first','info');return;}
+  const row=e=>`<tr><td><span class="box"></span></td><td class="cn">${esc(e.call_number||'—')}</td><td>${esc(e.title||'')}</td><td style="color:#6F6858;font-size:12px;">${esc(e.composer||'')}</td></tr>`;
+  const section=(label,items)=>`<h2>${esc(label)} <span class="cnt">${items.length} box${items.length===1?'':'es'}</span></h2>
+    <table><tbody>${items.map(row).join('')}</tbody></table>`;
+  openPrintDoc(`<!DOCTYPE html><html><head><title>Full Shelf Placement</title><style>
+    body{font-family:Georgia,serif;color:#232019;max-width:660px;margin:32px auto;padding:0 24px;}
+    h1{font-size:20px;margin:0 0 4px;} .sub{color:#6F6858;font-size:12px;margin-bottom:20px;}
+    h2{font-size:15px;margin:22px 0 6px;padding-bottom:3px;border-bottom:1px solid #232019;page-break-after:avoid;}
+    .cnt{font-size:11px;color:#6F6858;font-weight:400;}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;}
+    td{padding:6px;border-bottom:1px solid #E9E5DE;} .cn{font-family:monospace;font-size:11px;white-space:nowrap;}
+    .box{display:inline-block;width:12px;height:12px;border:1.5px solid #232019;border-radius:2px;}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+  <h1>Full Shelf Placement</h1><div class="sub">${total} boxes · ${new Date().toLocaleDateString()}</div>
+  ${shelfKeys.map(x=>section(`C${x.c}-S${x.s} — ${x.zone}`,plan[x.k])).join('')}
+  ${Object.keys(fileGroups).map(k=>section(`${k} — Filing cabinet`,fileGroups[k])).join('')}
+  <p class="noprint" style="margin-top:20px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print</button></p>
+  </body></html>`);
 }
 
 function runZoneLookup(){
