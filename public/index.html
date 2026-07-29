@@ -1418,19 +1418,39 @@ function computeLocationTag(entry){
 // honest: a zone's singles count toward its shelf share at the box's actual
 // size, not one slot per piece.
 function isSingle(e){return e&&e._type==='octavo'&&parseInt(e.copies)===1;}
-function _singlesCapacity(){const v=SHELF_CAP&&parseInt(SHELF_CAP.singlesCapacity);return v>=1?v:100;}
-function _singlesFootprint(){const v=SHELF_CAP&&parseInt(SHELF_CAP.singlesFootprint);return v>=1?v:2;}
+// JW Pepper file-finder boxes come in 1", 2" and 3" depths, and sections use
+// whatever mix fits their pile — so capacity (octavos per box) and footprint
+// (shelf slots) are configured PER SIZE, and every box carries its own size
+// (assignable in the Singles boxes card; new boxes get the default size).
+const SINGLES_SIZE_DEFAULTS={cap:{1:35,2:70,3:105},fp:{1:1,2:1,3:2}};
+function _singlesSizeCfg(){
+  const c=(SHELF_CAP&&SHELF_CAP.singlesSizeCfg)||{};
+  return{cap:{...SINGLES_SIZE_DEFAULTS.cap,...(c.cap||{})},fp:{...SINGLES_SIZE_DEFAULTS.fp,...(c.fp||{})}};
+}
+function _singlesDefaultSize(){const v=SHELF_CAP&&parseInt(SHELF_CAP.singlesDefaultSize);return[1,2,3].includes(v)?v:3;}
+function _boxSize(id){
+  const m=(SHELF_CAP&&SHELF_CAP.singlesSizes)||{};
+  const v=parseInt(m[id]);return[1,2,3].includes(v)?v:_singlesDefaultSize();
+}
+function _sizeCap(size){const v=parseInt(_singlesSizeCfg().cap[size]);return v>=1?v:SINGLES_SIZE_DEFAULTS.cap[size]||100;}
+function _sizeFp(size){const v=parseInt(_singlesSizeCfg().fp[size]);return v>=1?v:SINGLES_SIZE_DEFAULTS.fp[size]||1;}
 function computeSinglesBoxes(){
-  const cap=_singlesCapacity();
   const by={};
   data.work.filter(e=>isSingle(e)&&String(e.call_number||'').trim()&&_seasonOf(e))
     .forEach(e=>{(by[_seasonOf(e)]=by[_seasonOf(e)]||[]).push(e);});
   const out=[];
   for(const season of Object.keys(by)){
     const list=by[season].sort((a,b)=>compareCallNumbers(a.call_number,b.call_number));
-    for(let i=0;i<list.length;i+=cap){
-      const n=Math.floor(i/cap)+1;
-      out.push({id:`S-${season}-${n}`,season,n,pieces:list.slice(i,i+cap)});
+    // Sequential slicing: each box takes as many as ITS size holds, so a 3"
+    // box followed by a 1" box works. Resizing a box re-slices the ones after
+    // it — reprint contents sheets after a size change.
+    let i=0,n=1;
+    while(i<list.length){
+      const id=`S-${season}-${n}`;
+      const size=_boxSize(id);
+      const cap=_sizeCap(size);
+      out.push({id,season,n,size,pieces:list.slice(i,i+cap)});
+      i+=cap;n++;
     }
   }
   return out;
@@ -1616,8 +1636,9 @@ function getShelfOccupancy(c,s){
   // not one slot per piece.
   const here=data.work.filter(e=>e._type==='octavo'&&e.location_area!=='file'&&Number(e.location_cabinet)===c&&Number(e.location_shelf)===s);
   const multi=here.filter(e=>!isSingle(e)).length;
-  const boxIds=new Set(here.filter(isSingle).map(e=>{const b=singlesBoxOf(e);return b?b.id:'S-?';}));
-  return multi+boxIds.size*_singlesFootprint();
+  const boxes={};
+  here.filter(isSingle).forEach(e=>{const b=singlesBoxOf(e);if(b)boxes[b.id]=b.size;else boxes['S-?']=_singlesDefaultSize();});
+  return multi+Object.values(boxes).reduce((sum,z)=>sum+_sizeFp(z),0);
 }
 function getShelfOpenSlots(c,s){
   const cap=getShelfCapacity(c,s);
@@ -1729,8 +1750,7 @@ function _maxShelvesPerZone(){
 // with many singles.
 function _zoneShelfLoad(z){
   const multi=data.work.filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e))&&!isSingle(e)).length;
-  const boxes=singlesBoxesCached().filter(b=>z.seasons.includes(b.season)).length;
-  return multi+boxes*_singlesFootprint();
+  return multi+singlesBoxesCached().filter(b=>z.seasons.includes(b.season)).reduce((s,b)=>s+_sizeFp(b.size),0);
 }
 function _autoShelfSplit(maxPer){
   const total=_allShelvesList().length;                 // 35
@@ -1783,7 +1803,7 @@ function _zoneUnits(z,boxesBySeason){
   }
   return units;
 }
-function _unitCost(u){return u.kind==='box'?_singlesFootprint():1;}
+function _unitCost(u){return u.kind==='box'?_sizeFp(u.box.size):1;}
 function _unitSeason(u){return u.kind==='box'?u.box.season:_seasonOf(u.e);}
 // Season order first, pieces before their season's boxes, then number/box order.
 function _unitCompare(a,b){
@@ -4086,10 +4106,12 @@ function renderSinglesBoxesCard(){
   const rows=[...boxes].sort((a,b)=>si(a.season)-si(b.season)||a.n-b.n).map(b=>{
     const m=b.pieces[0]||{};
     const now=m.location_cabinet&&m.location_shelf?(m.location_area==='file'?`FC${m.location_cabinet}-D${m.location_shelf}`:`C${m.location_cabinet}-S${m.location_shelf}`):'—';
+    const sizeSel=`<select class="filter-select" style="font-size:12px;" title="Box depth — sets how many octavos it holds and how many shelf slots it takes" onchange="setSinglesBoxSize('${escAttr(b.id)}',this.value)">${[1,2,3].map(z=>`<option value="${z}"${z===b.size?' selected':''}>${z}&quot;</option>`).join('')}</select>`;
     return `<tr>
       <td style="font-family:var(--mono);font-weight:700;white-space:nowrap;">📦 ${esc(b.id)}</td>
       <td>${esc(seasonLabel(b.season))}</td>
-      <td>${b.pieces.length}</td>
+      <td>${sizeSel}</td>
+      <td>${b.pieces.length} / ${_sizeCap(b.size)}</td>
       <td>${esc(plannedLoc(b.id))}</td>
       <td class="text-muted">${esc(now)}</td>
       <td style="text-align:right;"><button class="btn-ghost btn-sm" onclick="printSinglesBoxContents('${escAttr(b.id)}')">${ICO.print} Contents</button></td>
@@ -4099,30 +4121,43 @@ function renderSinglesBoxesCard(){
   <div class="card" style="margin-top:24px;">
     <div class="card-header"><h3>Singles boxes</h3><span style="font-size:12px;color:var(--muted);">${totalSingles} single-copy titles in ${boxes.length} box${boxes.length===1?'':'es'} · each box files at the end of its section</span></div>
     <div class="card-body">
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
         <button class="btn-secondary btn-sm" onclick="generateSinglesBoxLabels()">${ICO.print} Print box labels</button>
         <button class="btn-secondary btn-sm" onclick="printSinglesBoxContents()">${ICO.print} Print all contents sheets</button>
         <span style="flex:1;"></span>
-        <label style="font-size:12.5px;color:var(--muted);" title="How many octavos fit one box — a 3&quot; JW Pepper file-finder box holds roughly 80–150. Sections with more singles get a second box.">Capacity/box:</label>
-        <input type="number" id="singles-cap-input" value="${_singlesCapacity()}" min="1" style="width:64px;${inp}">
-        <label style="font-size:12.5px;color:var(--muted);" title="How many ordinary box slots one singles box occupies on the shelf — this is what Rebalance and the fill bars count, so singles don't over-claim shelf space">Footprint (slots):</label>
-        <input type="number" id="singles-fp-input" value="${_singlesFootprint()}" min="1" style="width:56px;${inp}">
+        <label style="font-size:12.5px;color:var(--muted);" title="Size given to a box you haven't set a size on yet">New boxes are:</label>
+        <select id="singles-defsize-input" class="filter-select" style="font-size:12.5px;">${[1,2,3].map(z=>`<option value="${z}"${z===_singlesDefaultSize()?' selected':''}>${z}&quot;</option>`).join('')}</select>
         <button class="btn-primary btn-sm" onclick="saveSinglesCfg()">Set</button>
       </div>
-      <table style="width:100%;max-width:780px;">
-        <thead><tr><th>Box</th><th>Section</th><th>Titles</th><th>Planned spot</th><th>Now</th><th></th></tr></thead>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:12.5px;color:var(--muted);">
+        <span title="How many octavos fit each box depth — JW Pepper file-finder boxes; a 3&quot; holds roughly 80–150">Capacity 1"/2"/3":</span>
+        ${[1,2,3].map(z=>`<input type="number" id="singles-cap-${z}" value="${_sizeCap(z)}" min="1" style="width:58px;${inp}">`).join('')}
+        <span title="How many ordinary box slots each depth occupies on the shelf — this is what Rebalance and the fill bars count, so singles don't over-claim shelf space">Footprint (slots) 1"/2"/3":</span>
+        ${[1,2,3].map(z=>`<input type="number" id="singles-fp-${z}" value="${_sizeFp(z)}" min="1" style="width:48px;${inp}">`).join('')}
+      </div>
+      <table style="width:100%;max-width:860px;">
+        <thead><tr><th>Box</th><th>Section</th><th>Size</th><th>Titles / cap</th><th>Planned spot</th><th>Now</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
   </div>`;
 }
 function saveSinglesCfg(){
-  const cap=parseInt(document.getElementById('singles-cap-input').value);
-  const fp=parseInt(document.getElementById('singles-fp-input').value);
-  if(!(cap>=1)||!(fp>=1)){toast('Enter valid numbers (1 or more)','error');return;}
-  SHELF_CAP.singlesCapacity=cap;SHELF_CAP.singlesFootprint=fp;
+  const cap={},fp={};
+  for(const z of[1,2,3]){
+    cap[z]=parseInt(document.getElementById(`singles-cap-${z}`).value);
+    fp[z]=parseInt(document.getElementById(`singles-fp-${z}`).value);
+    if(!(cap[z]>=1)||!(fp[z]>=1)){toast('Enter valid numbers (1 or more)','error');return;}
+  }
+  SHELF_CAP.singlesSizeCfg={cap,fp};
+  SHELF_CAP.singlesDefaultSize=parseInt(document.getElementById('singles-defsize-input').value)||3;
   _sbMemo=null;_saveShelfCap();renderZoneView();
-  toast(`Singles boxes: ${cap} octavos/box · footprint ${fp} slot${fp===1?'':'s'}`,'success');
+  toast('Singles box sizes saved','success');
+}
+function setSinglesBoxSize(id,size){
+  SHELF_CAP.singlesSizes={...(SHELF_CAP.singlesSizes||{}),[id]:parseInt(size)};
+  _sbMemo=null;_saveShelfCap();renderZoneView();
+  toast(`${id} is now a ${parseInt(size)}″ box — later boxes in this section re-slice; reprint contents sheets`,'success',5000);
 }
 // Printable contents sheet — one box, or all boxes when no id given.
 function printSinglesBoxContents(boxId){
