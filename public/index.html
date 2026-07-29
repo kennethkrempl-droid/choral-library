@@ -1395,6 +1395,15 @@ function computeLocationTag(entry){
     tag=`FC${entry.location_cabinet}-D${entry.location_shelf}`;
   else if(!entry.location_cabinet||!entry.location_shelf) tag='Unassigned';
   else tag=`C${entry.location_cabinet}-S${entry.location_shelf}`;
+  // Pieces stored inside another piece's box point at their companion.
+  if(storedWithCN(entry)){
+    const c=storedCompanion(entry);
+    if(c){
+      const base=computeLocationTag({...c,stored_with:''});
+      return base==='Unassigned'?`in ${c.call_number}`:`${base} · in ${c.call_number}`;
+    }
+    return `in ${storedWithCN(entry)}`;
+  }
   // Singles live inside their section's singles box — say which one.
   if(isSingle(entry)){
     const b=singlesBoxOf(entry);
@@ -1417,7 +1426,17 @@ function computeLocationTag(entry){
 // the existing shelfCap config plumbing. Footprint is what keeps Rebalance
 // honest: a zone's singles count toward its shelf share at the box's actual
 // size, not one slot per piece.
-function isSingle(e){return e&&e._type==='octavo'&&parseInt(e.copies)===1;}
+// "Stored with" override: a piece (typically a 1-copy alternate arrangement)
+// can be filed INSIDE another piece's box — e.g. the lone SATB copy living in
+// the SAB arrangement's box. Set the companion's call number on the piece and
+// it leaves the singles box, takes no shelf slot of its own, and its location
+// follows the companion everywhere.
+function storedWithCN(e){return String((e&&e.stored_with)||'').trim().toUpperCase();}
+function storedCompanion(e){
+  const cn=storedWithCN(e);if(!cn)return null;
+  return data.work.find(x=>x._type==='octavo'&&x._id!==e._id&&String(x.call_number||'').trim().toUpperCase()===cn)||null;
+}
+function isSingle(e){return e&&e._type==='octavo'&&parseInt(e.copies)===1&&!storedWithCN(e);}
 // JW Pepper file-finder boxes come in 1", 2" and 3" depths, and sections use
 // whatever mix fits their pile — so capacity (octavos per box) and footprint
 // (shelf slots) are configured PER SIZE, and every box carries its own size
@@ -1634,7 +1653,7 @@ function getShelfOccupancy(c,s){
   // separate numbering space and must not be counted against C{c}-S{s}.
   // Singles share one physical box, so they count as their box's footprint,
   // not one slot per piece.
-  const here=data.work.filter(e=>e._type==='octavo'&&e.location_area!=='file'&&Number(e.location_cabinet)===c&&Number(e.location_shelf)===s);
+  const here=data.work.filter(e=>e._type==='octavo'&&e.location_area!=='file'&&Number(e.location_cabinet)===c&&Number(e.location_shelf)===s&&!storedWithCN(e));
   const multi=here.filter(e=>!isSingle(e)).length;
   const boxes={};
   here.filter(isSingle).forEach(e=>{const b=singlesBoxOf(e);if(b)boxes[b.id]=b.size;else boxes['S-?']=_singlesDefaultSize();});
@@ -1749,7 +1768,7 @@ function _maxShelvesPerZone(){
 // shelf) — this is what keeps Rebalance from over-allocating shelves to zones
 // with many singles.
 function _zoneShelfLoad(z){
-  const multi=data.work.filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e))&&!isSingle(e)).length;
+  const multi=data.work.filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e))&&!isSingle(e)&&!storedWithCN(e)).length;
   return multi+singlesBoxesCached().filter(b=>z.seasons.includes(b.season)).reduce((s,b)=>s+_sizeFp(b.size),0);
 }
 function _autoShelfSplit(maxPer){
@@ -1794,7 +1813,7 @@ function _zoneOrderCompare(z){
 // END of that season's run — "the box sits at the end of its own section".
 function _zoneUnits(z,boxesBySeason){
   const multi=data.work
-    .filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e))&&!isSingle(e))
+    .filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e))&&!isSingle(e)&&!storedWithCN(e))
     .sort(_zoneOrderCompare(z));
   const units=[];
   for(const season of z.seasons){
@@ -1872,6 +1891,15 @@ function computeAutoShelvePlan(){
     place(overflow[oi],'file',fcab,fdraw,false);
     left-=cost;unitsInFiling++;
   }
+  // Pieces stored inside another piece's box ride along with that piece —
+  // no slot of their own, location mirrors the companion's.
+  const locById={};assignments.forEach(a=>{locById[a.id]=a;});
+  for(const e of data.work){
+    if(e._type!=='octavo'||!storedWithCN(e))continue;
+    const comp=storedCompanion(e);
+    const a=comp&&locById[comp._id];
+    if(a)assignments.push({id:e._id,area:a.area,cab:a.cab,shelf:a.shelf,call:e.call_number,title:e.title,withPiece:comp.call_number});
+  }
   return {assignments,boxPlacements,onShelves:unitsOnShelves,growthUsed,
           inFiling:unitsInFiling,filingCabinets:unitsInFiling?fcab:0,byZone,drawerCap,drawersPer,
           total:unitsOnShelves+unitsInFiling};
@@ -1909,9 +1937,10 @@ async function autoShelveAll(opts={}){
     try{
       const r=await fetch(`/api/entries/work/${e._id}`,adminFetchOpts(updated,'PUT'));
       if(r.ok){const j=await r.json();const i=data.work.findIndex(x=>x._id===e._id);if(i>-1)data.work[i]={...data.work[i],...(j.entry||{}),...updated};done++;
-        // Singles moving with their box collapse into ONE move-list line per box
+        // Singles moving with their box collapse into ONE move-list line per box;
+        // stored-with pieces move inside their companion's box — no line at all.
         if(a.inBox){if(!boxMoves[a.inBox])boxMoves[a.inBox]={from,to:rawTag(updated),n:0};boxMoves[a.inBox].n++;}
-        else moves.push({call:a.call||'',title:a.title||'',from,to:rawTag(updated)});}
+        else if(!a.withPiece)moves.push({call:a.call||'',title:a.title||'',from,to:rawTag(updated)});}
     }catch{}
   }
   for(const[bid,m]of Object.entries(boxMoves)){
@@ -1931,6 +1960,18 @@ async function autoPlaceOne(entry){
   if(entry.location_cabinet&&entry.location_shelf)return null;   // already placed
   if(SHELF_CAP.default==null)return null;                        // need capacities to place
   _initFilingCfg();
+  if(storedWithCN(entry)){
+    // Files inside its companion's box — copy the companion's location.
+    const comp=storedCompanion(entry);
+    if(!comp||!comp.location_cabinet||!comp.location_shelf)return null;
+    const updated={...entry,location_cabinet:comp.location_cabinet,location_shelf:comp.location_shelf};
+    if(comp.location_area==='file')updated.location_area='file';else delete updated.location_area;
+    try{
+      const r=await fetch(`/api/entries/work/${entry._id}`,adminFetchOpts(updated,'PUT'));
+      if(r.ok){const j=await r.json();const i=data.work.findIndex(x=>x._id===entry._id);if(i>-1)data.work[i]={...data.work[i],...(j.entry||{}),...updated};return updated;}
+    }catch{}
+    return null;
+  }
   if(isSingle(entry)){
     // A single doesn't take its own slot — it files inside its section's
     // singles box. Put it wherever the plan says that box sits.
@@ -3232,6 +3273,7 @@ function octavoFields(tab){return[
     {key:'location_cabinet',label:'Cabinet (1–5)',type:'number',min:1,max:5,placeholder:'1–5',workOnly:true},
     {key:'location_shelf',label:'Shelf (1–7)',type:'number',min:1,max:7,placeholder:'1–7',workOnly:true},
     {key:'call_number',label:'Call Number',           type:'callnum-text',      workOnly:true},
+    {key:'stored_with',label:'Stored With (call number)',type:'text',placeholder:'e.g. SAC-SAB-0123 — files inside that piece’s box',workOnly:true},
     {key:'__loctag',   label:'Location',             type:'computed-loctag',   workOnly:true},
     {key:'__suggest',  label:'Suggested Location',   type:'computed-suggest',  workOnly:true},
   ]:[]),
@@ -4423,8 +4465,13 @@ function showShelfPlan(c,s){
   // Boxes physically sitting on this shelf right now (what the fill bar counts).
   const current=data.work.filter(e=>e._type==='octavo'&&e.location_area!=='file'&&Number(e.location_cabinet)===Number(c)&&Number(e.location_shelf)===Number(s));
   const plannedIds=new Set(pieces.flatMap(it=>it.__sbox?it.pieces.map(p=>p._id):[it._id]));
+  // Stored-with pieces belong wherever their companion is planned.
+  data.work.forEach(e=>{
+    if(e._type==='octavo'&&storedWithCN(e)){const comp=storedCompanion(e);if(comp&&plannedIds.has(comp._id))plannedIds.add(e._id);}
+  });
   const extras=current.filter(e=>!plannedIds.has(e._id));
   const destOf=e=>{
+    if(storedWithCN(e)){const comp=storedCompanion(e);if(comp)e=comp;}
     for(const k in plan){if(plan[k].some(it=>_itemHasPiece(it,e._id))){const[dc,ds]=k.split('-');return`C${dc}-S${ds}`;}}
     if(overflow.some(it=>_itemHasPiece(it,e._id)))return'Filing cabinets';
     return null;   // not in the plan at all — usually missing a call number
