@@ -846,6 +846,16 @@ html[data-theme="dark"] .brand-mark { border-color:var(--gold-line); color:var(-
       </div>
     </div>
 
+    <div class="settings-section admin-only">
+      <div class="settings-section-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg> Call Number Codes</div>
+      <div class="settings-section-body">
+        <p style="font-size:13px;color:var(--muted);">When a new piece is saved, its call number (SECTION-VOICING-NUMBER) is built from these codes; the number continues one library-wide sequence and is never reused. Edit a code here and future saves use it — existing call numbers are not touched.</p>
+        <div id="callnum-maps-editor"></div>
+        <div style="margin-top:10px;"><button class="btn-primary btn-sm" onclick="saveCallnumMaps()">Save Codes</button></div>
+        <div id="callnum-maps-status" style="font-size:12px;color:var(--muted);"></div>
+      </div>
+    </div>
+
     <div class="settings-section">
       <div class="settings-section-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share This Library</div>
       <div class="settings-section-body" id="share-body">
@@ -1337,7 +1347,12 @@ const GENRE_TO_SEASON={
   'Pop':'POP','Holiday':'HLD','Musical Theater':'MT',
   'Classical':'CON','Sacred':'SAC','Spiritual':'SPR','Folk':'FOL','Jazz':'JAZ','Winter':'WNT',
 };
-function voicingCode(v){return VOICING_TO_CODE[v]||'SPC';}
+// Settings overrides for the two mapping tables (synced from server via /api/zones).
+// The server holds the same defaults and applies the same overrides when it
+// auto-assigns call numbers on save.
+let CALLNUM_MAPS={genreToSeason:{},voicingToCode:{}};
+function voicingCode(v){return CALLNUM_MAPS.voicingToCode[v]||VOICING_TO_CODE[v]||'SPC';}
+function genreSeason(g){return CALLNUM_MAPS.genreToSeason[g]||GENRE_TO_SEASON[g]||null;}
 function computeCallNumber(entry){
   if(!entry.season||!entry.accession_id) return '';
   const vc=voicingCode(entry.voicing||'');
@@ -1531,6 +1546,7 @@ async function loadZonesFromServer(){
     const j=await r.json();
     if(j.zoneMap&&j.zoneMap.length)ZONE_MAP=j.zoneMap;
     if(j.shelfCap)SHELF_CAP=j.shelfCap;
+    if(j.callnumMaps)CALLNUM_MAPS={genreToSeason:j.callnumMaps.genreToSeason||{},voicingToCode:j.callnumMaps.voicingToCode||{}};
     _ensureZoneSeasons();
   }catch{}
 }
@@ -2602,6 +2618,69 @@ function renderStatsPage(){
     </div>`;
 }
 
+// ── Settings: call number code mappings ───────────────────────────────────
+// Defaults live in GENRE_TO_SEASON / VOICING_TO_CODE; only differences are
+// stored as overrides in server config (CALLNUM_MAPS), which the server also
+// reads when it auto-assigns call numbers.
+function _cnmapRows(defaults,overrides){
+  const keys=[...new Set([...Object.keys(defaults),...Object.keys(overrides)])].sort((a,b)=>a.localeCompare(b));
+  return keys.map(k=>({k,code:overrides[k]!==undefined?overrides[k]:defaults[k]}));
+}
+function renderCallnumMapsEditor(){
+  const el=document.getElementById('callnum-maps-editor');if(!el)return;
+  const secOpts=v=>SEASON_CODES.map(s=>`<option value="${s.code}"${s.code===v?' selected':''}>${s.code} — ${esc(s.label)}</option>`).join('');
+  const gRows=_cnmapRows(GENRE_TO_SEASON,CALLNUM_MAPS.genreToSeason).map(r=>
+    `<tr><td style="padding:3px 10px 3px 0;">${esc(r.k)}</td><td style="padding:3px 0;"><select class="cnmap-g filter-select" data-key="${escAttr(r.k)}" style="font-size:12px;">${secOpts(r.code)}</select></td></tr>`).join('');
+  const vRows=_cnmapRows(VOICING_TO_CODE,CALLNUM_MAPS.voicingToCode).map(r=>
+    `<tr><td style="padding:3px 10px 3px 0;">${esc(r.k)}</td><td style="padding:3px 0;"><input class="cnmap-v" data-key="${escAttr(r.k)}" value="${escAttr(r.code)}" maxlength="4" style="width:72px;font-family:var(--mono,monospace);font-size:12px;text-transform:uppercase;padding:4px 8px;border:1px solid var(--line);border-radius:5px;"></td></tr>`).join('');
+  el.innerHTML=`<div style="display:flex;gap:32px;flex-wrap:wrap;">
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Genre → Section</div>
+      <table style="font-size:12.5px;border-collapse:collapse;"><tbody>${gRows}</tbody></table>
+      <div style="display:flex;gap:6px;margin-top:8px;align-items:center;">
+        <input id="cnmap-new-genre" placeholder="New genre" style="width:110px;font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:5px;">
+        <select id="cnmap-new-genre-code" class="filter-select" style="font-size:12px;">${secOpts('')}</select>
+        <button type="button" class="btn-ghost btn-sm" onclick="addCallnumMapRow('genre')">＋ Add</button>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Voicing → Code</div>
+      <table style="font-size:12.5px;border-collapse:collapse;"><tbody>${vRows}</tbody></table>
+      <div style="display:flex;gap:6px;margin-top:8px;align-items:center;">
+        <input id="cnmap-new-voicing" placeholder="New voicing" style="width:110px;font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:5px;">
+        <input id="cnmap-new-voicing-code" placeholder="CODE" maxlength="4" style="width:72px;font-size:12px;text-transform:uppercase;padding:4px 8px;border:1px solid var(--line);border-radius:5px;">
+        <button type="button" class="btn-ghost btn-sm" onclick="addCallnumMapRow('voicing')">＋ Add</button>
+      </div>
+    </div>
+  </div>`;
+}
+function addCallnumMapRow(kind){
+  if(kind==='genre'){
+    const k=document.getElementById('cnmap-new-genre').value.trim();
+    const c=document.getElementById('cnmap-new-genre-code').value;
+    if(!k||!c){toast('Enter a genre and pick a section code','error');return;}
+    CALLNUM_MAPS.genreToSeason[k]=c;
+  }else{
+    const k=document.getElementById('cnmap-new-voicing').value.trim();
+    const c=document.getElementById('cnmap-new-voicing-code').value.trim().toUpperCase();
+    if(!k||!c){toast('Enter a voicing and a code','error');return;}
+    CALLNUM_MAPS.voicingToCode[k]=c;
+  }
+  renderCallnumMapsEditor();
+  toast('Added — press Save Codes to keep it','info');
+}
+async function saveCallnumMaps(){
+  const g={},v={};
+  document.querySelectorAll('.cnmap-g').forEach(s=>{const k=s.dataset.key;if(s.value!==GENRE_TO_SEASON[k])g[k]=s.value;});
+  document.querySelectorAll('.cnmap-v').forEach(i=>{const k=i.dataset.key;const val=i.value.trim().toUpperCase();if(val&&val!==VOICING_TO_CODE[k])v[k]=val;});
+  CALLNUM_MAPS={genreToSeason:g,voicingToCode:v};
+  try{
+    const r=await fetch('/api/config',adminFetchOpts({callnumMaps:CALLNUM_MAPS}));
+    if(!r.ok)throw new Error((await r.json()).error||'save failed');
+    toast('Call number codes saved','success');
+  }catch(e){toast('Could not save codes: '+e.message,'error');}
+}
+
 // ── Settings: backups, health, trash, history ──────────────────────────────
 async function refreshAuxSections(){
   const host=document.getElementById('aux-sections');if(!host||!isAdmin)return;
@@ -2970,7 +3049,7 @@ function switchTab(name){
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
   renderSidebar(); // re-renders with correct active state
   if(name==='all') renderTable('all');
-  if(name==='settings'){renderOptionChips();refreshAuxSections();}
+  if(name==='settings'){renderOptionChips();renderCallnumMapsEditor();refreshAuxSections();}
   if(name==='shelving') renderZoneView();
   if(name==='programs') renderPrograms();
   if(name==='stats') renderStatsPage();
@@ -3042,7 +3121,7 @@ function buildFieldHTML(f,prefix,value,entry,tab){
   }
   else if(f.type==='callnum-text'){
     const cn=(value!=null&&value!=='')?value:(entry?computeCallNumber(entry):'');
-    inner=`<div style="display:flex;gap:6px;align-items:center;"><input type="text" id="${id}" name="${f.key}" value="${escAttr(cn)}" placeholder="e.g. SAC-SATB-0001" style="font-family:var(--mono,monospace);font-size:13px;" autocomplete="off"><button type="button" class="btn-ghost btn-sm" title="Recompute from season &amp; voicing" onclick="_recomputeCallNum('${prefix}')">↺</button></div>`;
+    inner=`<div style="display:flex;gap:6px;align-items:center;"><input type="text" id="${id}" name="${f.key}" value="${escAttr(cn)}" placeholder="auto-assigned on save — type to override" style="font-family:var(--mono,monospace);font-size:13px;" autocomplete="off"><button type="button" class="btn-ghost btn-sm" title="Recompute from season &amp; voicing" onclick="_recomputeCallNum('${prefix}')">↺</button></div>`;
   }
   else if(f.type==='computed-loctag'){
     const lt=entry?computeLocationTag(entry):'Unassigned';
@@ -3608,12 +3687,10 @@ function submitForm(e,tab){
       if(confirm(`"${entry.genre}" isn't in your genre list — add it?`)) addToGenres(entry.genre);
     }
     entry._id=Date.now();
-    // Assign cataloging fields for new work octavos
-    if(tab==='work'&&entry._type==='octavo'){
-      if(!entry.accession_id) entry.accession_id=getNextAccessionId();
-      if(!entry.needs_cataloging) entry.needs_cataloging=(!entry.season)?true:false;
-      if(!entry.call_number) entry.call_number=computeCallNumber(entry);
-    }
+    // Call numbers are assigned by the SERVER on save (one global sequence,
+    // collision-safe even during bulk imports). Anything typed into the
+    // call-number field is kept as a manual override; the server rejects it
+    // only if it would reuse a NUMBER that another piece already holds.
     const r=await fetch(`/api/entries/${tab}`,adminFetchOpts(entry));
     const j=await r.json();
     if(!r.ok){toast(j.error||'Could not save','error');return;}
@@ -3655,19 +3732,39 @@ async function submitEdit(e){
   if(entry.genre&&!GENRES.includes(entry.genre)){
     if(confirm(`"${entry.genre}" isn't in your genre list — add it?`)) addToGenres(entry.genre);
   }
-  // Preserve cataloging fields and recompute call_number for work octavos
+  // Cataloging rules for work octavos: the NUMBER segment is frozen once
+  // assigned, but the SECTION-VOICING prefix follows the piece's current
+  // season/voicing. If the librarian didn't hand-edit the call-number field,
+  // rebuild the prefix here and warn — a section change moves the piece to a
+  // different shelf zone and the physical copies need re-marking.
   if(tab==='work'&&type==='octavo'){
-    if(!entry.accession_id) entry.accession_id=existing.accession_id||getNextAccessionId();
+    if(!entry.accession_id) entry.accession_id=existing.accession_id||'';
     entry.needs_cataloging=!entry.season;
-    if(!entry.call_number) entry.call_number=computeCallNumber(entry);
+    const oldCN=existing.call_number||'';
+    if(entry.call_number&&entry.call_number===oldCN){
+      const parts=callNumParts(oldCN);
+      const num=parts?parts.num:(parseInt(entry.accession_id)||0);
+      if(num&&entry.season){
+        const digits=Math.max(4,String(num).length);
+        const numStr=String(num).padStart(digits,'0');
+        const newCN=`${entry.season}-${voicingCode(entry.voicing||'')}-${numStr}`;
+        if(newCN!==oldCN){
+          const oz=parts?getZoneForSeason(parts.sec):null, nz=getZoneForSeason(entry.season);
+          const zoneNote=(oz&&nz&&oz.key!==nz.key)?`\nIt moves shelf zones: ${oz.name} → ${nz.name}.`:'';
+          if(!confirm(`Call number changes: ${oldCN} → ${newCN} (the number stays ${numStr}).${zoneNote}\nThe physical copies will need re-marking. Save anyway?`))return;
+          entry.call_number=newCN;
+        }
+      }
+    }
   }
   const r=await fetch(`/api/entries/${tab}/${id}`,adminFetchOpts(entry,'PUT'));
   const j=await r.json();
   if(!r.ok){toast(j.error||'Could not save','error');return;}
   const i=data[tab].findIndex(x=>x._id===id);
-  // Merge: keep existing fields (e.g. unavailable), overlay server response, then locally-built
-  // entry (which has the user's exact edits from the form) takes priority for form fields
-  if(i>-1)data[tab][i]={...data[tab][i],...(j.entry||{}),...entry};
+  // Merge: keep existing fields (e.g. unavailable), overlay the user's edits, then the
+  // server response last — the server is authoritative for cataloging fields (it may
+  // have just assigned/rebuilt the call number when the field was left blank).
+  if(i>-1)data[tab][i]={...data[tab][i],...entry,...(j.entry||{})};
   // Auto-shelve if this edit just gave it a call number and it isn't placed yet.
   if(tab==='work'&&type==='octavo'&&i>-1){const placed=await autoPlaceOne(data[tab][i]);if(placed){renderTable(tab);toast(`Shelved at ${computeLocationTag(placed)}`,'success');}}
   renderTable(tab);renderTable('all');closeModal();toast('Entry updated','success');
@@ -4190,7 +4287,7 @@ async function runCatalogMigration(){
   let done=0,flagged=0;
   for(const e of sorted){
     const accession_id=counter++;
-    const season=GENRE_TO_SEASON[e.genre]||null;
+    const season=genreSeason(e.genre);
     const needs_cataloging=!season;
     // Rename 3-Part Mixed → 3-Part
     const voicing=e.voicing==='3-Part Mixed'?'3-Part':e.voicing;

@@ -42,6 +42,10 @@ const jsonStore = {
     writeJSON(DATA_FILE, data);
     return data[tab][i];
   },
+  async getEntry(tab, id) {
+    const data = await this.getData();
+    return (data[tab] || []).find(e => e._id === id) || null;
+  },
   async deleteEntries(tab, ids) {
     const data = await this.getData();
     const set = new Set(ids);
@@ -152,6 +156,10 @@ function makePgStore() {
       const e = { ...entry, _id: id };
       const r = await q(`UPDATE entries SET payload=$3 WHERE tab=$1 AND id=$2`, [tab, id, e]);
       return r.rowCount ? e : null;
+    },
+    async getEntry(tab, id) {
+      const { rows } = await q(`SELECT payload FROM entries WHERE tab=$1 AND id=$2`, [tab, id]);
+      return rows.length ? rows[0].payload : null;
     },
     async deleteEntries(tab, ids) {
       const r = await q(`DELETE FROM entries WHERE tab=$1 AND id = ANY($2::bigint[])`, [tab, ids]);

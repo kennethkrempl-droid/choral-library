@@ -102,6 +102,109 @@ function adminRequired(req, res, next) {
     .catch(e => res.status(500).json({ error: e.message }));
 }
 
+// ── Call-number allocation (server-authoritative) ─────────────────────────────
+// The NUMBER segment is ONE global accession sequence across the whole library.
+// Every write that could mint or change a number is serialized through
+// _allocChain, so a bulk import posting hundreds of rows — or two librarians
+// saving at once — can never produce a duplicate. Numbers are never reused,
+// even after deletes. (Assumes a single server process, which is how the
+// Render service runs; if that ever changes, move the counter into Postgres.)
+const DEFAULT_GENRE_TO_SEASON = {
+  'Pop': 'POP', 'Holiday': 'HLD', 'Musical Theater': 'MT',
+  'Classical': 'CON', 'Sacred': 'SAC', 'Spiritual': 'SPR', 'Folk': 'FOL', 'Jazz': 'JAZ', 'Winter': 'WNT',
+};
+const DEFAULT_VOICING_TO_CODE = {
+  'SATB': 'SATB', 'SAB': 'SAB',
+  'SSA': 'SSA', 'SSAA': 'SSA',
+  '3-Part': '3PT', '3-Part Mixed': '3PT',
+  '2-Part': '2PT',
+  'SA': 'SPC',
+  'TTBB': 'TTB', 'TTB': 'TTB', 'TBB': 'TTB',
+  'Unison': 'UNI',
+  'SSAATTBB': 'SPC', 'SATTBB': 'SPC', 'SSATB': 'SPC', 'Other': 'SPC',
+};
+async function callnumMaps() {
+  const cfg = await db.getConfig();
+  const m = cfg.callnumMaps || {};
+  return {
+    genreToSeason: { ...DEFAULT_GENRE_TO_SEASON, ...(m.genreToSeason || {}) },
+    voicingToCode: { ...DEFAULT_VOICING_TO_CODE, ...(m.voicingToCode || {}) },
+  };
+}
+function parseCallNum(cn) {
+  const m = String(cn || '').trim().match(/^([A-Za-z]+)-([A-Za-z0-9]+)-(\d+)$/);
+  return m ? { sec: m[1].toUpperCase(), voicing: m[2].toUpperCase(), num: parseInt(m[3], 10) } : null;
+}
+function entryNum(e) {
+  const p = parseCallNum(e.call_number);
+  return Math.max(p ? p.num : 0, parseInt(e.accession_id) || 0);
+}
+const fmtNum = n => String(n).padStart(4, '0');
+
+let _allocChain = Promise.resolve();
+function withAllocLock(fn) {
+  const run = _allocChain.then(fn);
+  _allocChain = run.then(() => {}, () => {});
+  return run;
+}
+
+// Highest NUMBER ever seen. Cached so bulk imports don't rescan the library per
+// row; only ever moves up (numbers are never reused). Invalidated on whole-
+// document replace.
+let _maxNumCache = null;
+function bumpMaxNum(n) { if (_maxNumCache != null && n > _maxNumCache) _maxNumCache = n; }
+async function maxNumber() {
+  if (_maxNumCache == null) {
+    const d = await db.getData();
+    _maxNumCache = Math.max(0, ...(d.work || []).filter(e => e._type === 'octavo').map(entryNum));
+  }
+  return _maxNumCache;
+}
+
+// Fill in accession_id / call_number / season / needs_cataloging on a work
+// octavo before it is written. Must be called inside withAllocLock.
+// Throws err.status=409 when a manual call number would reuse a taken NUMBER.
+async function finalizeWorkOctavo(entry, opts = {}) {
+  const manualCN = String(entry.call_number || '').trim();
+  const prevCN = String(opts.prevCallNumber || '').trim();
+
+  if (manualCN) {
+    // Manual override: keep whatever the librarian wrote, but guard the sequence.
+    const p = parseCallNum(manualCN);
+    if (p) {
+      if (manualCN !== prevCN) {   // new or changed number → check for reuse
+        const d = await db.getData();
+        const clash = (d.work || []).find(e => e._type === 'octavo' && e._id !== entry._id && entryNum(e) === p.num);
+        if (clash) {
+          const err = new Error(`Call number ${manualCN} reuses number ${fmtNum(p.num)}, which belongs to “${clash.title || 'untitled'}” (${clash.call_number || 'no call number'}). Numbers are never reused — clear the field to auto-assign the next free number.`);
+          err.status = 409;
+          throw err;
+        }
+        bumpMaxNum(p.num);
+      }
+      if (!entry.accession_id) entry.accession_id = p.num;
+      if (!entry.season) entry.season = p.sec;
+    }
+    entry.needs_cataloging = !entry.season;
+    return entry;
+  }
+
+  // Auto path: need a section — from the season field or the genre mapping.
+  const maps = await callnumMaps();
+  const season = String(entry.season || '').trim().toUpperCase() ||
+                 maps.genreToSeason[String(entry.genre || '').trim()] || '';
+  if (!season) { entry.needs_cataloging = true; return entry; }
+  const vc = maps.voicingToCode[String(entry.voicing || '').trim()] || 'SPC';
+  let num = parseInt(entry.accession_id) || 0;   // NUMBER is frozen once assigned
+  if (!num) { num = (await maxNumber()) + 1; _maxNumCache = num; }
+  else bumpMaxNum(num);
+  entry.season = season;
+  entry.accession_id = num;
+  entry.call_number = `${season}-${vc}-${fmtNum(num)}`;
+  entry.needs_cataloging = false;
+  return entry;
+}
+
 // ── Data ──────────────────────────────────────────────────────────────────────
 
 app.get('/api/data', async (req, res) => {
@@ -121,7 +224,7 @@ async function logChange(action, detail) {
 
 // Legacy whole-document replace (kept for compatibility)
 app.post('/api/data', adminRequired, async (req, res) => {
-  try { await db.replaceData(req.body); res.json({ success: true }); }
+  try { await db.replaceData(req.body); _maxNumCache = null; res.json({ success: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -136,10 +239,18 @@ app.post('/api/entries/:tab', adminRequired, async (req, res) => {
     if (entry.composer && entry.title && entry.composer.trim() === entry.title.trim()) {
       return res.status(400).json({ error: `Data integrity error: composer ("${entry.composer}") equals title — check column mapping in your import.` });
     }
-    await db.addEntry(tab, entry);
+    if (tab === 'work' && entry._type === 'octavo') {
+      // Allocate + insert atomically so parallel saves can't mint the same number
+      await withAllocLock(async () => {
+        await finalizeWorkOctavo(entry);
+        await db.addEntry(tab, entry);
+      });
+    } else {
+      await db.addEntry(tab, entry);
+    }
     logChange('added', `${entry.title} (${tab})`);
     res.json({ success: true, entry });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
 app.put('/api/entries/:tab/:id', adminRequired, async (req, res) => {
@@ -149,11 +260,24 @@ app.put('/api/entries/:tab/:id', adminRequired, async (req, res) => {
     if (body.composer && body.title && body.composer.trim() === body.title.trim()) {
       return res.status(400).json({ error: `Data integrity error: composer ("${body.composer}") equals title — check column mapping in your import.` });
     }
-    const updated = await db.updateEntry(req.params.tab, parseInt(req.params.id), body);
+    const id = parseInt(req.params.id);
+    let updated;
+    if (req.params.tab === 'work' && body._type === 'octavo') {
+      updated = await withAllocLock(async () => {
+        const prev = await db.getEntry('work', id);
+        if (!prev) return null;
+        const e2 = { ...body, _id: id };
+        if (!e2.accession_id && prev.accession_id) e2.accession_id = prev.accession_id; // NUMBER frozen
+        await finalizeWorkOctavo(e2, { prevCallNumber: prev.call_number });
+        return db.updateEntry('work', id, e2);
+      });
+    } else {
+      updated = await db.updateEntry(req.params.tab, id, body);
+    }
     if (!updated) return res.status(404).json({ error: 'Entry not found' });
     logChange('updated', `${updated.title} (${req.params.tab})`);
     res.json({ success: true, entry: updated });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
 app.post('/api/entries/:tab/bulk', adminRequired, async (req, res) => {
@@ -896,7 +1020,7 @@ app.get('/api/config-read', adminRequired, async (req, res) => {
 
 app.post('/api/config', adminRequired, async (req, res) => {
   try {
-    const allowed = ['clientId', 'clientSecret', 'notifyEmail', 'smtpUser', 'smtpPass', 'smtpHost', 'smtpPort', 'geminiApiKey', 'zoneMap', 'shelfCap'];
+    const allowed = ['clientId', 'clientSecret', 'notifyEmail', 'smtpUser', 'smtpPass', 'smtpHost', 'smtpPort', 'geminiApiKey', 'zoneMap', 'shelfCap', 'callnumMaps'];
     const cfg = await db.getConfig();
     for (const k of allowed) if (k in req.body) cfg[k] = req.body[k];
     await db.saveConfig(cfg);
@@ -907,7 +1031,7 @@ app.post('/api/config', adminRequired, async (req, res) => {
 
 // Zone map (shelving layout) — synced across devices
 app.get('/api/zones', adminRequired, async (req, res) => {
-  try { const cfg = await db.getConfig(); res.json({ zoneMap: cfg.zoneMap || null, shelfCap: cfg.shelfCap || null }); }
+  try { const cfg = await db.getConfig(); res.json({ zoneMap: cfg.zoneMap || null, shelfCap: cfg.shelfCap || null, callnumMaps: cfg.callnumMaps || null }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
