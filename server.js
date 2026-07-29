@@ -111,7 +111,7 @@ function adminRequired(req, res, next) {
 // Render service runs; if that ever changes, move the counter into Postgres.)
 const DEFAULT_GENRE_TO_SEASON = {
   'Pop': 'POP', 'Holiday': 'HLD', 'Musical Theater': 'MT',
-  'Classical': 'CLA', 'Concert': 'CON', 'Sacred': 'SAC', 'Spiritual': 'SPR', 'Folk': 'FOL', 'Jazz': 'JAZ', 'Winter': 'WNT',
+  'Classical': 'CLA', 'Concert': 'CON', 'Sacred': 'SAC', 'Spiritual': 'SPR', 'Folk': 'FOL', 'Jazz': 'JAZ', 'Winter': 'WNT', 'School Song': 'SS',
 };
 const DEFAULT_VOICING_TO_CODE = {
   'SATB': 'SATB', 'SAB': 'SAB',

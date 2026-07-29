@@ -1334,6 +1334,7 @@ const SEASON_CODES=[
   {code:'SAC',label:'Sacred General'},
   {code:'SPR',label:'Spiritual'},
   {code:'PAT',label:'Patriotic/Civic'},
+  {code:'SS', label:'School Song'},
   {code:'FOL',label:'Folk/Americana'},
   {code:'SEA',label:'Seasonal Secular'},
   {code:'MSC',label:'Miscellaneous'},
@@ -1350,7 +1351,7 @@ const VOICING_TO_CODE={
 };
 const GENRE_TO_SEASON={
   'Pop':'POP','Holiday':'HLD','Musical Theater':'MT',
-  'Classical':'CLA','Concert':'CON','Sacred':'SAC','Spiritual':'SPR','Folk':'FOL','Jazz':'JAZ','Winter':'WNT',
+  'Classical':'CLA','Concert':'CON','Sacred':'SAC','Spiritual':'SPR','Folk':'FOL','Jazz':'JAZ','Winter':'WNT','School Song':'SS',
 };
 // Settings overrides for the two mapping tables (synced from server via /api/zones).
 // The server holds the same defaults and applies the same overrides when it
@@ -1604,14 +1605,14 @@ const DEFAULT_ZONE_MAP=[
   {key:'secular',  name:'Secular/Seasonal',  seasons:['SEA','FOL'],     shelves:[{c:3,s:1},{c:3,s:2},{c:3,s:3},{c:3,s:4},{c:3,s:5},{c:3,s:6},{c:3,s:7}]},
   {key:'pop',      name:'Pop/Show',          seasons:['POP','MT','JAZ'],shelves:[{c:4,s:1},{c:4,s:2},{c:4,s:3},{c:4,s:4},{c:4,s:5}]},
   {key:'concert',  name:'Concert/Classical', seasons:['CON','CLA'],     shelves:[{c:4,s:6},{c:4,s:7},{c:5,s:1},{c:5,s:2}]},
-  {key:'patriotic',name:'Patriotic/Misc',    seasons:['PAT','MSC'],     shelves:[{c:5,s:3},{c:5,s:4},{c:5,s:5}]},
+  {key:'patriotic',name:'Patriotic/Misc',    seasons:['PAT','MSC','SS'],shelves:[{c:5,s:3},{c:5,s:4},{c:5,s:5}]},
   {key:'growth',   name:'Growth (overflow)', seasons:[],                shelves:[{c:5,s:6},{c:5,s:7}]},
 ];
 let ZONE_MAP=DEFAULT_ZONE_MAP.map(z=>({...z,shelves:z.shelves.map(s=>({...s}))}));
 let SHELF_CAP={default:null,overrides:{}};
 // Saved zone maps (localStorage/server) may predate newer season codes — make sure
 // they're always present so those pieces can be shelved.
-const ZONE_SEASON_ADDITIONS={sacred:['SPR'],holiday:['WNT'],pop:['JAZ'],concert:['CLA']};
+const ZONE_SEASON_ADDITIONS={sacred:['SPR'],holiday:['WNT'],pop:['JAZ'],concert:['CLA'],patriotic:['SS']};
 function _ensureZoneSeasons(){
   for(const [key,codes] of Object.entries(ZONE_SEASON_ADDITIONS)){
     const z=ZONE_MAP.find(z=>z.key===key);
