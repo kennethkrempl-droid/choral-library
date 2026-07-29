@@ -1347,6 +1347,29 @@ function computeCallNumber(entry){
   const num=String(entry.accession_id).padStart(padLen,'0');
   return `${entry.season}-${vc}-${num}`;
 }
+// ── Filing order ──────────────────────────────────────────────────────────
+// Call numbers file by SECTION first (SEASON_CODES order), then by the NUMBER
+// segment alone. VOICING is deliberately ignored: a 2PT box files right next
+// to an SATB box. Numbers within a section will have gaps (numbering is one
+// global accession sequence) — that is correct, not a bug.
+function callNumParts(cn){
+  const m=String(cn||'').trim().match(/^([A-Za-z]+)-([A-Za-z0-9]+)-(\d+)$/);
+  return m?{sec:m[1].toUpperCase(),num:parseInt(m[3],10)}:null;
+}
+function compareCallNumbers(a,b){
+  const pa=callNumParts(a),pb=callNumParts(b);
+  if(pa&&pb){
+    if(pa.sec!==pb.sec){
+      const ia=SEASON_CODES.findIndex(s=>s.code===pa.sec),ib=SEASON_CODES.findIndex(s=>s.code===pb.sec);
+      if(ia!==ib)return(ia<0?999:ia)-(ib<0?999:ib);
+      return pa.sec<pb.sec?-1:1;   // both unknown codes — alphabetical
+    }
+    return pa.num-pb.num;
+  }
+  if(pa)return -1;                 // parseable call numbers file before junk/blank
+  if(pb)return 1;
+  return String(a||'').localeCompare(String(b||''),undefined,{numeric:true});
+}
 function computeLocationTag(entry){
   if(entry.location_area==='file'&&entry.location_cabinet&&entry.location_shelf)
     return `FC${entry.location_cabinet}-D${entry.location_shelf}`;
@@ -1650,14 +1673,15 @@ function _autoShelfSplit(maxPer){
   return ZONE_MAP.map(z=>z.key==='growth'?growthCount:alloc[gi++]);
 }
 // Shared ordering: genres stay together in the zone's season order (e.g. POP → MT → JAZ),
-// numeric call-number compare inside each genre. computeShelfPlan (the "click a shelf"
-// view) uses the SAME comparator, so what auto-shelve does and what the shelf detail
-// says belongs there can never disagree.
+// NUMBER-only call-number compare inside each genre (voicing ignored — see
+// compareCallNumbers). computeShelfPlan (the "click a shelf" view) uses the SAME
+// comparator, so what auto-shelve does and what the shelf detail says belongs
+// there can never disagree.
 function _zoneOrderCompare(z){
   return (a,b)=>{
     const ga=z.seasons.indexOf(_seasonOf(a)),gb=z.seasons.indexOf(_seasonOf(b));
     if(ga!==gb)return ga-gb;
-    return String(a.call_number||'').localeCompare(String(b.call_number||''),undefined,{numeric:true});
+    return compareCallNumbers(a.call_number,b.call_number);
   };
 }
 // Deterministic, idempotent plan for EVERY call-numbered octavo.
@@ -1685,7 +1709,7 @@ function computeAutoShelvePlan(){
   overflow.sort((a,b)=>{
     const sa=SEASON_CODES.findIndex(s=>s.code===_seasonOf(a)),sb=SEASON_CODES.findIndex(s=>s.code===_seasonOf(b));
     if(sa!==sb)return sa-sb;
-    return String(a.call_number||'').localeCompare(String(b.call_number||''),undefined,{numeric:true});
+    return compareCallNumbers(a.call_number,b.call_number);
   });
   // Growth zone absorbs overflow first
   const growth=ZONE_MAP.find(z=>z.key==='growth');
@@ -4088,7 +4112,7 @@ function printFullPlacement(){
   }
   // Filing-cabinet boxes come from saved locations (auto-shelve writes them there)
   const fileBoxes=data.work.filter(e=>e._type==='octavo'&&e.location_area==='file'&&e.location_cabinet&&e.location_shelf)
-    .sort((a,b)=>(a.location_cabinet-b.location_cabinet)||(a.location_shelf-b.location_shelf)||String(a.call_number||'').localeCompare(String(b.call_number||''),undefined,{numeric:true}));
+    .sort((a,b)=>(a.location_cabinet-b.location_cabinet)||(a.location_shelf-b.location_shelf)||compareCallNumbers(a.call_number,b.call_number));
   const fileGroups={};
   fileBoxes.forEach(e=>{const k=`FC${e.location_cabinet}-D${e.location_shelf}`;(fileGroups[k]=fileGroups[k]||[]).push(e);});
   const total=shelfKeys.reduce((n,x)=>n+plan[x.k].length,0)+fileBoxes.length;
@@ -4595,6 +4619,11 @@ function getSorted(tab,rows){
   return[...rows].sort((a,b)=>{
     let av=a[col],bv=b[col];
     if(col==='copies'){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return (av-bv)*dir;}
+    if(col==='call_number'){
+      const as=String(av||''),bs=String(bv||'');
+      if(as===''&&bs!=='')return 1; if(bs===''&&as!=='')return -1;   // blanks always last
+      return compareCallNumbers(as,bs)*dir;
+    }
     av=String(Array.isArray(av)?av.join(', '):(av||'')).toLowerCase();bv=String(Array.isArray(bv)?bv.join(', '):(bv||'')).toLowerCase();
     if(av===''&&bv!=='')return 1; if(bv===''&&av!=='')return -1;
     if(av<bv)return -dir;if(av>bv)return dir;
@@ -5252,10 +5281,12 @@ async function syncSheets(tab){
     const groupBy=(arr,fn)=>{const m={};arr.forEach(e=>{const k=fn(e);(m[k]=m[k]||[]).push(e);});return m;};
     const octavos=allRows.filter(e=>e._type==='octavo'), books=allRows.filter(e=>e._type==='book');
     const sheets=[{title:'All Music',headers,rows:allRows.map(toRow)}];
+    // Octavo sub-sheets read in filing order: section, then NUMBER (voicing ignored)
+    const byFiling=arr=>[...arr].sort((a,b)=>compareCallNumbers(computeCallNumber(a),computeCallNumber(b)));
     const vGroups=groupBy(octavos,e=>san(e.voicing)||'(none)');
-    Object.keys(vGroups).sort().forEach(v=>sheets.push({title:`Voicing – ${v}`,headers,rows:vGroups[v].map(toRow)}));
+    Object.keys(vGroups).sort().forEach(v=>sheets.push({title:`Voicing – ${v}`,headers,rows:byFiling(vGroups[v]).map(toRow)}));
     const ogGroups=groupBy(octavos,e=>san(e.genre)||'(none)');
-    Object.keys(ogGroups).sort().forEach(g=>sheets.push({title:`Octavos – ${g}`,headers,rows:ogGroups[g].map(toRow)}));
+    Object.keys(ogGroups).sort().forEach(g=>sheets.push({title:`Octavos – ${g}`,headers,rows:byFiling(ogGroups[g]).map(toRow)}));
     const bgGroups=groupBy(books,e=>san(e.genre)||'(none)');
     Object.keys(bgGroups).sort().forEach(g=>sheets.push({title:`Books – ${g}`,headers,rows:bgGroups[g].map(toRow)}));
     // Two calls: each cleans up stale "Work – *" and "Personal – *" sub-sheets respectively
