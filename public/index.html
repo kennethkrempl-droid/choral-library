@@ -1929,6 +1929,16 @@ async function autoShelveAll(opts={}){
     return !(areaNow===a.area&&Number(e.location_cabinet)===a.cab&&Number(e.location_shelf)===a.shelf);
   });
   if(!changes.length){toast('Everything is already shelved where it belongs','success');if(!opts.silent)showAutoShelveSummary(plan,[]);return plan;}
+  // Progress feedback — placing hundreds of boxes takes minutes; without this
+  // the button looks dead while it works.
+  const asBtn=document.getElementById('auto-shelve-btn');
+  const asOrig=asBtn?asBtn.innerHTML:null;
+  const progressPanel=document.getElementById('rebalance-panel');
+  const showProgress=n=>{
+    if(asBtn){asBtn.disabled=true;asBtn.innerHTML=`<span class="spinner"></span> Shelving ${n}/${changes.length}…`;}
+    if(progressPanel&&!opts.silent)progressPanel.innerHTML=`<div class="zone-suggest-box zone-suggest-warn" style="max-width:560px;margin-bottom:16px;"><b>Auto-shelve running…</b> saving new locations for ${changes.length} box${changes.length===1?'':'es'} — ${n} done. Leave this page open; the summary and move list appear when it finishes.</div>`;
+  };
+  showProgress(0);
   let done=0;const moves=[];const boxMoves={};
   const rawTag=x=>x.location_area==='file'&&x.location_cabinet&&x.location_shelf?`FC${x.location_cabinet}-D${x.location_shelf}`:(x.location_cabinet&&x.location_shelf?`C${x.location_cabinet}-S${x.location_shelf}`:'Unassigned');
   for(const a of changes){
@@ -1944,7 +1954,9 @@ async function autoShelveAll(opts={}){
         if(a.inBox){if(!boxMoves[a.inBox])boxMoves[a.inBox]={from,to:rawTag(updated),n:0};boxMoves[a.inBox].n++;}
         else if(!a.withPiece)moves.push({call:a.call||'',title:a.title||'',from,to:rawTag(updated)});}
     }catch{}
+    if(done%5===0)showProgress(done);
   }
+  if(asBtn){asBtn.disabled=false;asBtn.innerHTML=asOrig;}
   for(const[bid,m]of Object.entries(boxMoves)){
     const b=singlesBoxesCached().find(x=>x.id===bid);
     moves.push({call:bid,title:`SINGLE COPIES — ${b?seasonLabel(b.season):''} (${b?b.pieces.length:m.n} titles, one box)`,from:m.from,to:m.to});
@@ -4105,7 +4117,7 @@ function renderZoneView(){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
       <h2 style="margin:0;font-size:18px;font-weight:800;">Shelving Dashboard</h2>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button class="btn-primary btn-sm" onclick="autoShelveAll()" title="Assign every call-numbered box to a shelf automatically; overflow goes to filing cabinets">✦ Auto-shelve all</button>
+        <button class="btn-primary btn-sm" id="auto-shelve-btn" onclick="autoShelveAll()" title="Assign every call-numbered box to a shelf automatically; overflow goes to filing cabinets">✦ Auto-shelve all</button>
         <button class="btn-gold btn-sm" onclick="rebalanceSuggest()" title="Suggest a fair shelf split based on how much music each zone actually holds">⚖ Rebalance shelves</button>
         <label style="font-size:13px;color:var(--muted);">Default shelf capacity:</label>
         <input type="number" id="global-cap-input" value="${SHELF_CAP.default!=null?SHELF_CAP.default:''}" placeholder="not set" min="1" style="width:80px;padding:5px 8px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:13px;background:var(--bg);color:var(--ink);">
