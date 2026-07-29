@@ -516,6 +516,10 @@ header .auth-pill.disconnected, .settings-section .auth-pill.disconnected { colo
 .zone-suggest-ok { background:var(--success-light); border:1px solid var(--success-line); color:var(--success); }
 .zone-suggest-warn { background:var(--warning-light); border:1px solid var(--warning-line); color:var(--warning); }
 .zone-suggest-err { background:var(--danger-light); border:1px solid var(--danger-line); color:var(--danger); }
+/* Single-copy marker: derived from copies=1, never stored in the call number */
+.single-badge { display:inline-block; margin-left:5px; padding:0 5px; border-radius:4px;
+  font-size:10px; font-weight:800; line-height:16px; vertical-align:1px; cursor:help;
+  background:var(--warning-light); color:var(--warning); border:1px solid var(--warning-line); }
 .zone-warn-msg { font-size:12px; color:var(--warning); margin-top:6px; }
 .zone-no-cap-notice { font-size:12px; color:var(--faint); font-style:italic; }
 .zone-editor-table { width:100%; font-size:13px; }
@@ -1386,10 +1390,60 @@ function compareCallNumbers(a,b){
   return String(a||'').localeCompare(String(b||''),undefined,{numeric:true});
 }
 function computeLocationTag(entry){
+  let tag;
   if(entry.location_area==='file'&&entry.location_cabinet&&entry.location_shelf)
-    return `FC${entry.location_cabinet}-D${entry.location_shelf}`;
-  if(!entry.location_cabinet||!entry.location_shelf) return 'Unassigned';
-  return `C${entry.location_cabinet}-S${entry.location_shelf}`;
+    tag=`FC${entry.location_cabinet}-D${entry.location_shelf}`;
+  else if(!entry.location_cabinet||!entry.location_shelf) tag='Unassigned';
+  else tag=`C${entry.location_cabinet}-S${entry.location_shelf}`;
+  // Singles live inside their section's singles box — say which one.
+  if(isSingle(entry)){
+    const b=singlesBoxOf(entry);
+    if(b)return tag==='Unassigned'?b.id:`${tag} · ${b.id}`;
+  }
+  return tag;
+}
+
+// ── Singles boxes (Change 3) ──────────────────────────────────────────────
+// Pieces with exactly ONE copy are consolidated into shared "singles boxes":
+// one or more per section (season code), filed at the END of that section's
+// run on the shelf. Box IDs are S-<SECTION>-<n> (S-SAC-1, S-SAC-2 …) — a shape
+// that can never collide with a piece call number. Pieces keep their call
+// numbers untouched; "single" is DERIVED from copies === 1 and shown as an
+// S badge. Buy a second copy and the piece files back onto the open shelf —
+// nothing physical is ever re-marked.
+//
+// Capacity (octavos per box) and footprint (how many ordinary box slots one
+// singles box occupies on a shelf) are stored in SHELF_CAP, so they sync via
+// the existing shelfCap config plumbing. Footprint is what keeps Rebalance
+// honest: a zone's singles count toward its shelf share at the box's actual
+// size, not one slot per piece.
+function isSingle(e){return e&&e._type==='octavo'&&parseInt(e.copies)===1;}
+function _singlesCapacity(){const v=SHELF_CAP&&parseInt(SHELF_CAP.singlesCapacity);return v>=1?v:100;}
+function _singlesFootprint(){const v=SHELF_CAP&&parseInt(SHELF_CAP.singlesFootprint);return v>=1?v:2;}
+function computeSinglesBoxes(){
+  const cap=_singlesCapacity();
+  const by={};
+  data.work.filter(e=>isSingle(e)&&String(e.call_number||'').trim()&&_seasonOf(e))
+    .forEach(e=>{(by[_seasonOf(e)]=by[_seasonOf(e)]||[]).push(e);});
+  const out=[];
+  for(const season of Object.keys(by)){
+    const list=by[season].sort((a,b)=>compareCallNumbers(a.call_number,b.call_number));
+    for(let i=0;i<list.length;i+=cap){
+      const n=Math.floor(i/cap)+1;
+      out.push({id:`S-${season}-${n}`,season,n,pieces:list.slice(i,i+cap)});
+    }
+  }
+  return out;
+}
+// Short-lived memo — table renders call singlesBoxOf per row.
+let _sbMemo=null,_sbMemoAt=0;
+function singlesBoxesCached(){
+  if(!_sbMemo||Date.now()-_sbMemoAt>1500){_sbMemo=computeSinglesBoxes();_sbMemoAt=Date.now();}
+  return _sbMemo;
+}
+function singlesBoxOf(e){
+  if(!isSingle(e))return null;
+  return singlesBoxesCached().find(b=>b.pieces.some(p=>p._id===e._id))||null;
 }
 
 // ── Generate printable box labels for all Work Octavos ────────────────────
@@ -1558,7 +1612,12 @@ function getShelfCapacity(c,s){
 function getShelfOccupancy(c,s){
   // Open display shelves only — filing-cabinet boxes (location_area==='file') live in a
   // separate numbering space and must not be counted against C{c}-S{s}.
-  return data.work.filter(e=>e._type==='octavo'&&e.location_area!=='file'&&Number(e.location_cabinet)===c&&Number(e.location_shelf)===s).length;
+  // Singles share one physical box, so they count as their box's footprint,
+  // not one slot per piece.
+  const here=data.work.filter(e=>e._type==='octavo'&&e.location_area!=='file'&&Number(e.location_cabinet)===c&&Number(e.location_shelf)===s);
+  const multi=here.filter(e=>!isSingle(e)).length;
+  const boxIds=new Set(here.filter(isSingle).map(e=>{const b=singlesBoxOf(e);return b?b.id:'S-?';}));
+  return multi+boxIds.size*_singlesFootprint();
 }
 function getShelfOpenSlots(c,s){
   const cap=getShelfCapacity(c,s);
@@ -1664,11 +1723,20 @@ function _maxShelvesPerZone(){
   const v=SHELF_CAP&&SHELF_CAP.maxShelvesPerZone;
   return (v!=null&&v>=1)?v:DEFAULT_MAX_SHELVES_PER_ZONE;
 }
+// Shelf load of a zone in SLOT units: multi-copy pieces count 1 each; singles
+// count via their boxes' footprint (compressed in a box, not spread along the
+// shelf) — this is what keeps Rebalance from over-allocating shelves to zones
+// with many singles.
+function _zoneShelfLoad(z){
+  const multi=data.work.filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e))&&!isSingle(e)).length;
+  const boxes=singlesBoxesCached().filter(b=>z.seasons.includes(b.season)).length;
+  return multi+boxes*_singlesFootprint();
+}
 function _autoShelfSplit(maxPer){
   const total=_allShelvesList().length;                 // 35
   maxPer=Math.max(1,Math.min(total,maxPer||DEFAULT_MAX_SHELVES_PER_ZONE));
   const nonGrowth=ZONE_MAP.filter(z=>z.key!=='growth');
-  const counts=nonGrowth.map(z=>data.work.filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e))).length);
+  const counts=nonGrowth.map(_zoneShelfLoad);
   const W=counts.reduce((a,b)=>a+b,0);
   let alloc;
   if(W<=0){ alloc=nonGrowth.map(()=>1); }
@@ -1700,56 +1768,93 @@ function _zoneOrderCompare(z){
     return compareCallNumbers(a.call_number,b.call_number);
   };
 }
+// ── Filing UNITS ────────────────────────────────────────────────────────────
+// A unit is either one multi-copy piece (cost: 1 slot) or one singles box
+// (cost: its footprint in slots). Each season's singles box(es) file at the
+// END of that season's run — "the box sits at the end of its own section".
+function _zoneUnits(z,boxesBySeason){
+  const multi=data.work
+    .filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e))&&!isSingle(e))
+    .sort(_zoneOrderCompare(z));
+  const units=[];
+  for(const season of z.seasons){
+    for(const e of multi)if(_seasonOf(e)===season)units.push({kind:'piece',e});
+    for(const b of (boxesBySeason[season]||[]))units.push({kind:'box',box:b});
+  }
+  return units;
+}
+function _unitCost(u){return u.kind==='box'?_singlesFootprint():1;}
+function _unitSeason(u){return u.kind==='box'?u.box.season:_seasonOf(u.e);}
+// Season order first, pieces before their season's boxes, then number/box order.
+function _unitCompare(a,b){
+  const sa=SEASON_CODES.findIndex(s=>s.code===_unitSeason(a)),sb=SEASON_CODES.findIndex(s=>s.code===_unitSeason(b));
+  if(sa!==sb)return(sa<0?999:sa)-(sb<0?999:sb);
+  const ka=a.kind==='box'?1:0,kb=b.kind==='box'?1:0;
+  if(ka!==kb)return ka-kb;
+  if(ka===1)return a.box.n-b.box.n;
+  return compareCallNumbers(a.e.call_number,b.e.call_number);
+}
 // Deterministic, idempotent plan for EVERY call-numbered octavo.
+// assignments: one per PIECE (singles get their box's location, tagged inBox)
+// boxPlacements: boxId -> {area,cab,shelf} for the shelving map / summaries.
 function computeAutoShelvePlan(){
-  const assignments=[];      // {id, area:'shelf'|'file', cab, shelf, call, title, growth?}
-  const overflow=[];         // pieces that didn't fit their own zone's shelves
+  const assignments=[];      // {id, area:'shelf'|'file', cab, shelf, call, title, growth?, inBox?}
+  const boxPlacements={};
+  const overflow=[];         // units that didn't fit their own zone's shelves
   const byZone={};
+  const boxesBySeason={};
+  computeSinglesBoxes().forEach(b=>{(boxesBySeason[b.season]=boxesBySeason[b.season]||[]).push(b);});
+  let unitsOnShelves=0,unitsInFiling=0;
+  const place=(u,area,cab,shelf,growth)=>{
+    if(u.kind==='piece'){
+      assignments.push({id:u.e._id,area,cab,shelf,call:u.e.call_number,title:u.e.title,...(growth?{growth:true}:{})});
+    }else{
+      boxPlacements[u.box.id]={area,cab,shelf};
+      for(const p of u.box.pieces)
+        assignments.push({id:p._id,area,cab,shelf,call:p.call_number,title:p.title,inBox:u.box.id,...(growth?{growth:true}:{})});
+    }
+  };
   for(const z of ZONE_MAP){
     if(z.key==='growth'||!z.seasons.length)continue;
-    const items=data.work
-      .filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e)))
-      .sort(_zoneOrderCompare(z));
-    byZone[z.key]={name:z.name,total:items.length,onShelf:0,overflow:0,shelves:z.shelves.length};
+    const units=_zoneUnits(z,boxesBySeason);
+    byZone[z.key]={name:z.name,total:units.length,onShelf:0,overflow:0,shelves:z.shelves.length};
     let idx=0;
     for(const sh of z.shelves){
-      const cap=Math.max(1,_shelfCapOf(sh.c,sh.s));
-      for(let k=0;k<cap&&idx<items.length;k++,idx++){
-        assignments.push({id:items[idx]._id,area:'shelf',cab:sh.c,shelf:sh.s,call:items[idx].call_number,title:items[idx].title});
-        byZone[z.key].onShelf++;
+      let left=Math.max(1,_shelfCapOf(sh.c,sh.s));
+      while(idx<units.length&&_unitCost(units[idx])<=left){
+        place(units[idx],'shelf',sh.c,sh.s,false);
+        left-=_unitCost(units[idx]);idx++;unitsOnShelves++;byZone[z.key].onShelf++;
       }
     }
-    for(;idx<items.length;idx++){overflow.push(items[idx]);byZone[z.key].overflow++;}
+    for(;idx<units.length;idx++){overflow.push(units[idx]);byZone[z.key].overflow++;}
   }
-  // Overflow keeps genres together too (season order per SEASON_CODES), numeric inside.
-  overflow.sort((a,b)=>{
-    const sa=SEASON_CODES.findIndex(s=>s.code===_seasonOf(a)),sb=SEASON_CODES.findIndex(s=>s.code===_seasonOf(b));
-    if(sa!==sb)return sa-sb;
-    return compareCallNumbers(a.call_number,b.call_number);
-  });
+  // Overflow keeps sections together (SEASON_CODES order), boxes after their pieces.
+  overflow.sort(_unitCompare);
   // Growth zone absorbs overflow first
   const growth=ZONE_MAP.find(z=>z.key==='growth');
   let oi=0,growthUsed=0;
   if(growth){
     for(const sh of growth.shelves){
-      const cap=Math.max(1,_shelfCapOf(sh.c,sh.s));
-      for(let k=0;k<cap&&oi<overflow.length;k++,oi++){
-        assignments.push({id:overflow[oi]._id,area:'shelf',cab:sh.c,shelf:sh.s,call:overflow[oi].call_number,title:overflow[oi].title,growth:true});
-        growthUsed++;
+      let left=Math.max(1,_shelfCapOf(sh.c,sh.s));
+      while(oi<overflow.length&&_unitCost(overflow[oi])<=left){
+        place(overflow[oi],'shelf',sh.c,sh.s,true);
+        left-=_unitCost(overflow[oi]);oi++;growthUsed++;unitsOnShelves++;
       }
     }
   }
   // Filing cabinets, added on demand
   const drawerCap=Math.max(1,_fileDrawerCap());
   const drawersPer=Math.max(1,FILE_DRAWERS_PER_CABINET);
-  let fcab=1,fdraw=1,inDraw=0,filing=0;
+  let fcab=1,fdraw=1,left=drawerCap;
   for(;oi<overflow.length;oi++){
-    if(inDraw>=drawerCap){inDraw=0;fdraw++;if(fdraw>drawersPer){fdraw=1;fcab++;}}
-    assignments.push({id:overflow[oi]._id,area:'file',cab:fcab,shelf:fdraw,call:overflow[oi].call_number,title:overflow[oi].title});
-    inDraw++;filing++;
+    const cost=Math.min(_unitCost(overflow[oi]),drawerCap);
+    if(cost>left){left=drawerCap;fdraw++;if(fdraw>drawersPer){fdraw=1;fcab++;}}
+    place(overflow[oi],'file',fcab,fdraw,false);
+    left-=cost;unitsInFiling++;
   }
-  return {assignments,onShelves:assignments.filter(a=>a.area==='shelf').length,growthUsed,
-          inFiling:filing,filingCabinets:filing?fcab:0,byZone,drawerCap,drawersPer,total:assignments.length};
+  return {assignments,boxPlacements,onShelves:unitsOnShelves,growthUsed,
+          inFiling:unitsInFiling,filingCabinets:unitsInFiling?fcab:0,byZone,drawerCap,drawersPer,
+          total:unitsOnShelves+unitsInFiling};
 }
 async function autoShelveAll(opts={}){
   if(typeof isAdmin==='undefined'||!isAdmin){toast('Turn on Librarian mode first','error');return;}
@@ -1774,17 +1879,24 @@ async function autoShelveAll(opts={}){
     return !(areaNow===a.area&&Number(e.location_cabinet)===a.cab&&Number(e.location_shelf)===a.shelf);
   });
   if(!changes.length){toast('Everything is already shelved where it belongs','success');if(!opts.silent)showAutoShelveSummary(plan,[]);return plan;}
-  let done=0;const moves=[];
+  let done=0;const moves=[];const boxMoves={};
+  const rawTag=x=>x.location_area==='file'&&x.location_cabinet&&x.location_shelf?`FC${x.location_cabinet}-D${x.location_shelf}`:(x.location_cabinet&&x.location_shelf?`C${x.location_cabinet}-S${x.location_shelf}`:'Unassigned');
   for(const a of changes){
     const e=data.work.find(x=>x._id===a.id);if(!e)continue;
-    const from=computeLocationTag(e);
+    const from=rawTag(e);
     const updated={...e,location_cabinet:a.cab,location_shelf:a.shelf};
     if(a.area==='file')updated.location_area='file';else delete updated.location_area;
     try{
       const r=await fetch(`/api/entries/work/${e._id}`,adminFetchOpts(updated,'PUT'));
       if(r.ok){const j=await r.json();const i=data.work.findIndex(x=>x._id===e._id);if(i>-1)data.work[i]={...data.work[i],...(j.entry||{}),...updated};done++;
-        moves.push({call:a.call||'',title:a.title||'',from,to:computeLocationTag(updated)});}
+        // Singles moving with their box collapse into ONE move-list line per box
+        if(a.inBox){if(!boxMoves[a.inBox])boxMoves[a.inBox]={from,to:rawTag(updated),n:0};boxMoves[a.inBox].n++;}
+        else moves.push({call:a.call||'',title:a.title||'',from,to:rawTag(updated)});}
     }catch{}
+  }
+  for(const[bid,m]of Object.entries(boxMoves)){
+    const b=singlesBoxesCached().find(x=>x.id===bid);
+    moves.push({call:bid,title:`SINGLE COPIES — ${b?seasonLabel(b.season):''} (${b?b.pieces.length:m.n} titles, one box)`,from:m.from,to:m.to});
   }
   if(typeof renderZoneView==='function')renderZoneView();
   if(!opts.silent)showAutoShelveSummary(plan,moves);
@@ -1799,6 +1911,27 @@ async function autoPlaceOne(entry){
   if(entry.location_cabinet&&entry.location_shelf)return null;   // already placed
   if(SHELF_CAP.default==null)return null;                        // need capacities to place
   _initFilingCfg();
+  if(isSingle(entry)){
+    // A single doesn't take its own slot — it files inside its section's
+    // singles box. Put it wherever the plan says that box sits.
+    _sbMemo=null;
+    const b=computeSinglesBoxes().find(x=>x.pieces.some(p=>p._id===entry._id));
+    if(b){
+      const{plan}=computeShelfPlan();
+      for(const k in plan){
+        if(plan[k].some(it=>it.__sbox&&it.id===b.id)){
+          const[c,s]=k.split('-');
+          const updated={...entry,location_cabinet:+c,location_shelf:+s};delete updated.location_area;
+          try{
+            const r=await fetch(`/api/entries/work/${entry._id}`,adminFetchOpts(updated,'PUT'));
+            if(r.ok){const j=await r.json();const i=data.work.findIndex(x=>x._id===entry._id);if(i>-1)data.work[i]={...data.work[i],...(j.entry||{}),...updated};return updated;}
+          }catch{}
+          return null;
+        }
+      }
+      return null;   // box lives in the filing cabinets — leave to Auto-shelve
+    }
+  }
   const slot=findAutoSlotForSeason(entry.season);
   if(!slot)return null;
   const updated={...entry,location_cabinet:slot.location_cabinet,location_shelf:slot.location_shelf};
@@ -3934,11 +4067,136 @@ function renderZoneView(){
     <div class="zone-grid">
       ${stats.map(z=>renderZoneCard(z)).join('')}
     </div>
+    ${renderSinglesBoxesCard()}
     ${renderFilingCabinets()}`;
+}
+// ── Singles boxes card: which songs go in which box ───────────────────────
+function renderSinglesBoxesCard(){
+  _sbMemo=null;
+  const boxes=computeSinglesBoxes();
+  if(!boxes.length)return '';
+  const{plan}=computeShelfPlan();
+  const plannedLoc=id=>{
+    for(const k in plan){if(plan[k].some(it=>it.__sbox&&it.id===id)){const[c,s]=k.split('-');return`C${c}-S${s}`;}}
+    return 'Filing cabinets';
+  };
+  const si=code=>{const i=SEASON_CODES.findIndex(s=>s.code===code);return i<0?999:i;};
+  const totalSingles=boxes.reduce((n,b)=>n+b.pieces.length,0);
+  const inp='padding:5px 8px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:13px;background:var(--bg);color:var(--ink);';
+  const rows=[...boxes].sort((a,b)=>si(a.season)-si(b.season)||a.n-b.n).map(b=>{
+    const m=b.pieces[0]||{};
+    const now=m.location_cabinet&&m.location_shelf?(m.location_area==='file'?`FC${m.location_cabinet}-D${m.location_shelf}`:`C${m.location_cabinet}-S${m.location_shelf}`):'—';
+    return `<tr>
+      <td style="font-family:var(--mono);font-weight:700;white-space:nowrap;">📦 ${esc(b.id)}</td>
+      <td>${esc(seasonLabel(b.season))}</td>
+      <td>${b.pieces.length}</td>
+      <td>${esc(plannedLoc(b.id))}</td>
+      <td class="text-muted">${esc(now)}</td>
+      <td style="text-align:right;"><button class="btn-ghost btn-sm" onclick="printSinglesBoxContents('${escAttr(b.id)}')">${ICO.print} Contents</button></td>
+    </tr>`;
+  }).join('');
+  return `
+  <div class="card" style="margin-top:24px;">
+    <div class="card-header"><h3>Singles boxes</h3><span style="font-size:12px;color:var(--muted);">${totalSingles} single-copy titles in ${boxes.length} box${boxes.length===1?'':'es'} · each box files at the end of its section</span></div>
+    <div class="card-body">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="btn-secondary btn-sm" onclick="generateSinglesBoxLabels()">${ICO.print} Print box labels</button>
+        <button class="btn-secondary btn-sm" onclick="printSinglesBoxContents()">${ICO.print} Print all contents sheets</button>
+        <span style="flex:1;"></span>
+        <label style="font-size:12.5px;color:var(--muted);" title="How many octavos fit one box — a 3&quot; JW Pepper file-finder box holds roughly 80–150. Sections with more singles get a second box.">Capacity/box:</label>
+        <input type="number" id="singles-cap-input" value="${_singlesCapacity()}" min="1" style="width:64px;${inp}">
+        <label style="font-size:12.5px;color:var(--muted);" title="How many ordinary box slots one singles box occupies on the shelf — this is what Rebalance and the fill bars count, so singles don't over-claim shelf space">Footprint (slots):</label>
+        <input type="number" id="singles-fp-input" value="${_singlesFootprint()}" min="1" style="width:56px;${inp}">
+        <button class="btn-primary btn-sm" onclick="saveSinglesCfg()">Set</button>
+      </div>
+      <table style="width:100%;max-width:780px;">
+        <thead><tr><th>Box</th><th>Section</th><th>Titles</th><th>Planned spot</th><th>Now</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+function saveSinglesCfg(){
+  const cap=parseInt(document.getElementById('singles-cap-input').value);
+  const fp=parseInt(document.getElementById('singles-fp-input').value);
+  if(!(cap>=1)||!(fp>=1)){toast('Enter valid numbers (1 or more)','error');return;}
+  SHELF_CAP.singlesCapacity=cap;SHELF_CAP.singlesFootprint=fp;
+  _sbMemo=null;_saveShelfCap();renderZoneView();
+  toast(`Singles boxes: ${cap} octavos/box · footprint ${fp} slot${fp===1?'':'s'}`,'success');
+}
+// Printable contents sheet — one box, or all boxes when no id given.
+function printSinglesBoxContents(boxId){
+  const si=code=>{const i=SEASON_CODES.findIndex(s=>s.code===code);return i<0?999:i;};
+  const boxes=computeSinglesBoxes().filter(b=>!boxId||b.id===boxId).sort((a,b)=>si(a.season)-si(b.season)||a.n-b.n);
+  if(!boxes.length){toast('No singles boxes yet — singles are pieces with exactly 1 copy and a call number','info');return;}
+  const total=boxes.reduce((n,b)=>n+b.pieces.length,0);
+  const sec=b=>`<h2>${esc(b.id)} — SINGLE COPIES · ${esc(seasonLabel(b.season))} <span class="cnt">${b.pieces.length} title${b.pieces.length===1?'':'s'}</span></h2>
+    <table><tbody>${b.pieces.map(e=>`<tr><td><span class="box"></span></td><td class="cn">${esc(e.call_number)}</td><td>${esc(e.title)}</td><td style="color:#6F6858;font-size:12px;">${esc(e.composer||'')}</td><td class="cn">${esc(e.voicing||'')}</td></tr>`).join('')}</tbody></table>`;
+  openPrintDoc(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Singles Box Contents</title><style>
+    body{font-family:Georgia,serif;color:#232019;max-width:660px;margin:32px auto;padding:0 24px;}
+    h1{font-size:20px;margin:0 0 4px;} .sub{color:#6F6858;font-size:12px;margin-bottom:20px;}
+    h2{font-size:15px;margin:22px 0 6px;padding-bottom:3px;border-bottom:1px solid #232019;page-break-after:avoid;}
+    .cnt{font-size:11px;color:#6F6858;font-weight:400;}
+    table{width:100%;border-collapse:collapse;font-size:12.5px;}
+    td{padding:6px;border-bottom:1px solid #E9E5DE;} .cn{font-family:monospace;font-size:11px;white-space:nowrap;}
+    .box{display:inline-block;width:12px;height:12px;border:1.5px solid #232019;border-radius:2px;}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+  <h1>Singles Box Contents</h1><div class="sub">${total} title${total===1?'':'s'} · filed by call number · rev. ${new Date().toLocaleDateString()}</div>
+  ${boxes.map(sec).join('')}
+  <p class="noprint" style="margin-top:20px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print</button></p>
+  </body></html>`);
+}
+// Box labels on the existing 4"×2" sheet layout (2 cols × 5 rows).
+function generateSinglesBoxLabels(){
+  const esc2=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const si=code=>{const i=SEASON_CODES.findIndex(s=>s.code===code);return i<0?999:i;};
+  const boxes=computeSinglesBoxes().sort((a,b)=>si(a.season)-si(b.season)||a.n-b.n);
+  if(!boxes.length){toast('No singles boxes yet — singles are pieces with exactly 1 copy and a call number','info');return;}
+  const rev=new Date().toLocaleDateString();
+  const labelHtml=boxes.map(b=>`
+    <div class="label">
+      <div class="lbl-main">
+        <div class="lbl-call">${esc2(b.id)}</div>
+        <div class="lbl-title">SINGLE COPIES</div>
+        <div class="lbl-composer">${esc2(seasonLabel(b.season))}</div>
+        <div class="lbl-copies">${b.pieces.length} title${b.pieces.length===1?'':'s'} · rev. ${esc2(rev)}</div>
+      </div>
+    </div>`).join('');
+  openPrintDoc(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Singles Box Labels</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:white;}
+@media screen{
+  body{background:#f0f2f5;padding:20px;}
+  .print-bar{background:white;border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;gap:12px;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+  .print-bar button{padding:8px 18px;border:none;border-radius:5px;background:#2e7d32;color:white;font-size:14px;font-weight:bold;cursor:pointer;}
+  .print-bar p{font-size:12px;color:#555;}
+  .labels-grid{background:white;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);}
+  .label{border-color:#bbb;border-radius:4px;}
+}
+/* Avery 5163 / Business Source 26116 — 4"×2", 2 cols × 5 rows */
+@page{size:letter;margin:0;}
+@media print{.print-bar{display:none;}.label{border:none;}}
+.labels-grid{display:grid;grid-template-columns:4in 4in;column-gap:0.25in;row-gap:0;padding:0.5in 0.1875in;width:8.5in;}
+.label{width:4in;height:2in;overflow:hidden;border:1px solid #bbb;padding:0.15in 0.2in;display:flex;}
+.lbl-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.lbl-call{font-size:16pt;font-weight:bold;color:#166534;border-bottom:1px dashed #ccc;padding-bottom:4px;margin-bottom:2px;font-family:monospace;letter-spacing:1px;}
+.lbl-title{font-size:15pt;font-weight:bold;letter-spacing:2px;}
+.lbl-composer{font-size:11pt;color:#333;}
+.lbl-copies{margin-top:auto;font-size:9pt;font-weight:bold;color:#991b1b;text-align:right;}
+</style></head><body>
+<div class="print-bar">
+  <button onclick="window.print()">🖨 Print Labels</button>
+  <p>${boxes.length} singles box label${boxes.length===1?'':'s'} &nbsp;·&nbsp; 2-up layout &nbsp;·&nbsp; Print at 100% scale — do <em>not</em> use "fit to page"</p>
+</div>
+<div class="labels-grid">${labelHtml}</div>
+</body></html>`,'width=950,height=720');
 }
 // ── Shelf rebalancing: suggest → approve → apply + move list ────────────────
 function _zonePieceCounts(){
-  return ZONE_MAP.map(z=>data.work.filter(e=>e._type==='octavo'&&e.season&&z.seasons.includes(e.season)).length);
+  // Slot units, not raw piece counts — singles are compressed into boxes.
+  return ZONE_MAP.map(_zoneShelfLoad);
 }
 function _suggestShelfCounts(){
   const total=_allShelvesList().length;
@@ -3970,7 +4228,7 @@ function rebalanceSuggest(){
     <div class="card-header"><h3>Suggested shelf split</h3><span style="font-size:12px;color:var(--muted);">${total} shelves · based on what each zone actually holds, with room to grow</span></div>
     <div class="card-body">
       <table style="max-width:640px;">
-        <thead><tr><th>Zone</th><th>Pieces</th><th>Now</th><th>Suggested</th></tr></thead>
+        <thead><tr><th>Zone</th><th title="Multi-copy boxes count 1 slot each; singles count at their box's footprint">Shelf load</th><th>Now</th><th>Suggested</th></tr></thead>
         <tbody>
         ${ZONE_MAP.map((z,i)=>`<tr>
           <td style="font-weight:550;">${esc(z.name)}</td>
@@ -4080,36 +4338,46 @@ function _seasonOf(e){
 }
 function seasonLabel(code){const s=SEASON_CODES.find(x=>x.code===code);return s?s.label:code;}
 function computeShelfPlan(){
-  const plan={};           // "c-s" -> ordered pieces that belong there
-  const overflow=[];       // pieces that fit nowhere (even Growth is full)
+  // Same units, costs, and ordering as computeAutoShelvePlan — keep in lockstep,
+  // so this view and Auto-shelve/Apply can never disagree. Items in plan[key]
+  // are either piece entries or singles-box markers {__sbox,id,season,pieces}.
+  const plan={};           // "c-s" -> ordered items that belong there
+  const overflow=[];       // items that fit nowhere on display shelves (→ filing)
+  const boxesBySeason={};
+  computeSinglesBoxes().forEach(b=>{(boxesBySeason[b.season]=boxesBySeason[b.season]||[]).push(b);});
+  const item=u=>u.kind==='piece'?u.e:{__sbox:true,id:u.box.id,season:u.box.season,pieces:u.box.pieces};
   const growth=ZONE_MAP.find(z=>z.key==='growth');
   const growthQueue=[];
   for(const z of ZONE_MAP){
     if((growth&&z.key===growth.key)||!z.seasons.length||!z.shelves.length)continue;
-    const pieces=data.work
-      .filter(e=>e._type==='octavo'&&String(e.call_number||'').trim()&&z.seasons.includes(_seasonOf(e)))
-      .sort(_zoneOrderCompare(z));   // same comparator as computeAutoShelvePlan — keep in lockstep
-    // _shelfCapOf (not getShelfCapacity): same default-15 fallback as the
-    // auto-shelve engine, so this view and Auto-shelve/Apply can never disagree.
-    const caps=z.shelves.map(sh=>Math.max(1,_shelfCapOf(sh.c,sh.s)));
-    let i=0;
-    z.shelves.forEach((sh,si)=>{
-      const take=pieces.slice(i,i+caps[si]);
-      plan[`${sh.c}-${sh.s}`]=take;i+=take.length;
-    });
-    if(i<pieces.length)growthQueue.push(...pieces.slice(i));
+    const units=_zoneUnits(z,boxesBySeason);
+    let idx=0;
+    for(const sh of z.shelves){
+      // _shelfCapOf (not getShelfCapacity): same default-15 fallback as the
+      // auto-shelve engine.
+      let left=Math.max(1,_shelfCapOf(sh.c,sh.s));
+      const take=[];
+      while(idx<units.length&&_unitCost(units[idx])<=left){take.push(item(units[idx]));left-=_unitCost(units[idx]);idx++;}
+      plan[`${sh.c}-${sh.s}`]=take;
+    }
+    for(;idx<units.length;idx++)growthQueue.push(units[idx]);
   }
+  growthQueue.sort(_unitCompare);
   if(growth&&growth.shelves.length){
     let i=0;
     for(const sh of growth.shelves){
-      const cap=Math.max(1,_shelfCapOf(sh.c,sh.s));
-      const take=growthQueue.slice(i,i+cap);
-      plan[`${sh.c}-${sh.s}`]=take;i+=take.length;
+      let left=Math.max(1,_shelfCapOf(sh.c,sh.s));
+      const take=[];
+      while(i<growthQueue.length&&_unitCost(growthQueue[i])<=left){take.push(item(growthQueue[i]));left-=_unitCost(growthQueue[i]);i++;}
+      plan[`${sh.c}-${sh.s}`]=take;
     }
-    if(i<growthQueue.length)overflow.push(...growthQueue.slice(i));
-  }else overflow.push(...growthQueue);
+    for(;i<growthQueue.length;i++)overflow.push(item(growthQueue[i]));
+  }else growthQueue.forEach(u=>overflow.push(item(u)));
   return{plan,overflow};
 }
+// Item helpers shared by the shelf-detail view and the printouts.
+function _itemHasPiece(it,id){return it.__sbox?it.pieces.some(p=>p._id===id):it._id===id;}
+function _itemSeason(it){return it.__sbox?it.season:_seasonOf(it);}
 function showShelfPlan(c,s){
   const{plan,overflow}=computeShelfPlan();
   const zone=ZONE_MAP.find(z=>z.shelves.some(sh=>Number(sh.c)===Number(c)&&Number(sh.s)===Number(s)));
@@ -4119,11 +4387,11 @@ function showShelfPlan(c,s){
   const body=document.getElementById('shelf-plan-body');
   // Boxes physically sitting on this shelf right now (what the fill bar counts).
   const current=data.work.filter(e=>e._type==='octavo'&&e.location_area!=='file'&&Number(e.location_cabinet)===Number(c)&&Number(e.location_shelf)===Number(s));
-  const plannedIds=new Set(pieces.map(e=>e._id));
+  const plannedIds=new Set(pieces.flatMap(it=>it.__sbox?it.pieces.map(p=>p._id):[it._id]));
   const extras=current.filter(e=>!plannedIds.has(e._id));
   const destOf=e=>{
-    for(const k in plan){if(plan[k].some(p=>p._id===e._id)){const[dc,ds]=k.split('-');return`C${dc}-S${ds}`;}}
-    if(overflow.some(p=>p._id===e._id))return'Filing cabinets';
+    for(const k in plan){if(plan[k].some(it=>_itemHasPiece(it,e._id))){const[dc,ds]=k.split('-');return`C${dc}-S${ds}`;}}
+    if(overflow.some(it=>_itemHasPiece(it,e._id)))return'Filing cabinets';
     return null;   // not in the plan at all — usually missing a call number
   };
   const extrasHtml=extras.length?`
@@ -4149,10 +4417,24 @@ function showShelfPlan(c,s){
       :'Nothing is slated for this shelf, and nothing is on it — it’s a free shelf in the current plan.'}</p>${extrasHtml}`;
   }else{
     let lastSeason=null;
-    const rows=pieces.map(e=>{
-      const sn=_seasonOf(e);
+    const rows=pieces.map(it=>{
+      const sn=_itemSeason(it);
       const hdr=sn!==lastSeason?`<tr><td colspan="4" style="padding:12px 6px 3px;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:none;">${esc(seasonLabel(sn))}</td></tr>`:'';
       lastSeason=sn;
+      if(it.__sbox){
+        // The whole box is one shelf unit; "here" if its members are stored here.
+        const m=it.pieces[0]||{};
+        const here=m.location_area!=='file'&&Number(m.location_cabinet)===Number(c)&&Number(m.location_shelf)===Number(s);
+        const placed=m.location_cabinet&&m.location_shelf?(m.location_area==='file'?`FC${m.location_cabinet}-D${m.location_shelf}`:`C${m.location_cabinet}-S${m.location_shelf}`):'';
+        const note=placed?(here?'<span style="color:#16a34a;font-size:11px;white-space:nowrap;">✓ here</span>':`<span style="color:#d97706;font-size:11px;white-space:nowrap;">now ${esc(placed)}</span>`):'';
+        return hdr+`<tr style="background:var(--warning-light,#fef8ec);">
+          <td style="font-family:var(--mono);font-size:11.5px;white-space:nowrap;font-weight:700;">📦 ${esc(it.id)}</td>
+          <td style="font-size:13px;font-weight:600;">SINGLE COPIES — ${esc(seasonLabel(it.season))}</td>
+          <td style="font-size:12px;color:var(--muted);">${it.pieces.length} title${it.pieces.length===1?'':'s'} · <a href="#" onclick="event.preventDefault();printSinglesBoxContents('${escAttr(it.id)}')">contents</a></td>
+          <td style="text-align:right;">${note}</td>
+        </tr>`;
+      }
+      const e=it;
       const here=e.location_area!=='file'&&Number(e.location_cabinet)===Number(c)&&Number(e.location_shelf)===Number(s);
       const placed=e.location_cabinet&&e.location_shelf?computeLocationTag(e):'';
       const note=placed?(here?'<span style="color:#16a34a;font-size:11px;white-space:nowrap;">✓ here</span>':`<span style="color:#d97706;font-size:11px;white-space:nowrap;">now ${esc(placed)}</span>`):'';
@@ -4188,11 +4470,12 @@ function printShelfPlan(c,s){
   <h1>Shelf C${c}-S${s}${zone?' — '+esc(zone.name)+' zone':''}</h1>
   <div class="sub">${pieces.length} boxes · ${new Date().toLocaleDateString()}</div>
   <table><tbody>
-  ${pieces.map(e=>{
-    const sn=_seasonOf(e);
+  ${pieces.map(it=>{
+    const sn=_itemSeason(it);
     const hdr=sn!==lastSeason?`<tr><td colspan="4" class="sec">${esc(seasonLabel(sn))}</td></tr>`:'';
     lastSeason=sn;
-    return hdr+`<tr><td><span class="box"></span></td><td class="cn">${esc(e.call_number)}</td><td>${esc(e.title)}</td><td style="color:#6F6858;font-size:12px;">${esc(e.composer||'')}</td></tr>`;
+    if(it.__sbox)return hdr+`<tr><td><span class="box"></span></td><td class="cn" style="font-weight:700;">${esc(it.id)}</td><td style="font-weight:600;">SINGLE COPIES — ${esc(seasonLabel(it.season))}</td><td style="color:#6F6858;font-size:12px;">${it.pieces.length} title${it.pieces.length===1?'':'s'}</td></tr>`;
+    return hdr+`<tr><td><span class="box"></span></td><td class="cn">${esc(it.call_number)}</td><td>${esc(it.title)}</td><td style="color:#6F6858;font-size:12px;">${esc(it.composer||'')}</td></tr>`;
   }).join('')}
   </tbody></table>
   <p class="noprint" style="margin-top:20px;"><button onclick="print()" style="padding:8px 20px;font-size:14px;">Print</button></p>
@@ -4207,14 +4490,27 @@ function printFullPlacement(){
     const k=`${sh.c}-${sh.s}`;
     if(plan[k]&&plan[k].length)shelfKeys.push({k,c:sh.c,s:sh.s,zone:z.name});
   }
-  // Filing-cabinet boxes come from saved locations (auto-shelve writes them there)
-  const fileBoxes=data.work.filter(e=>e._type==='octavo'&&e.location_area==='file'&&e.location_cabinet&&e.location_shelf)
+  // Filing-cabinet boxes come from saved locations (auto-shelve writes them there).
+  // Singles stored in a drawer collapse into one row for their singles box.
+  const fileEntries=data.work.filter(e=>e._type==='octavo'&&e.location_area==='file'&&e.location_cabinet&&e.location_shelf)
     .sort((a,b)=>(a.location_cabinet-b.location_cabinet)||(a.location_shelf-b.location_shelf)||compareCallNumbers(a.call_number,b.call_number));
   const fileGroups={};
-  fileBoxes.forEach(e=>{const k=`FC${e.location_cabinet}-D${e.location_shelf}`;(fileGroups[k]=fileGroups[k]||[]).push(e);});
-  const total=shelfKeys.reduce((n,x)=>n+plan[x.k].length,0)+fileBoxes.length;
+  fileEntries.forEach(e=>{const k=`FC${e.location_cabinet}-D${e.location_shelf}`;(fileGroups[k]=fileGroups[k]||[]).push(e);});
+  for(const k in fileGroups){
+    const items=[],seen=new Set();
+    for(const e of fileGroups[k]){
+      const b=isSingle(e)?singlesBoxOf(e):null;
+      if(b){
+        if(!seen.has(b.id)){seen.add(b.id);items.push({__sbox:true,id:b.id,season:b.season,pieces:fileGroups[k].filter(x=>isSingle(x)&&(singlesBoxOf(x)||{}).id===b.id)});}
+      }else items.push(e);
+    }
+    fileGroups[k]=items;
+  }
+  const total=shelfKeys.reduce((n,x)=>n+plan[x.k].length,0)+Object.values(fileGroups).reduce((n,g)=>n+g.length,0);
   if(!total){toast('Nothing is placed in the plan yet — run Auto-shelve first','info');return;}
-  const row=e=>`<tr><td><span class="box"></span></td><td class="cn">${esc(e.call_number||'—')}</td><td>${esc(e.title||'')}</td><td style="color:#6F6858;font-size:12px;">${esc(e.composer||'')}</td></tr>`;
+  const row=it=>it.__sbox
+    ?`<tr><td><span class="box"></span></td><td class="cn" style="font-weight:700;">${esc(it.id)}</td><td style="font-weight:600;">SINGLE COPIES — ${esc(seasonLabel(it.season))}</td><td style="color:#6F6858;font-size:12px;">${it.pieces.length} title${it.pieces.length===1?'':'s'}</td></tr>`
+    :`<tr><td><span class="box"></span></td><td class="cn">${esc(it.call_number||'—')}</td><td>${esc(it.title||'')}</td><td style="color:#6F6858;font-size:12px;">${esc(it.composer||'')}</td></tr>`;
   const section=(label,items)=>`<h2>${esc(label)} <span class="cnt">${items.length} box${items.length===1?'':'es'}</span></h2>
     <table><tbody>${items.map(row).join('')}</tbody></table>`;
   openPrintDoc(`<!DOCTYPE html><html><head><title>Full Shelf Placement</title><style>
@@ -5008,6 +5304,7 @@ function _cardHTML(tab,e){
         ${e.voicing?`<span class="mc-chip">${esc(e.voicing)}</span>`:''}
         ${(parseFloat(e.copiesOut)>0)?`<span class="mc-chip mc-chip-unavail" title="${escAttr((e.copiesOut||'')+' copies out'+(e.checkedOutTo?' to '+e.checkedOutTo:''))}">${esc(e.copiesOut)} out</span>`:unavailBadge}
         ${e.call_number?`<span class="mc-callnum">${esc(e.call_number)}</span>`:''}
+        ${isSingle(e)&&e.call_number?`<span class="single-badge" title="Single copy — files in ${escAttr((singlesBoxOf(e)||{}).id||'its section’s singles box')}">S</span>`:''}
       </div>
     </div>
   </div>`;
@@ -5095,7 +5392,7 @@ function renderTable(tab){
         }
         if(c.key==='__avail') return `<td><span class="status-badge ${e.unavailable?'status-declined':'status-avail'}">${e.unavailable?'In Use':'Available'}</span></td>`;
         if(c.key==='__src') return `<td><span class="source-chip source-${e.__src||'work'}">${cap(e.__src||'work')}</span></td>`;
-        if(c.key==='call_number') return `<td>${e.call_number?`<span class="call-number-badge">${esc(e.call_number)}</span>`:e.needs_cataloging?'<span class="needs-cat-badge">Needs Cat.</span>':'<span class="text-muted">—</span>'}</td>`;
+        if(c.key==='call_number') return `<td>${e.call_number?`<span class="call-number-badge">${esc(e.call_number)}</span>${isSingle(e)?`<span class="single-badge" title="Single copy — files in ${escAttr((singlesBoxOf(e)||{}).id||'its section’s singles box')}">S</span>`:''}`:e.needs_cataloging?'<span class="needs-cat-badge">Needs Cat.</span>':'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='__loctag'){const lt=computeLocationTag(e);return `<td><span class="${lt==='Unassigned'?'text-muted':'loc-tag-badge'}">${esc(lt)}</span></td>`;}
         if(c.key==='voicing') return `<td>${e.voicing?`<span class="voicing-chip">${esc(e.voicing)}</span>`:'<span class="text-muted">—</span>'}</td>`;
         if(c.key==='genre') return `<td style="white-space:nowrap">${esc(e.genre||'')||'<span class="text-muted">—</span>'}</td>`;
